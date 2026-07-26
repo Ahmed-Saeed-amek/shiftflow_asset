@@ -1,0 +1,94 @@
+@model ShiftFlow.Web.ViewModels.TeamCreateVm
+@using ShiftFlow.Web.ViewModels
+@{
+    ViewData["Title"] = Loc.T("New Team");
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Team"),Subtitle=Loc.T("Create a reusable group of employees")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger py-2 small">
+                    @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>@e.ErrorMessage</div>
+                    }
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">@Loc.T("Name") <span class="text-danger">*</span></label>
+                    <input asp-for="Name" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">@Loc.T("Arabic Name")</label>
+                    <input asp-for="NameAr" class="form-control" dir="rtl" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">@Loc.T("Description")</label>
+                    <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">@Loc.T("Members")</label>
+                    <div class="position-relative">
+                        <input type="text" id="memberSearch" class="form-control" autocomplete="off" placeholder="@Loc.T("Search by name or email…")" />
+                        <div id="memberResults" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto"></div>
+                    </div>
+                    <div id="memberChips" class="d-flex flex-wrap gap-1 mt-2"></div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary" id="submitBtn"><i class="bi bi-check-lg me-1"></i>@Loc.T("Create Team")</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const chipsEl = document.getElementById('memberChips');
+    const search = document.getElementById('memberSearch');
+    const results = document.getElementById('memberResults');
+    const selected = new Map();
+    let timer = null;
+
+    function renderChips() {
+        chipsEl.innerHTML = '';
+        selected.forEach((label, id) => {
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2';
+            chip.innerHTML = `${label}<input type="hidden" name="MemberUserIds" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem"></button>`;
+            chip.querySelector('button').addEventListener('click', () => { selected.delete(id); renderChips(); });
+            chipsEl.appendChild(chip);
+        });
+    }
+
+    function query() {
+        const q = search.value.trim();
+        fetch(`/api/users/search?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } })
+            .then(r => r.ok ? r.json() : [])
+            .then(list => {
+                const available = list.filter(u => !selected.has(u.id));
+                if (available.length === 0) { results.classList.add('d-none'); results.innerHTML = ''; return; }
+                results.innerHTML = available.map(u =>
+                    `<button type="button" class="list-group-item list-group-item-action py-1" data-id="${u.id}" data-label="${(u.fullName||'').replace(/"/g,'&quot;')}">
+                        <div class="fw-semibold small">${u.fullName||''}</div><div class="text-muted" style="font-size:.72rem">${u.email||''}</div></button>`).join('');
+                results.classList.remove('d-none');
+                results.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {
+                    selected.set(b.dataset.id, b.dataset.label);
+                    renderChips();
+                    search.value = '';
+                    results.classList.add('d-none');
+                }));
+            });
+    }
+    search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(query, 220); });
+    search.addEventListener('focus', query);
+    document.addEventListener('click', e => { if (!results.contains(e.target) && e.target !== search) results.classList.add('d-none'); });
+})();
+</script>
+}

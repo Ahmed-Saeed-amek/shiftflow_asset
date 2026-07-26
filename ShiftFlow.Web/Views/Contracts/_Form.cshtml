@@ -1,0 +1,85 @@
+@model ContractViewModel
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Vendor")</label>
+                    <select asp-for="VendorId" class="form-select">
+                        @foreach (var v in (List<Vendor>)ViewBag.Vendors)
+                        {
+                            <option value="@v.Id">@v.Name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="VendorId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Contract Type")</label>
+                    <select asp-for="ContractType" class="form-select">
+                        @foreach (var t in Contract.ContractTypes)
+                        {
+                            <option value="@t">@Loc.T(t)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Contract Number")</label>
+                    <input asp-for="ContractNumber" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Start Date")</label>
+                    <input asp-for="StartDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("End Date")</label>
+                    <input asp-for="EndDate" type="date" class="form-control" />
+                    <span asp-validation-for="EndDate" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Cost")</label>
+                    <input asp-for="Cost" type="number" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-4" id="pmCadenceWrap" style="display:none">
+                    <label class="form-label small">@Loc.T("Cadence")</label>
+                    <select asp-for="PmCadence" class="form-select">
+                        <option value="">@Loc.T("Select cadence…")</option>
+                        @foreach (var c in Contract.PmCadences)
+                        {
+                            <option value="@c">@Loc.T(c)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="PmCadence" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Linked Assets")</label>
+                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    (function () {
+        var typeSelect = document.getElementById('ContractType');
+        var cadenceWrap = document.getElementById('pmCadenceWrap');
+        var endDateInput = document.getElementById('EndDate');
+        function togglePm() {
+            var isPm = typeSelect.value === 'Preventive Maintenance';
+            cadenceWrap.style.display = isPm ? '' : 'none';
+            endDateInput.required = isPm;
+        }
+        typeSelect.addEventListener('change', togglePm);
+        togglePm();
+    })();
+</script>

@@ -1,0 +1,41 @@
+flowchart TB
+    subgraph Client["Client Layer"]
+        Browser["Web Browser (Razor Views, Bootstrap 5, vanilla JS)"]
+        Mobile["ShiftFlow.Mobile (.NET MAUI)"]
+    end
+
+    subgraph Web["ShiftFlow.Web — ASP.NET Core 8 MVC"]
+        MVC["Controllers (MVC actions + JSON API endpoints)"]
+        Views["Razor Views + Shared Partials\n(_EmployeePicker, _AssetMultiPicker, _StatusBadge...)"]
+        Auth["ASP.NET Core Identity\n+ Custom Permission System\n(PermissionCatalog / PermissionAuthorizationHandler)"]
+        App["Application Services\n(WorkOrderService, ContractService, PermissionService,\nDashboardService, AI tool functions...)"]
+        Loc["Localization Layer\n(Translations.cs, ILanguageService, RTL/LTR)"]
+    end
+
+    subgraph Data["Data Layer"]
+        EF["EF Core 8 (Code-First, Migrations)"]
+        DB[("SQL Server / LocalDB\nShiftFlowAssetsDB")]
+        Files["App_Data/uploads/*\n(Shift report + Work order attachments,\noutside wwwroot)"]
+    end
+
+    subgraph External["External Integrations"]
+        Entra["Microsoft Entra ID (Azure AD)\nExternal Login"]
+        Email["Email Service"]
+        WhatsApp["WhatsApp Service"]
+        AI["AI Assistant (LLM tool-calling)"]
+    end
+
+    Browser --> MVC
+    Mobile --> MVC
+    MVC --> Views
+    MVC --> Auth
+    MVC --> App
+    Views --> Loc
+    Auth --> EF
+    App --> EF
+    App --> Files
+    EF --> DB
+    Auth --> Entra
+    App --> Email
+    App --> WhatsApp
+    App --> AI

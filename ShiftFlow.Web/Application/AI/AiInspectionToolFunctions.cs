@@ -1,0 +1,173 @@
+using Microsoft.EntityFrameworkCore;
+using ShiftFlow.Application.Services;
+using ShiftFlow.Domain.Entities;
+using ShiftFlow.Infrastructure.Data;
+
+namespace ShiftFlow.Application.AI;
+
+public class AiInspectionToolFunctions : IAiInspectionToolFunctions
+{
+    private readonly IInspectionOrderService _orders;
+    private readonly ITeamService _teams;
+    private readonly IDashboardService _dashboard;
+    private readonly IWorkOrderService _workOrders;
+    private readonly ApplicationDbContext _db;
+
+    public AiInspectionToolFunctions(IInspectionOrderService orders, ITeamService teams,
+        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db)
+    {
+        _orders = orders;
+        _teams = teams;
+        _dashboard = dashboard;
+        _workOrders = workOrders;
+        _db = db;
+    }
+
+    private static object OrderSummary(InspectionOrder o) => new
+    {
+        id = o.Id,
+        orderNumber = o.OrderNumber,
+        title = o.Title,
+        status = o.Status,
+        assignedTo = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
+        dueDate = o.DueDate?.ToString("yyyy-MM-dd"),
+        totalAssets = o.InspectionRun?.Items.Count ?? 0,
+        checkedAssets = o.InspectionRun?.Items.Count(i => i.Outcome != "Pending") ?? 0,
+    };
+
+    public async Task<object> GetMyInspectionOrdersAsync(string userId, CancellationToken ct)
+    {
+        var orders = await _orders.GetMyOrdersAsync(userId, includeDone: false);
+        return new { orders = orders.Select(OrderSummary) };
+    }
+
+    public async Task<object> GetInspectionOrderDetailAsync(int orderId, string userId, CancellationToken ct)
+    {
+        var order = await _orders.GetByIdAsync(orderId);
+        if (order == null) return new { error = "not_found", message = "Inspection order not found." };
+
+        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
+        if (order.AssignedToUserId != userId && !isTeamMember)
+        {
+            // Allow managers through — callers without InspectionOrder.Manage never reach this
+            // tool at all (see orchestrator's RequiredPermission on getInspectionOrderDetail).
+        }
+
+        return new
+        {
+            id = order.Id,
+            orderNumber = order.OrderNumber,
+            title = order.Title,
+            description = order.Description,
+            status = order.Status,
+            dueDate = order.DueDate?.ToString("yyyy-MM-dd"),
+            assignedTo = order.AssignedToUser?.FullName ?? (order.AssignedToTeam != null ? $"Team: {order.AssignedToTeam.Name}" : null),
+            items = order.InspectionRun?.Items.Select(i => new
+            {
+                itemId = i.Id,
+                assetTag = i.Asset.AssetTag,
+                assetName = i.Asset.Name,
+                outcome = i.Outcome,
+                notes = i.Notes,
+            }),
+        };
+    }
+
+    public async Task<object> GetDashboardKpisAsync(string userId, CancellationToken ct)
+    {
+        var kpis = await _dashboard.GetKpisAsync(userId);
+        return new
+        {
+            openInspectionOrders = kpis.OpenInspectionOrders,
+            inspectionOrdersOverdue = kpis.InspectionOrdersOverdue,
+            activeTeams = kpis.ActiveTeams,
+            totalEngineers = kpis.TotalEngineers,
+            totalAssets = kpis.TotalAssets,
+            defectiveAssets = kpis.DefectiveAssets,
+            openWorkOrders = kpis.OpenWorkOrders,
+            criticalOpenWorkOrders = kpis.CriticalOpenWorkOrders,
+        };
+    }
+
+    public async Task<object> FindEmployeeAsync(string query, string userId, CancellationToken ct)
+    {
+        var term = query?.Trim() ?? "";
+        var users = await _db.Users.AsNoTracking()
+            .Where(u => u.IsActive && (u.FullName.Contains(term) || (u.Email != null && u.Email.Contains(term))))
+            .OrderBy(u => u.FullName)
+            .Take(10)
+            .Select(u => new { id = u.Id, fullName = u.FullName, email = u.Email })
+            .ToListAsync(ct);
+        return new { results = users };
+    }
+
+    public async Task<object> ListTeamsAsync(string userId, CancellationToken ct)
+    {
+        var teams = await _teams.GetAllAsync();
+        return new { teams = teams.Select(t => new { id = t.Id, name = t.Name, memberCount = t.Members.Count }) };
+    }
+
+    public async Task<object> GetTeamDetailAsync(int teamId, string userId, CancellationToken ct)
+    {
+        var team = await _teams.GetByIdAsync(teamId);
+        if (team == null) return new { error = "not_found", message = "Team not found." };
+        return new
+        {
+            id = team.Id,
+            name = team.Name,
+            isActive = team.IsActive,
+            members = team.Members.Select(m => new { userId = m.UserId, fullName = m.User.FullName }),
+        };
+    }
+
+    public async Task<object> CreateInspectionOrderAsync(string title, string? description, string? assignedToUserId,
+        int? assignedToTeamId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct)
+    {
+        var order = await _orders.CreateAsync(title, description, assignedToUserId, assignedToTeamId, zoneId, assetIds, dueDate, userId);
+        return new { success = true, id = order.Id, orderNumber = order.OrderNumber };
+    }
+
+    public async Task<object> ReportInspectionOutcomeAsync(int itemId, string outcome, string? notes, int? actionTypeId, int? causeId, string userId, CancellationToken ct)
+    {
+        int? workOrderId = null;
+        if (outcome == "Defective")
+        {
+            var item = await _db.InspectionRunAssets.FindAsync([itemId], ct)
+                ?? throw new InvalidOperationException("Inspection item not found.");
+            if (actionTypeId == null || causeId == null)
+                throw new InvalidOperationException("Action Type and Cause are required to report a defect.");
+            var wo = await _workOrders.ReportAsync(new WorkOrder
+            {
+                AssetId = item.AssetId, ActionTypeId = actionTypeId, CauseId = causeId, Notes = notes,
+            }, userId);
+            workOrderId = wo.Id;
+        }
+
+        await _orders.UpdateInspectionItemAsync(itemId, outcome, notes, workOrderId, userId);
+        return new { success = true, outcome, workOrderId };
+    }
+
+    public async Task<object> CancelInspectionOrderAsync(int orderId, string userId, CancellationToken ct)
+    {
+        await _orders.CancelAsync(orderId, userId);
+        return new { success = true };
+    }
+
+    public async Task<object> CreateTeamAsync(string name, string? description, List<string>? memberUserIds, string userId, CancellationToken ct)
+    {
+        var team = await _teams.CreateAsync(name, null, description, memberUserIds ?? [], userId);
+        return new { success = true, id = team.Id, name = team.Name };
+    }
+
+    public async Task<object> AddTeamMemberAsync(int teamId, string memberUserId, string userId, CancellationToken ct)
+    {
+        await _teams.AddMemberAsync(teamId, memberUserId, userId);
+        return new { success = true };
+    }
+
+    public async Task<object> RemoveTeamMemberAsync(int teamId, string memberUserId, string userId, CancellationToken ct)
+    {
+        await _teams.RemoveMemberAsync(teamId, memberUserId, userId);
+        return new { success = true };
+    }
+}

@@ -1,0 +1,80 @@
+@model ReportActionViewModel
+@{
+    var asset = (Asset)ViewBag.Asset;
+    ViewData["Title"] = Loc.T("Report Action");
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Report Action"),Subtitle=$"{asset.AssetTag} — {asset.Name}"})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="AssetId" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Category")</label>
+                    <input type="text" class="form-control" value="@asset.Category?.Name" disabled />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Action Type")</label>
+                    <select id="actionTypeSelect" asp-for="ActionTypeId" class="form-select">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="ActionTypeId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Cause")</label>
+                    <select id="causeSelect" asp-for="CauseId" class="form-select" disabled>
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="CauseId" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Report Action")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Details", "Assets", new { id = asset.Id }))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const actionTypeSel = document.getElementById('actionTypeSelect');
+    const causeSel = document.getElementById('causeSelect');
+    const categoryId = @asset.CategoryId;
+    const selectedActionTypeId = @Html.Raw(Model.ActionTypeId > 0 ? Model.ActionTypeId.ToString() : "null");
+    const selectedCauseId = @Html.Raw(Model.CauseId > 0 ? Model.CauseId.ToString() : "null");
+
+    function fillSelect(sel, items, selectedId) {
+        sel.innerHTML = '<option value="">—</option>';
+        items.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.id; opt.textContent = i.name;
+            if (selectedId && i.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.disabled = items.length === 0;
+    }
+
+    async function loadActionTypes() {
+        const types = await (await fetch(`/AssetActionTypes/ByCategory?categoryId=${categoryId}`)).json();
+        fillSelect(actionTypeSel, types, selectedActionTypeId);
+        if (selectedActionTypeId) await loadCauses(selectedActionTypeId, selectedCauseId);
+    }
+
+    async function loadCauses(actionTypeId, preselectCauseId) {
+        if (!actionTypeId) { fillSelect(causeSel, [], null); return; }
+        const causes = await (await fetch(`/AssetActionTypes/CausesByActionType?actionTypeId=${actionTypeId}`)).json();
+        fillSelect(causeSel, causes, preselectCauseId);
+    }
+
+    actionTypeSel.addEventListener('change', () => loadCauses(actionTypeSel.value ? Number(actionTypeSel.value) : null, null));
+    loadActionTypes();
+})();
+</script>

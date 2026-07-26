@@ -1,0 +1,72 @@
+@model List<WorkOrder>
+@{
+    ViewData["Title"] = Loc.T("My Work Orders");
+    string actionsHtml = "<div class=\"btn-group\"><button type=\"button\" class=\"btn btn-outline-secondary btn-sm active\" id=\"listViewBtn\">" + Loc.T("List View") + "</button><button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" id=\"mapViewBtn\">" + Loc.T("Map View") + "</button></div>";
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("My Work Orders"),ActionsHtml=actionsHtml})" />
+
+<div id="listView">
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Type")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th></tr></thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                    }
+                    @foreach (var w in Model)
+                    {
+                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = w.Id })'">
+                            <td class="small font-monospace">@w.WorkOrderNumber</td>
+                            <td class="small">@w.Asset?.AssetTag</td>
+                            <td>
+                                @if (w.SourceContractId != null)
+                                {
+                                    <span class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle"><i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">@Loc.T("Manual")</span>
+                                }
+                            </td>
+                            <td><partial name="_StatusBadge" model="@w.Priority" /></td>
+                            <td><partial name="_StatusBadge" model="@w.Stage" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="mapView" class="card border-0 shadow-sm d-none">
+    <div id="vendorWorkOrdersMap" style="height:600px;border-radius:2px"></div>
+</div>
+
+<script>
+(function () {
+    const listView = document.getElementById('listView');
+    const mapView = document.getElementById('mapView');
+    const listBtn = document.getElementById('listViewBtn');
+    const mapBtn = document.getElementById('mapViewBtn');
+    let mapInitialized = false;
+
+    listBtn.addEventListener('click', () => {
+        listView.classList.remove('d-none'); mapView.classList.add('d-none');
+        listBtn.classList.add('active'); mapBtn.classList.remove('active');
+    });
+    mapBtn.addEventListener('click', () => {
+        listView.classList.add('d-none'); mapView.classList.remove('d-none');
+        mapBtn.classList.add('active'); listBtn.classList.remove('active');
+        if (!mapInitialized) {
+            mapInitialized = true;
+            initVendorWorkOrderMap('vendorWorkOrdersMap', '@Url.Action("MapData")', '@Url.Action("Details", new { id = "__ID__" })');
+        }
+    });
+})();
+</script>

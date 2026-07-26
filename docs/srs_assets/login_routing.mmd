@@ -1,0 +1,10 @@
+flowchart TD
+    A["User submits credentials<br/>local password or Microsoft Entra ID"] --> B{"Account exists<br/>and IsActive?"}
+    B -- No / Inactive --> C["Error: invalid credentials /<br/>account deactivated"]
+    B -- Yes --> D{"must_change_password<br/>claim present?"}
+    D -- Yes --> E["Redirect to Change Password"]
+    D -- No --> F{"User role = Vendor?"}
+    F -- Yes --> G["Redirect to /VendorPortal<br/>vendor-only sidebar, no<br/>internal ShiftFlow nav"]
+    F -- No --> H{"Holds ShiftAnalytics.View<br/>permission?"}
+    H -- Yes --> I["Manager template:<br/>Overview / Operations /<br/>Administration / AI Assistant"]
+    H -- No --> J["Personal template:<br/>My Home / My Tasks /<br/>Requests / Scheduling / etc."]

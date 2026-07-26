@@ -1,0 +1,178 @@
+@model ShiftFlow.Web.ViewModels.EmployeeProfileViewModel
+@{
+    ViewData["Title"] = Model.FullName + " — " + Loc.T("Profile");
+    var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
+    var roleLabel = string.Join(", ", Model.Roles.Select(r => Loc.LocalizedName(r, roleNameArByName.GetValueOrDefault(r))));
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Employees")
+        </a>
+        <h4 class="fw-bold mb-0">@Model.FullName</h4>
+        @if (Model.IsActive)
+        {
+            <span class="badge bg-success">@Loc.T("Active")</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">@Loc.T("Inactive")</span>
+        }
+    </div>
+    <a href="@Url.Action("UserPermissions", "Rbac", new { userId = Model.Id })"
+       class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-shield-lock me-1"></i>@Loc.T("Permissions")
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <div class="row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Employee #")</div>
+                <div class="fw-semibold">@Model.EmployeeNumber</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Email")</div>
+                <div class="fw-semibold">@Model.Email</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Phone")</div>
+                <div class="fw-semibold">@Model.Phone</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Role")</div>
+                <div class="fw-semibold">@roleLabel</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Department")</div>
+                <div class="fw-semibold">@Model.Department</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Specialization")</div>
+                <div class="fw-semibold">@Model.Specialization</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Created")</div>
+                <div class="fw-semibold">@Loc.TDate(Model.CreatedDate.ToLocalTime().ToString("dd/MM/yyyy"))</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="text-muted small mb-1">@Loc.T("Last Login")</div>
+                <div class="fw-semibold">@(Model.LastLogin.HasValue ? Loc.TDate(Model.LastLogin.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")) : "—")</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h6 class="fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.08em">@Loc.T("Inspection Orders")</h6>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-3">@Model.OrdersAssigned</div>
+            <div class="text-muted small">@Loc.T("Assigned")</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-3 text-success">@Model.OrdersDone</div>
+            <div class="text-muted small">@Loc.T("Done")</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-3 text-secondary">@Model.OrdersOpen</div>
+            <div class="text-muted small">@Loc.T("Open")</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-3" style="color:#38bdf8">@Model.OrdersInProgress</div>
+            <div class="text-muted small">@Loc.T("In Progress")</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fw-bold fs-3 text-danger">@Model.DefectsFound</div>
+            <div class="text-muted small">@Loc.T("Defective")</div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-0 flex-nowrap overflow-x-auto" id="profileTabs" style="-webkit-overflow-scrolling:touch">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOrders">
+        <i class="bi bi-clipboard-check me-1"></i>@Loc.T("Inspection Orders") <span class="badge bg-light text-dark ms-1">@Model.Orders.Count</span>
+    </button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAudit">
+        <i class="bi bi-journal-text me-1"></i>@Loc.T("Audit Log") <span class="badge bg-light text-dark ms-1">@Model.AuditLog.Count</span>
+    </button></li>
+</ul>
+
+<div class="tab-content">
+
+    <div class="tab-pane fade show active" id="tabOrders">
+        <div class="card border-0 shadow-sm border-top-0 rounded-top-0">
+            @if (!Model.Orders.Any())
+            {
+                <div class="card-body text-center text-muted py-5">@Loc.T("No inspection orders assigned yet.")</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>@Loc.T("Order #")</th><th>@Loc.T("Title")</th><th>@Loc.T("Status")</th>
+                                <th>@Loc.T("Checked")</th><th>@Loc.T("Due Date")</th><th>@Loc.T("Assigned Via")</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in Model.Orders)
+                            {
+                                <tr>
+                                    <td class="fw-semibold"><a asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.OrderId">@o.OrderNumber</a></td>
+                                    <td>@o.Title</td>
+                                    <td><partial name="_StatusBadge" model="@o.Status" /></td>
+                                    <td>@o.CheckedAssets/@o.TotalAssets</td>
+                                    <td class="small text-nowrap">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
+                                    <td class="small text-muted">@Loc.T(o.AssignedContext)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="tabAudit">
+        <div class="card border-0 shadow-sm border-top-0 rounded-top-0">
+            @if (!Model.AuditLog.Any())
+            {
+                <div class="card-body text-center text-muted py-5">@Loc.T("No audit entries.")</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>@Loc.T("When")</th><th>@Loc.T("Action")</th><th>@Loc.T("Entity")</th><th>@Loc.T("Details")</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in Model.AuditLog)
+                            {
+                                <tr>
+                                    <td class="small text-nowrap text-muted">@Loc.TDate(e.When.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</td>
+                                    <td><span class="badge bg-light text-dark border">@e.Action</span></td>
+                                    <td class="small text-muted">@e.EntityType</td>
+                                    <td class="small" style="max-width:400px;word-break:break-word">@e.Details</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>

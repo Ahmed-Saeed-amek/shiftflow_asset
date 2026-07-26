@@ -1,0 +1,17 @@
+@*
+    Reusable searchable single-asset picker (typeahead by asset tag / name), hitting the same
+    /Assets/Search endpoint the multi-asset picker uses.
+    Usage:
+      <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
+          Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null, SelectedLabel = assetLabel }' />
+    The hidden input carries the selected asset id under the given Name, so existing
+    form-post contracts (asp-for / name) are unchanged.
+*@
+@model ShiftFlow.Web.ViewModels.AssetSinglePickerModel
+<div class="asset-picker position-relative" data-asset-picker>
+    <input type="hidden" name="@Model.Name" value="@Model.SelectedId" data-ap-value />
+    <input type="text" class="form-control @Model.CssClass" autocomplete="off"
+           placeholder="@(Model.Placeholder ?? Loc.T("Search by asset tag or name…"))"
+           value="@Model.SelectedLabel" data-ap-search />
+    <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-ap-results></div>
+</div>

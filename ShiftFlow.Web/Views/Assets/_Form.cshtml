@@ -1,0 +1,192 @@
+@model AssetViewModel
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Asset Tag")</label>
+                    <input asp-for="AssetTag" class="form-control" />
+                    <span asp-validation-for="AssetTag" class="text-danger small"></span>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small">@Loc.T("Name")</label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                    <input asp-for="NameAr" class="form-control" dir="rtl" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Status")</label>
+                    <select asp-for="Status" class="form-select">
+                        @foreach (var s in Asset.Statuses)
+                        {
+                            <option value="@s">@Loc.T(s)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">@Loc.T("Category")</label>
+                    <select id="categoryParentSelect" class="form-select">
+                        <option value="">—</option>
+                        @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
+                        {
+                            <option value="@c.Id" selected="@(ViewBag.SelectedParentCategoryId as int? == c.Id)">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">@Loc.T("Subcategory")</label>
+                    <select id="categorySubSelect" class="form-select" disabled>
+                        <option value="">@Loc.T("None")</option>
+                    </select>
+                    <input type="hidden" asp-for="CategoryId" id="categoryIdHidden" />
+                    <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Governorate")</label>
+                    <select id="governorateSelect" class="form-select">
+                        <option value="">—</option>
+                        @foreach (var g in (List<Governorate>)ViewBag.Governorates)
+                        {
+                            <option value="@g.Id" selected="@(ViewBag.SelectedGovernorateId as int? == g.Id)">@Loc.LocalizedName(g.Name, g.NameAr)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Area")</label>
+                    <select id="areaSelect" class="form-select" disabled>
+                        <option value="">—</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Block")</label>
+                    <select id="blockSelect" class="form-select" disabled>
+                        <option value="">—</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Zone")</label>
+                    <select asp-for="ZoneId" id="zoneSelect" class="form-select" disabled>
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="ZoneId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Manufacturer")</label>
+                    <input asp-for="Manufacturer" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Model")</label>
+                    <input asp-for="Model" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Serial Number")</label>
+                    <input asp-for="SerialNumber" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("SKU")</label>
+                    <input asp-for="Sku" class="form-control" placeholder="@Loc.T("Manufacturer part/catalog number")" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Purchase Date")</label>
+                    <input asp-for="PurchaseDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Warranty Expiry")</label>
+                    <input asp-for="WarrantyExpiry" type="date" class="form-control" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                    <div class="form-text"><i class="bi bi-info-circle me-1"></i>@Loc.T("Vendor is determined automatically from this asset's linked Contracts — link it to a contract to set its vendor.")</div>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function () {
+    const govSel = document.getElementById('governorateSelect');
+    const areaSel = document.getElementById('areaSelect');
+    const blockSel = document.getElementById('blockSelect');
+    const zoneSel = document.getElementById('zoneSelect');
+    const isArabic = @(Loc.IsRTL ? "true" : "false");
+    const selectedAreaId = @Html.Raw(ViewBag.SelectedAreaId != null ? ViewBag.SelectedAreaId.ToString() : "null");
+    const selectedBlockId = @Html.Raw(ViewBag.SelectedBlockId != null ? ViewBag.SelectedBlockId.ToString() : "null");
+    const selectedZoneId = @Html.Raw(Model.ZoneId > 0 ? Model.ZoneId.ToString() : "null");
+    const noneLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("None")));
+
+    function fillSelect(sel, items, selectedId) {
+        sel.innerHTML = '<option value="">—</option>';
+        items.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.id; opt.textContent = (isArabic && i.nameAr) ? i.nameAr : i.name;
+            if (selectedId && i.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.disabled = items.length === 0;
+    }
+
+    async function loadAreas(governorateId, preselectAreaId) {
+        if (!governorateId) { fillSelect(areaSel, [], null); fillSelect(blockSel, [], null); fillSelect(zoneSel, [], null); return; }
+        const areas = await (await fetch(`/Areas/ByGovernorate?governorateId=${governorateId}`)).json();
+        fillSelect(areaSel, areas, preselectAreaId);
+        if (preselectAreaId) await loadBlocks(preselectAreaId, selectedBlockId);
+        else { fillSelect(blockSel, [], null); fillSelect(zoneSel, [], null); }
+    }
+
+    async function loadBlocks(areaId, preselectBlockId) {
+        if (!areaId) { fillSelect(blockSel, [], null); fillSelect(zoneSel, [], null); return; }
+        const blocks = await (await fetch(`/Blocks/ByArea?areaId=${areaId}`)).json();
+        fillSelect(blockSel, blocks, preselectBlockId);
+        if (preselectBlockId) await loadZones(preselectBlockId, selectedZoneId);
+        else fillSelect(zoneSel, [], null);
+    }
+
+    async function loadZones(blockId, preselectZoneId) {
+        if (!blockId) { fillSelect(zoneSel, [], null); return; }
+        const zones = await (await fetch(`/Zones/ByBlock?blockId=${blockId}`)).json();
+        fillSelect(zoneSel, zones, preselectZoneId);
+    }
+
+    govSel.addEventListener('change', () => loadAreas(govSel.value ? Number(govSel.value) : null, null));
+    areaSel.addEventListener('change', () => loadBlocks(areaSel.value ? Number(areaSel.value) : null, null));
+    blockSel.addEventListener('change', () => loadZones(blockSel.value ? Number(blockSel.value) : null, null));
+
+    if (govSel.value) loadAreas(Number(govSel.value), selectedAreaId);
+
+    // Category → Subcategory (subcategory optional — CategoryId hidden field falls back to the parent when none is chosen)
+    const catParentSel = document.getElementById('categoryParentSelect');
+    const catSubSel = document.getElementById('categorySubSelect');
+    const catIdHidden = document.getElementById('categoryIdHidden');
+    const selectedSubcategoryId = @Html.Raw(ViewBag.SelectedSubcategoryId != null ? ViewBag.SelectedSubcategoryId.ToString() : "null");
+
+    function updateCategoryHidden() {
+        catIdHidden.value = catSubSel.value || catParentSel.value || '';
+    }
+
+    async function loadSubcategories(parentId, preselectSubId) {
+        if (!parentId) { fillSelect(catSubSel, [], null); updateCategoryHidden(); return; }
+        const subs = await (await fetch(`/AssetCategories/ByParent?parentId=${parentId}`)).json();
+        fillSelect(catSubSel, subs, preselectSubId);
+        catSubSel.querySelector('option[value=""]').textContent = noneLabel;
+        updateCategoryHidden();
+    }
+
+    catParentSel.addEventListener('change', async () => { await loadSubcategories(catParentSel.value ? Number(catParentSel.value) : null, null); });
+    catSubSel.addEventListener('change', updateCategoryHidden);
+
+    if (catParentSel.value) loadSubcategories(Number(catParentSel.value), selectedSubcategoryId);
+})();
+</script>

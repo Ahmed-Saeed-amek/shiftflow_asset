@@ -1,0 +1,16 @@
+flowchart TD
+    A["Vendor logs in"] --> B{"Role = Vendor?"}
+    B -- Yes --> C["Redirected straight to /VendorPortal<br/>BuildLandingPath routing"]
+    B -- No --> Z["Normal employee/manager landing"]
+    C --> D["VendorPortal/Index<br/>Work orders where VendorId = my Vendor.Id"]
+    D --> E["Open a work order<br/>VendorPortal/Details"]
+    E --> F{"Ownership check:<br/>WorkOrder.VendorId == my Vendor.Id ?"}
+    F -- No --> G["403 Forbidden"]
+    F -- Yes --> H["View full details:<br/>asset, location, category,<br/>reported action/cause, priority"]
+    H --> I{"Stage = Sent to Vendor?"}
+    I -- No --> J["Read-only status banner"]
+    I -- Yes --> K{"Vendor decision"}
+    K -- Can fix --> L["Submit Fix form:<br/>description, cost, parts,<br/>completion date, file attachments"]
+    K -- Cannot proceed --> M["Submit Block form:<br/>categorized reason + detail"]
+    L --> N["WorkOrderService.VendorFixAsync"]
+    M --> O["WorkOrderService.VendorBlockAsync"]

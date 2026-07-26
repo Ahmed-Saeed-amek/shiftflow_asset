@@ -1,0 +1,12 @@
+<div id="floatingAvatar">
+    <div class="avatar-card">
+        <div class="small fw-semibold text-primary mb-1">@Loc.T("AI Assistant")</div>
+        <div class="small text-muted mb-2">@Loc.T("Ask me anything about the system!")</div>
+        <a asp-controller="AiAssistant" asp-action="Index" class="small fw-semibold text-decoration-none">
+            <i class="bi bi-chat-dots me-1"></i>@Loc.T("Open Chat")
+        </a>
+    </div>
+    <div class="avatar-bubble" onclick="document.getElementById('floatingAvatar').classList.toggle('open')">
+        <i class="bi bi-robot fs-4"></i>
+    </div>
+</div>

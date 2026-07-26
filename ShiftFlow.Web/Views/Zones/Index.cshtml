@@ -1,0 +1,85 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<Zone>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Asset Locations");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
+    string actionsHtml = "<div class=\"btn-group me-2\"><button type=\"button\" class=\"btn btn-outline-secondary btn-sm active\" id=\"listViewBtn\">" + Loc.T("List View") + "</button><button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" id=\"mapViewBtn\">" + Loc.T("Map View") + "</button></div>";
+    if (canManage)
+        actionsHtml += "<a href='" + Url.Action("Index", "Areas") + "' class='btn btn-outline-secondary btn-sm me-2'>" + Loc.T("Area") + "</a>"
+                     + "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Zone") + "</a>";
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Locations"),ActionsHtml=actionsHtml})" />
+
+<div id="listView">
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead><tr><th>@Loc.T("Governorate")</th><th>@Loc.T("Area")</th><th>@Loc.T("Block")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th><th></th></tr></thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                    }
+                    @foreach (var z in Model)
+                    {
+                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
+                            <td class="small text-muted">@(z.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null)</td>
+                            <td class="small">@(z.Block?.Area is { } area ? Loc.LocalizedName(area.Name, area.NameAr) : null)</td>
+                            <td class="small">@z.Block?.Number</td>
+                            <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
+                            <td>
+                                @if (z.Latitude.HasValue)
+                                {
+                                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-geo-alt"></i></span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">@Loc.T("No coordinates set")</span>
+                                }
+                            </td>
+                            <td>@z.Assets.Count</td>
+                            <td onclick="event.stopPropagation()">
+                                @if (canManage)
+                                {
+                                    <a asp-action="Edit" asp-route-id="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="mapView" class="card border-0 shadow-sm d-none">
+    <div id="zonesOverviewMap" style="height:600px;border-radius:2px"></div>
+</div>
+
+<script>
+(function () {
+    const listView = document.getElementById('listView');
+    const mapView = document.getElementById('mapView');
+    const listBtn = document.getElementById('listViewBtn');
+    const mapBtn = document.getElementById('mapViewBtn');
+    let mapInitialized = false;
+
+    listBtn.addEventListener('click', () => {
+        listView.classList.remove('d-none'); mapView.classList.add('d-none');
+        listBtn.classList.add('active'); mapBtn.classList.remove('active');
+    });
+    mapBtn.addEventListener('click', () => {
+        listView.classList.add('d-none'); mapView.classList.remove('d-none');
+        mapBtn.classList.add('active'); listBtn.classList.remove('active');
+        if (!mapInitialized) {
+            mapInitialized = true;
+            initZoneOverviewMap('zonesOverviewMap', '@Url.Action("MapData")', '@Url.Action("Details", new { id = "__ID__" })');
+        }
+    });
+})();
+</script>

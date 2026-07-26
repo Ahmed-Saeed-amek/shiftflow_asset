@@ -1,0 +1,21 @@
+flowchart TD
+    A[Request hits a policy-gated\naction: Authorize Policy = X] --> B[PermissionAuthorizationHandler]
+    B --> C[PermissionService.HasPermissionAsync\nuserId, permission]
+    C --> D{Cached in\nIMemoryCache?\n5 min sliding}
+    D -- Yes --> N[Return cached set]
+    D -- No --> E[ComputeEffectivePermissionsAsync]
+    E --> F[Load UserPermissions\noverrides for this user]
+    F --> G[Load roles for user\n+ RolePermissions for those roles]
+    G --> H{Any Deny override\nfor this permission?}
+    H -- Yes --> I[Excluded regardless\nof role grants]
+    H -- No --> J{Allow override OR\nrole grants it?}
+    J -- Yes --> K[Granted]
+    J -- No --> L[Not granted]
+    K --> M{Holds\nSystem.IsAdmin?}
+    M -- Yes --> O[Every permission in\nthe catalog is granted]
+    M -- No --> N2[Effective set = explicit grants]
+    N --> P{Permission in\neffective set?}
+    N2 --> P
+    O --> P
+    P -- Yes --> Q[200 — action proceeds]
+    P -- No --> R[403 Forbidden /\nAccessDenied view]

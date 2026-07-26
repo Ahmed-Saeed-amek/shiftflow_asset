@@ -1,0 +1,70 @@
+@model List<ShiftFlow.Domain.Entities.InspectionOrder>
+@using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Web.Authorization
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Inspection Orders");
+    var status = (string?)ViewBag.Status;
+    var search = (string?)ViewBag.Search;
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
+    var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderExport)).Succeeded;
+    string actionsHtml = "";
+    if (canManage) actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm me-2'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
+    if (canExport) actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Export") + "</a>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Inspection Orders"),Subtitle=Loc.T("Assign inspections to employees or teams"),ActionsHtml=actionsHtml})" />
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <div class="btn-group btn-group-sm" role="group">
+        <a class="btn @(status == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index">@Loc.T("All")</a>
+        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Open">@Loc.T("Open")</a>
+        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Done">@Loc.T("Done")</a>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        <input type="hidden" name="status" value="@status" />
+        <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order # or title...")" style="min-width:220px" />
+        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
+    </form>
+</div>
+
+<div class="card border-0 shadow-sm">
+    @if (Model.Count == 0)
+    {
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-clipboard-check fs-1 d-block mb-2 opacity-25"></i>
+            @Loc.T("No inspection orders found.")
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>@Loc.T("Order #")</th><th>@Loc.T("Title")</th><th>@Loc.T("Assigned To")</th>
+                        <th>@Loc.T("Status")</th><th>@Loc.T("Checked")</th><th>@Loc.T("Due Date")</th><th>@Loc.T("Created")</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model)
+                    {
+                        var items = o.InspectionRun?.Items ?? new List<ShiftFlow.Domain.Entities.InspectionRunAsset>();
+                        <tr>
+                            <td class="fw-semibold">@o.OrderNumber</td>
+                            <td>@o.Title</td>
+                            <td>@(o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? Loc.T("Team") + ": " + o.AssignedToTeam.Name : "—"))</td>
+                            <td><partial name="_StatusBadge" model="@o.Status" /></td>
+                            <td>@items.Count(i => i.Outcome != "Pending")/@items.Count</td>
+                            <td>@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>
+                            <td>@o.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Open")</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

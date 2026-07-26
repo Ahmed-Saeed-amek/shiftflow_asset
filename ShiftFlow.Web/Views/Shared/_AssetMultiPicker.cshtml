@@ -1,0 +1,119 @@
+@model AssetMultiPickerModel
+@{
+    var containerId = $"picker-{Model.Name}";
+}
+<div id="@containerId" class="position-relative">
+    @if (Model.Categories != null)
+    {
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 bg-light rounded">
+            <div>
+                <label class="form-label small mb-1">@Loc.T("Category")</label>
+                <select class="form-select form-select-sm" data-category-select style="min-width:160px">
+                    <option value="">@Loc.T("Category")</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </select>
+            </div>
+            <div data-subcategory-wrap class="d-none">
+                <label class="form-label small mb-1">@Loc.T("Subcategory")</label>
+                <select class="form-select form-select-sm" data-subcategory-select style="min-width:160px">
+                    <option value="">@Loc.T("All")</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-add-by-category disabled>@Loc.T("Add All")</button>
+        </div>
+    }
+    <div class="d-flex flex-wrap gap-1 mb-2" data-chips>
+        @foreach (var chip in Model.Selected)
+        {
+            <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2" data-chip data-id="@chip.Id">
+                @chip.Label
+                <input type="hidden" name="@Model.Name" value="@chip.Id" />
+                <button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>
+            </span>
+        }
+    </div>
+    <input type="text" class="form-control" autocomplete="off" placeholder="@(Model.Placeholder ?? Loc.T("Search"))" data-search />
+    <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-results></div>
+</div>
+
+<script>
+(function () {
+    const root = document.getElementById('@containerId');
+    const chipsEl = root.querySelector('[data-chips]');
+    const searchEl = root.querySelector('[data-search]');
+    const resultsEl = root.querySelector('[data-results]');
+    const inputName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Name));
+    let debounceTimer = null;
+
+    function selectedIds() {
+        return Array.from(chipsEl.querySelectorAll('[data-chip]')).map(c => Number(c.dataset.id));
+    }
+
+    function addChip(id, label) {
+        if (selectedIds().includes(id)) return;
+        const chip = document.createElement('span');
+        chip.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2';
+        chip.setAttribute('data-chip', ''); chip.dataset.id = id;
+        chip.innerHTML = `${label}<input type="hidden" name="${inputName}" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>`;
+        chip.querySelector('[data-remove]').addEventListener('click', () => chip.remove());
+        chipsEl.appendChild(chip);
+    }
+
+    chipsEl.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => btn.closest('[data-chip]').remove()));
+
+    async function search(term) {
+        const res = await fetch(`/Assets/Search?q=${encodeURIComponent(term)}`);
+        const items = await res.json();
+        resultsEl.innerHTML = '';
+        const available = items.filter(i => !selectedIds().includes(i.id));
+        if (available.length === 0) { resultsEl.classList.add('d-none'); return; }
+        available.forEach(i => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action small';
+            item.textContent = `${i.assetTag} — ${i.name}`;
+            item.addEventListener('click', () => {
+                addChip(i.id, `${i.assetTag} — ${i.name}`);
+                searchEl.value = '';
+                resultsEl.classList.add('d-none');
+                searchEl.focus();
+            });
+            resultsEl.appendChild(item);
+        });
+        resultsEl.classList.remove('d-none');
+    }
+
+    searchEl.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => search(searchEl.value.trim()), 220);
+    });
+    searchEl.addEventListener('focus', () => search(searchEl.value.trim()));
+    document.addEventListener('click', e => { if (!root.contains(e.target)) resultsEl.classList.add('d-none'); });
+
+    // "Add all assets in category" — bulk-adds the current snapshot of a category's (or
+    // subcategory's) assets as normal removable chips; addChip's dedup skips ones already added.
+    const catSel = root.querySelector('[data-category-select]');
+    const subSel = root.querySelector('[data-subcategory-select]');
+    const subWrap = root.querySelector('[data-subcategory-wrap]');
+    const addByCategoryBtn = root.querySelector('[data-add-by-category]');
+    if (catSel) {
+        catSel.addEventListener('change', async () => {
+            subSel.innerHTML = `<option value="">${@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("All")))}</option>`;
+            if (!catSel.value) { subWrap.classList.add('d-none'); addByCategoryBtn.disabled = true; return; }
+            const subs = await (await fetch(`/AssetCategories/ByParent?parentId=${catSel.value}`)).json();
+            subs.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; subSel.appendChild(opt); });
+            subWrap.classList.toggle('d-none', subs.length === 0);
+            addByCategoryBtn.disabled = false;
+        });
+        addByCategoryBtn.addEventListener('click', async () => {
+            const categoryId = (subSel.value) ? subSel.value : catSel.value;
+            if (!categoryId) return;
+            const items = await (await fetch(`/Assets/ByCategory?categoryId=${categoryId}`)).json();
+            items.forEach(i => addChip(i.id, `${i.assetTag} — ${i.name}`));
+        });
+    }
+})();
+</script>

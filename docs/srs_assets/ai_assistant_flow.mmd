@@ -1,0 +1,21 @@
+flowchart TD
+    A["User asks the AI Assistant\na question (text or voice)"] --> B["Orchestrator builds system prompt\n(role-scoped instructions,\nprompt-injection guardrail,\ntoday's date, language)"]
+    B --> C["Chat completion call\n(OpenAI or Azure OpenAI)\nwith 27 registered tools"]
+    C --> D{"Model requests\na tool call?"}
+    D -- No --> E["Return final answer text\n(+ optional TTS voice)"]
+    D -- Yes --> F{"Tool name registered?"}
+    F -- No --> G["Return forbidden error\nto the model, keep conversation alive"]
+    F -- Yes --> H{"Caller holds the tool's\nRequiredPermission?\n(null = self-scoped only)"}
+    H -- No --> I["Return {error: forbidden}\nto the model"]
+    H -- Yes --> J["Execute domain service call"]
+    J --> K{"InvalidOperationException?\n(bad id, wrong status, etc.)"}
+    K -- Yes --> L["Return {error: action_failed, message}\nto the model"]
+    K -- No --> M["Return tool result data to the model"]
+    M --> N{"Tool marked IsWrite?"}
+    N -- Yes --> O["Audit log: 'AI:{functionName}'\n(in addition to the domain\nservice's own audit entry)"]
+    N -- No --> P["Loop back to model\n(max 6 iterations)"]
+    O --> P
+    G --> P
+    I --> P
+    L --> P
+    P --> C

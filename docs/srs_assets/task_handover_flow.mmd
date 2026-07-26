@@ -1,0 +1,15 @@
+flowchart TD
+    A["Manager clicks Close Shift"] --> B["Enter closing summary +\nequipment status + attachments"]
+    B --> C["ShiftOperationsService.CloseShiftAsync"]
+    C --> D["Compute AttendeeCount / AbsentCount\nfrom the roster"]
+    D --> E["Create ShiftReport"]
+    E --> F{"Any ShiftTask with\nStatus NOT IN (Done, HandedOver)?"}
+    F -- No --> K["DailyGroupShift.Status = Closed"]
+    F -- Yes --> G["Resolve target shift:\nexplicit targetShiftId OR\nthe group's next non-Closed future shift"]
+    G --> H{"Target shift found?"}
+    H -- No --> I["Block the close —\nthrow: no shift to hand over to"]
+    H -- Yes --> J["Create a NEW ShiftTask on the target shift\n(copies Title/Description/IsMandatoryForHandover,\nsets RolledOverFromTaskId back to original)"]
+    J --> L["Original task → Status = HandedOver\n+ ShiftTaskCompletion audit row"]
+    L --> K
+    K --> M["ClosedAt = UtcNow"]
+    M --> N["Save attachments via\nReportAttachmentStorage\n(outside wwwroot, validated)"]

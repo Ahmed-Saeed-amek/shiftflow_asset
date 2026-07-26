@@ -1,0 +1,207 @@
+@using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Web.Authorization
+@inject IAuthorizationService AuthZ
+@{
+    var isRTL = Loc.IsRTL;
+    var currentPath = Context.Request.Path + Context.Request.QueryString;
+    var canUseAi = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AiAssistantUse)).Succeeded;
+    var canViewInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
+    var canManageInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
+    var canReportInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderReport)).Succeeded;
+    var canViewTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamView)).Succeeded;
+    var canManageTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
+    var canViewAssets = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetView)).Succeeded;
+    var canViewVendors = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
+    var canViewWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderView)).Succeeded;
+    var canManageWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+    var canViewContracts = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractView)).Succeeded;
+    var canReportAssetAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
+    var canManageAssetScope = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetScopeManage)).Succeeded;
+    var canViewUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
+    var canViewAuditLogs = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AuditLogView)).Succeeded;
+    var canManageRbac = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
+}
+<!DOCTYPE html>
+<html lang="@Loc.Lang" dir="@(isRTL ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>@ViewData["Title"] - ShiftFlow</title>
+    <link rel="icon" type="image/png" href="~/images/favicon.png" asp-append-version="true" />
+    @if (isRTL)
+    {
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" />
+    }
+    else
+    {
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    }
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script>
+        // Applied before the sidebar renders so the desktop collapsed
+        // preference (persisted in localStorage, see site.js) takes effect
+        // on the very first paint instead of flashing expanded-then-collapsed.
+        if (localStorage.getItem('sidebarCollapsed') === '1') {
+            document.documentElement.classList.add('sidebar-collapsed-pref');
+        }
+    </script>
+</head>
+<body>
+<div class="d-flex" id="wrapper">
+    <nav id="sidebar" class="p-3 d-flex flex-column">
+        <div class="d-flex align-items-center justify-content-center mb-4 pb-3 border-bottom border-secondary">
+            <img src="~/images/logo.png" asp-append-version="true" alt="Ministry of Electricity, Water and Renewable Energy" style="width:180px;object-fit:contain" />
+        </div>
+
+        <ul class="nav flex-column gap-1 flex-grow-1 sidebar-nav-scroll">
+
+        @if (User.IsInRole("Vendor"))
+        {
+            <li class="nav-section-label">@Loc.T("Vendor Portal")</li>
+            <li><a class="nav-link" asp-controller="VendorPortal" asp-action="Index"><i class="bi bi-tools me-2"></i>@Loc.T("My Work Orders")</a></li>
+        }
+        else
+        {
+            <li class="nav-section-label">@Loc.T("My Work")</li>
+            <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
+            <li><a class="nav-link" asp-controller="Users" asp-action="MyTasks"><i class="bi bi-check2-square me-2"></i>@Loc.T("My Tasks")</a></li>
+            <li><a class="nav-link" asp-controller="Users" asp-action="MyMetrics"><i class="bi bi-graph-up-arrow me-2"></i>@Loc.T("My Metrics")</a></li>
+
+            @if (canManageInspectionOrders)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Overview")</li>
+                <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>@Loc.T("Executive Dashboard")</a></li>
+            }
+
+            @if (canViewInspectionOrders || canManageInspectionOrders || canReportInspectionOrders)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Inspection Orders")</li>
+                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="MyOrders"><i class="bi bi-clipboard-check me-2"></i>@Loc.T("My Orders")</a></li>
+                @if (canManageInspectionOrders)
+                {
+                    <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
+                    <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Create"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Order")</a></li>
+                }
+            }
+
+            @if (canViewTeams)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Teams")</li>
+                <li><a class="nav-link" asp-controller="Teams" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Teams")</a></li>
+            }
+
+            @if (canViewAssets || canViewWorkOrders || canViewVendors || canViewContracts)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Asset Management")</li>
+                if (canViewAssets)
+                {
+                    <li><a class="nav-link" asp-controller="Assets" asp-action="Index"><i class="bi bi-box-seam me-2"></i>@Loc.T("Assets")</a></li>
+                    <li><a class="nav-link" asp-controller="AssetCategories" asp-action="Index"><i class="bi bi-diagram-2 me-2"></i>@Loc.T("Asset Categories")</a></li>
+                    <li><a class="nav-link" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Asset Locations")</a></li>
+                }
+                if (canViewWorkOrders)
+                {
+                    <li><a class="nav-link" asp-controller="WorkOrders" asp-action="Index"><i class="bi bi-tools me-2"></i>@Loc.T("Work Orders")</a></li>
+                }
+                if (canManageWorkOrders)
+                {
+                    <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
+                }
+                if (canViewVendors)
+                {
+                    <li><a class="nav-link" asp-controller="Vendors" asp-action="Index"><i class="bi bi-building-gear me-2"></i>@Loc.T("Vendors")</a></li>
+                }
+                if (canViewContracts)
+                {
+                    <li><a class="nav-link" asp-controller="Contracts" asp-action="Index"><i class="bi bi-file-earmark-text me-2"></i>@Loc.T("Contracts")</a></li>
+                }
+                if (canManageAssetScope)
+                {
+                    <li><a class="nav-link" asp-controller="UserAssetScopes" asp-action="Index"><i class="bi bi-person-lock me-2"></i>@Loc.T("Asset Visibility")</a></li>
+                }
+            }
+
+            @if (canViewUsers || canManageRbac || canViewAuditLogs)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Administration")</li>
+                @if (canViewUsers)
+                {
+                    <li><a class="nav-link" asp-controller="Users" asp-action="Index"><i class="bi bi-person-badge me-2"></i>@Loc.T("Users")</a></li>
+                }
+                @if (canManageRbac)
+                {
+                    <li><a class="nav-link" asp-controller="Rbac" asp-action="Index"><i class="bi bi-shield-lock me-2"></i>@Loc.T("Permissions")</a></li>
+                }
+                @if (canViewAuditLogs)
+                {
+                    <li><a class="nav-link" asp-controller="AuditLogs" asp-action="Index"><i class="bi bi-journal-text me-2"></i>@Loc.T("Audit Logs")</a></li>
+                }
+            }
+
+            @if (canUseAi)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("AI Assistant")</li>
+                <li><a class="nav-link" asp-controller="AiAssistant" asp-action="Index"><i class="bi bi-robot me-2"></i>@Loc.T("AI Assistant")</a></li>
+            }
+        }
+        </ul>
+
+        <div class="border-top border-secondary pt-3 mt-3">
+            <div class="small text-white-50 mb-2">
+                <i class="bi bi-person-circle me-1"></i>@User.Identity?.Name
+            </div>
+            <form asp-controller="Language" asp-action="SetLanguage" method="post" class="mb-2">
+                <input type="hidden" name="returnUrl" value="@currentPath" />
+                <input type="hidden" name="lang" value="@(isRTL ? "en" : "ar")" />
+                <button type="submit" class="btn btn-sm btn-outline-light w-100">
+                    <i class="bi bi-translate me-1"></i>@(isRTL ? "English" : "عربي")
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="Logout" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+                    <i class="bi bi-box-arrow-right me-1"></i>@Loc.T("Logout")
+                </button>
+            </form>
+        </div>
+    </nav>
+    <div id="sidebarBackdrop"></div>
+
+    <div class="flex-grow-1 d-flex flex-column">
+        <nav class="navbar bg-white border-bottom px-3 px-md-4 py-2 shadow-sm flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary me-3" id="sidebarToggle"><i class="bi bi-list fs-5"></i></button>
+            <span class="fw-semibold text-primary">@ViewData["Title"]</span>
+            <div class="ms-auto d-flex align-items-center gap-2 gap-md-3">
+                @if (TempData["Success"] != null)
+                {
+                    <span class="badge bg-success py-2 px-3">@Loc.T((TempData["Success"] ?? "").ToString()!)</span>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <span class="badge bg-danger py-2 px-3">@Loc.T((TempData["Error"] ?? "").ToString()!)</span>
+                }
+                <span class="text-muted small d-none d-sm-inline">@Loc.TDate(DateTime.Now.ToString("dd/MM/yyyy"))</span>
+            </div>
+        </nav>
+        <main class="flex-grow-1 p-3 p-md-4" style="background:hsl(var(--background))">
+            @RenderBody()
+        </main>
+        <footer class="bg-white border-top text-center text-muted small py-2">ShiftFlow &copy; @DateTime.Now.Year</footer>
+    </div>
+</div>
+
+@if (canUseAi)
+{
+    <partial name="_FloatingAvatar" />
+}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+<script>
+    document.querySelectorAll('#sidebar .nav-link').forEach(l => { if (l.href === window.location.href) l.classList.add('active'); });
+</script>
+</body>
+</html>

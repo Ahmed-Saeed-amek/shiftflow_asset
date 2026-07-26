@@ -1,0 +1,163 @@
+@model IReadOnlyList<ShiftFlow.Domain.Entities.Permission>
+@{
+    var user = (ShiftFlow.Domain.Entities.ApplicationUser)ViewBag.User;
+    var userRoles = (IList<string>)ViewBag.UserRoles;
+    var roleGrants = (Dictionary<string, HashSet<string>>)ViewBag.RoleGrants;
+    var roleNameArByName = (Dictionary<string, string?>)ViewBag.RoleNameArByName;
+    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+    var allowOverrides = (HashSet<string>)ViewBag.AllowOverrides;
+    var denyOverrides = (HashSet<string>)ViewBag.DenyOverrides;
+    ViewData["Title"] = $"{Loc.T("Permissions")} — {user.FullName}";
+
+    // All permissions this user inherits via any role
+    var inheritedPerms = roleGrants.Values.SelectMany(s => s).ToHashSet();
+
+    var groups = Model.GroupBy(p => p.Category).OrderBy(g => g.Key);
+}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a href="@Url.Action("Index","Rbac")" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
+    </a>
+    <div>
+        <h4 class="mb-0 fw-bold">
+            <i class="bi bi-person-lock text-success me-2"></i>@user.FullName
+            <span class="text-muted fw-normal fs-6 ms-1">— @Loc.T("Permission Overrides")</span>
+        </h4>
+        <small class="text-muted">
+            @Loc.T("Roles"): @string.Join(", ", userRoles.Select(r => $"<span class='badge bg-info-subtle text-info border border-info-subtle'>{RoleLabel(r)}</span>"))
+        </small>
+    </div>
+</div>
+
+@if (TempData["Success"] is string msg)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle me-2"></i>@msg
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Legend -->
+<div class="d-flex flex-wrap gap-3 mb-4 p-3 bg-light rounded">
+    <span class="small"><span class="badge bg-success-subtle text-success border border-success-subtle px-2">@Loc.T("Allow")</span> — @Loc.T("Extra permission granted to this user only")</span>
+    <span class="small"><span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">@Loc.T("Deny")</span> — @Loc.T("Blocks permission even if the role grants it")</span>
+    <span class="small"><span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2">@Loc.T("Inherited")</span> — @Loc.T("Granted via role (no override needed)")</span>
+    <span class="small"><span class="badge bg-light text-muted border px-2">@Loc.T("None")</span> — @Loc.T("Not granted anywhere")</span>
+</div>
+
+<form method="post" asp-action="SaveUserPermissions" asp-route-userId="@user.Id">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-3 mb-4">
+        @foreach (var group in groups)
+        {
+            <div class="col-md-6 col-xl-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-transparent border-bottom py-2 px-3">
+                        <span class="fw-semibold small text-uppercase text-muted">@Loc.T(group.Key)</span>
+                    </div>
+                    <div class="card-body py-0 px-0">
+                        @foreach (var perm in group)
+                        {
+                            bool inherited = inheritedPerms.Contains(perm.Name);
+                            bool isAllow   = allowOverrides.Contains(perm.Name);
+                            bool isDeny    = denyOverrides.Contains(perm.Name);
+
+                            // Determine visual effective state
+                            string effectiveLabel = isDeny ? Loc.T("Deny") :
+                                                    isAllow ? Loc.T("Allow") :
+                                                    inherited ? Loc.T("Inherited") : Loc.T("None");
+                            string effectiveClass = isDeny ? "text-danger" :
+                                                    isAllow ? "text-success" :
+                                                    inherited ? "text-secondary" : "text-muted";
+
+                            // Which roles grant it?
+                            var grantingRoles = roleGrants
+                                .Where(kv => kv.Value.Contains(perm.Name))
+                                .Select(kv => kv.Key);
+
+                            <div class="px-3 py-2 border-bottom border-light-subtle perm-row"
+                                 data-perm="@perm.Name">
+                                <div class="d-flex align-items-start gap-2">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-medium small">@Loc.T(PermissionDisplay.GetTitle(perm.Name))</div>
+                                        <div class="text-muted" style="font-size:.75rem">@Loc.T(perm.Description)</div>
+                                        @if (grantingRoles.Any())
+                                        {
+                                            <div style="font-size:.72rem" class="text-secondary mt-1">
+                                                @Loc.T("via:") @string.Join(", ", grantingRoles.Select(RoleLabel))
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <!-- Three-way toggle: None / Allow / Deny -->
+                                    <div class="btn-group btn-group-sm flex-shrink-0" role="group">
+                                        <input type="radio" class="btn-check" name="perm-@perm.Name" id="none-@perm.Id"
+                                               value="none" @(!isAllow && !isDeny ? "checked" : "") />
+                                        <label class="btn btn-outline-secondary py-1 px-2" for="none-@perm.Id"
+                                               title="@Loc.T("No override — use role default")">
+                                            <i class="bi bi-dash"></i>
+                                        </label>
+
+                                        <input type="radio" class="btn-check" name="perm-@perm.Name" id="allow-@perm.Id"
+                                               value="allow" @(isAllow ? "checked" : "") />
+                                        <label class="btn btn-outline-success py-1 px-2" for="allow-@perm.Id"
+                                               title="@Loc.T("Allow") — @Loc.T("grant extra permission")">
+                                            <i class="bi bi-check-lg"></i>
+                                        </label>
+
+                                        <input type="radio" class="btn-check" name="perm-@perm.Name" id="deny-@perm.Id"
+                                               value="deny" @(isDeny ? "checked" : "") />
+                                        <label class="btn btn-outline-danger py-1 px-2" for="deny-@perm.Id"
+                                               title="@Loc.T("Deny") — @Loc.T("block even if role grants it")">
+                                            <i class="bi bi-x-lg"></i>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Hidden inputs built by JS from radio selections -->
+    <div id="hiddenInputs"></div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4" id="saveBtn">
+            <i class="bi bi-floppy me-2"></i>@Loc.T("Save Overrides")
+        </button>
+        <a href="@Url.Action("Index","Rbac")" class="btn btn-outline-secondary px-4">@Loc.T("Cancel")</a>
+    </div>
+</form>
+
+<script>
+document.getElementById('saveBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+
+    const hiddenDiv = document.getElementById('hiddenInputs');
+    hiddenDiv.innerHTML = '';
+
+    document.querySelectorAll('.perm-row').forEach(row => {
+        const perm = row.dataset.perm;
+        const selected = row.querySelector('input[type=radio]:checked');
+        if (!selected) return;
+
+        if (selected.value === 'allow') {
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'allowList'; inp.value = perm;
+            hiddenDiv.appendChild(inp);
+        } else if (selected.value === 'deny') {
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'denyList'; inp.value = perm;
+            hiddenDiv.appendChild(inp);
+        }
+        // 'none' = no hidden input → backend removes any existing override
+    });
+
+    this.closest('form').submit();
+});
+</script>

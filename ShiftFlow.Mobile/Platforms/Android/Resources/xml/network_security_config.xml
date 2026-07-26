@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug-overrides only supports <trust-anchors>, not domain-config with
+     cleartextTrafficPermitted (nesting it there is a hard XML parse error that
+     crashes the app on launch) — so the cleartext exception has to live at the
+     top level. This is still safe in a release build: 10.0.2.2/localhost are
+     emulator/loopback-only addresses that ShiftFlowServerConfig never points at
+     outside DEBUG (release always uses the fixed HTTPS ProductionUrl). -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

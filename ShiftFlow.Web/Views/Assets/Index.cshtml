@@ -1,0 +1,136 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<Asset>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Assets");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
+    var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderExport)).Succeeded;
+    string actionsHtml = "";
+    if (canExport)
+        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
+                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
+    if (canManage)
+        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Asset") + "</a>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Assets"),ActionsHtml=actionsHtml})" />
+
+@if ((bool)ViewBag.IsScoped)
+{
+    <div class="alert alert-info small py-2"><i class="bi bi-eye me-1"></i>@Loc.T("Your view is restricted to a specific zone, area, or category assigned by your manager.")</div>
+}
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+    <div class="col-auto">
+        <input type="text" name="q" value="@ViewBag.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search")" style="min-width:220px" />
+    </div>
+    <div class="col-auto">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Status")</option>
+            @foreach (var s in Asset.Statuses)
+            {
+                <option value="@s" selected="@(ViewBag.Status==s)">@Loc.T(s)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="categoryId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Category")</option>
+            @{ var allCategories = (List<AssetCategory>)ViewBag.Categories; }
+            @foreach (var top in allCategories.Where(c => c.ParentCategoryId == null))
+            {
+                <option value="@top.Id" style="font-weight:bold" selected="@(ViewBag.CategoryId==top.Id)">@top.Name</option>
+                @foreach (var sub in allCategories.Where(c => c.ParentCategoryId == top.Id))
+                {
+                    <option value="@sub.Id" selected="@(ViewBag.CategoryId==sub.Id)">@("    ")@sub.Name</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="governorateId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Governorate")</option>
+            @foreach (var gov in (List<Governorate>)ViewBag.Governorates)
+            {
+                <option value="@gov.Id" selected="@(ViewBag.GovernorateId==gov.Id)">@Loc.LocalizedName(gov.Name, gov.NameAr)</option>
+            }
+        </select>
+    </div>
+    @if (ViewBag.GovernorateId != null)
+    {
+        <div class="col-auto">
+            <select name="areaId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@Loc.T("Area")</option>
+                @foreach (var ar in (List<Area>)ViewBag.Areas)
+                {
+                    <option value="@ar.Id" selected="@(ViewBag.AreaId==ar.Id)">@Loc.LocalizedName(ar.Name, ar.NameAr)</option>
+                }
+            </select>
+        </div>
+    }
+    @if (ViewBag.AreaId != null)
+    {
+        <div class="col-auto">
+            <select name="blockId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@Loc.T("Block")</option>
+                @foreach (var bl in (List<Block>)ViewBag.Blocks)
+                {
+                    <option value="@bl.Id" selected="@(ViewBag.BlockId==bl.Id)">@bl.Number</option>
+                }
+            </select>
+        </div>
+    }
+    <div class="col-auto">
+        <select name="zoneId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Zone")</option>
+            @foreach (var g in ((List<Zone>)ViewBag.Zones).GroupBy(z => z.Block!.Area!.Governorate!.Name))
+            {
+                <optgroup label="@g.Key">
+                    @foreach (var z in g)
+                    {
+                        <option value="@z.Id" selected="@(ViewBag.ZoneId==z.Id)">@z.Block!.Area!.Name (Block @z.Block.Number) — @z.Name</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
+    </div>
+    @if (ViewBag.GovernorateId != null || ViewBag.AreaId != null || ViewBag.BlockId != null || ViewBag.ZoneId != null || ViewBag.CategoryId != null || ViewBag.Status != null || !string.IsNullOrEmpty((string)ViewBag.Q))
+    {
+        <div class="col-auto">
+            <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")</a>
+        </div>
+    }
+    <div class="col-auto ms-auto text-muted small">@Model.Count @Loc.T("records")</div>
+</form>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var a in Model)
+                {
+                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = a.Id })'">
+                        <td class="small text-muted font-monospace">@a.AssetTag</td>
+                        <td>@a.Name</td>
+                        <td>@a.Category?.Name</td>
+                        <td class="small">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null))</span></td>
+                        <td><partial name="_StatusBadge" model="@a.Status" /></td>
+                        <td onclick="event.stopPropagation()">
+                            @if (canManage)
+                            {
+                                <a asp-action="Edit" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,69 @@
+erDiagram
+    GOVERNORATE ||--o{ AREA : contains
+    AREA ||--o{ ZONE : contains
+    ZONE ||--o{ ASSET : locates
+    ASSETCATEGORY ||--o{ ASSETCATEGORY : "has subcategories"
+    ASSETCATEGORY ||--o{ ASSET : classifies
+    ASSETCATEGORY ||--o{ ASSETACTIONTYPE : defines
+    ASSETACTIONTYPE ||--o{ ASSETACTIONCAUSE : defines
+    ASSET ||--o{ WORKORDER : "has"
+    ASSET ||--o{ CONTRACTASSET : "covered by"
+    CONTRACT ||--o{ CONTRACTASSET : covers
+    VENDOR ||--o{ CONTRACT : holds
+    VENDOR ||--o{ WORKORDER : assigned
+    VENDOR ||--o| APPLICATIONUSER : "portal login (UserId)"
+    WORKORDER ||--o{ WORKORDERSTAGEEVENT : "audit trail"
+    WORKORDER ||--o{ WORKORDERPART : "parts used"
+    WORKORDER ||--o{ WORKORDERATTACHMENT : "fix files"
+    WORKORDER }o--o| ASSETACTIONTYPE : "reported as"
+    WORKORDER }o--o| ASSETACTIONCAUSE : "caused by"
+    WORKORDER }o--o| WORKORDERBLOCKREASON : "blocked by"
+    APPLICATIONUSER ||--o{ WORKORDER : creates
+    APPLICATIONUSER ||--o{ USERASSETSCOPE : "scoped to"
+
+    ASSET {
+        int Id
+        string AssetTag
+        string Name
+        int CategoryId
+        int ZoneId
+        string Status
+        string Model
+        string SerialNumber
+    }
+    ASSETCATEGORY {
+        int Id
+        string Name
+        int ParentCategoryId
+    }
+    WORKORDER {
+        int Id
+        string WorkOrderNumber
+        string Stage
+        string Priority
+        int AssetId
+        int VendorId
+        int ActionTypeId
+        int CauseId
+        int BlockReasonId
+    }
+    CONTRACT {
+        int Id
+        int VendorId
+        string ContractType
+        string ContractNumber
+        date StartDate
+        date EndDate
+    }
+    VENDOR {
+        int Id
+        string Name
+        string Status
+        string UserId
+    }
+    USERASSETSCOPE {
+        int Id
+        string UserId
+        string ScopeType
+        int ScopeValueId
+    }

@@ -1,0 +1,96 @@
+@using Microsoft.AspNetCore.Authorization
+@model Contract
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Model.ContractNumber ?? Loc.T("Contracts");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractManage)).Succeeded;
+    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.ContractNumber ?? Loc.T("Contracts"),Subtitle=Model.Vendor?.Name,ActionsHtml=actionsHtml})" />
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Vendor")</span><a asp-controller="Vendors" asp-action="Details" asp-route-id="@Model.VendorId" class="small">@Model.Vendor?.Name</a></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Contract Type")</span><partial name="_StatusBadge" model="@Model.ContractType" /></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Start Date")</span><span class="small">@Model.StartDate.ToString("yyyy-MM-dd")</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("End Date")</span><span class="small">@(Model.EndDate?.ToString("yyyy-MM-dd") ?? "—")</span></div>
+                @if (Model.ContractType == "Preventive Maintenance")
+                {
+                    <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Cadence")</span><span class="small">@Loc.T(Model.PmCadence ?? "—")</span></div>
+                }
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Cost")</span><span class="small">@Model.Cost</span></div>
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small">@Model.Notes</div></div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Linked Assets")</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Status")</th></tr></thead>
+                    <tbody>
+                        @if (Model.AssetLinks.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                        }
+                        @foreach (var link in Model.AssetLinks)
+                        {
+                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "Assets", new { id = link.AssetId })'">
+                                <td class="small font-monospace">@link.Asset?.AssetTag</td>
+                                <td>@link.Asset?.Name</td>
+                                <td><partial name="_StatusBadge" model="@link.Asset?.Status" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (Model.ContractType == "Preventive Maintenance")
+        {
+            var schedule = (List<PmScheduleRow>)(ViewBag.PmSchedule ?? new List<PmScheduleRow>());
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("PM Schedule")</div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead><tr><th>@Loc.T("Due Date")</th><th>@Loc.T("Asset")</th><th>@Loc.T("Status")</th></tr></thead>
+                        <tbody>
+                            @if (schedule.Count == 0)
+                            {
+                                <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                            }
+                            @foreach (var row in schedule)
+                            {
+                                <tr>
+                                    <td class="small">@row.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="small">@row.AssetLabel</td>
+                                    <td>
+                                        @if (row.WorkOrderId != null)
+                                        {
+                                            <span class="badge border bg-success-subtle text-success-emphasis border-success-subtle">@Loc.T("Generated")</span>
+                                            <a asp-controller="WorkOrders" asp-action="Details" asp-route-id="@row.WorkOrderId" class="small ms-1">@row.WorkOrderNumber</a>
+                                        }
+                                        else if (row.DueDate <= DateTime.UtcNow.Date)
+                                        {
+                                            <span class="badge border bg-warning-subtle text-warning-emphasis border-warning-subtle">@Loc.T("Pending Generation")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge border bg-secondary-subtle text-secondary-emphasis border-secondary-subtle">@Loc.T("Upcoming")</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>

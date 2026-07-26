@@ -1,0 +1,24 @@
+flowchart TD
+    A["Manager sees a shift needs\ncoverage (shortage / extra work)"] --> B{"Request type"}
+    B -- "Temp Transfer" --> C["Pick affected employee +\ntarget group's shift"]
+    B -- "Overtime" --> D["Pick employee +\ntarget shift needing coverage"]
+
+    C --> E["Pre-flight checks:\n- employee has a Scheduled assignment\n  for that date\n- attendance not yet recorded\n- source shift still Draft\n- target group has a shift that date"]
+    D --> F["Pre-flight checks:\n- target shift not Closed\n- employee has no existing\n  OvertimeAssignment on it"]
+
+    E --> G["ShiftChangeRequest created\n(Status = Pending)"]
+    F --> G
+
+    G --> H{"Requester == Affected employee?"}
+    H -- Yes --> I["Manager can Approve/Reject directly\n(ChangeRequest.Review)"]
+    H -- "No (manager-initiated)" --> J["Employee must Accept or Decline\n(ChangeRequest.Submit)\nManager CANNOT force-approve"]
+
+    I --> K{"Approved?"}
+    J --> K
+
+    K -- Reject / Decline --> L["Status = Rejected"]
+    K -- Approve / Accept --> M["Re-validate applicability\n(state may have changed since submit)"]
+    M --> N{"Still valid?"}
+    N -- No --> O["Approval fails loudly —\nrequest stays Pending"]
+    N -- Yes --> P["Materialize EmployeeShiftException\n+ update ShiftAssignment /\ncreate OvertimeAssignment"]
+    P --> Q["Status = Approved"]

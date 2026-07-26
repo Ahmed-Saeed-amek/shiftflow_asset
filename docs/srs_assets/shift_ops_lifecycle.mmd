@@ -1,0 +1,22 @@
+stateDiagram-v2
+    [*] --> Draft: DailyGroupShift created by\nFillFromRotationAsync
+    Draft --> Active: Activate\n(ShiftOps.Activate)
+    Draft --> Draft: Manual override / swap\n(Schedule.Override.Apply)
+
+    state Active {
+        [*] --> Running
+        Running --> Running: Update attendance\n(Present/Late/Absent/Excused/OnLeave/Replaced)
+        Running --> Running: Add / update / delete tasks\n(Pending → InProgress → Done/Blocked)
+        Running --> Running: Log incidents\n(Low/Medium/High/Critical)
+    }
+
+    Active --> Closed: Close Shift\n(ShiftOps.Close)\n- requires closing summary\n- computes attendee/absent counts\n- creates ShiftReport (+ attachments)\n- rolls over unfinished tasks to\n  the group's next shift\n  (Status → HandedOver)
+    Closed --> [*]
+
+    note right of Closed
+        Once Closed:
+        - No new tasks
+        - No task deletion
+        - No further attendance edits
+        - No overrides
+    end note

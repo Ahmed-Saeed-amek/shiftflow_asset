@@ -1,0 +1,123 @@
+// Leaflet helpers for the Asset Locations (Zone) map UI. Kept out of CSP-restricted
+// inline scripts where practical; loaded only on Zones views, not globally.
+
+// Kuwait-wide default center/zoom, used when no governorate/coordinates are selected yet.
+const KUWAIT_CENTER = [29.3117, 47.4818];
+const KUWAIT_ZOOM = 9;
+const GOVERNORATE_ZOOM = 12;
+const PIN_ZOOM = 15;
+
+/** Editable single-marker map for Zone Create/Edit — two-way synced with the Lat/Lng inputs. */
+function initZonePickerMap(mapElId, latInputId, lngInputId, initialLat, initialLng) {
+    const latInput = document.getElementById(latInputId);
+    const lngInput = document.getElementById(lngInputId);
+    const startLat = initialLat ?? KUWAIT_CENTER[0];
+    const startLng = initialLng ?? KUWAIT_CENTER[1];
+
+    const map = L.map(mapElId).setView([startLat, startLng], initialLat ? PIN_ZOOM : KUWAIT_ZOOM);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+
+    let marker = (initialLat && initialLng) ? L.marker([initialLat, initialLng]).addTo(map) : null;
+
+    function setMarker(lat, lng) {
+        if (marker) marker.setLatLng([lat, lng]);
+        else marker = L.marker([lat, lng]).addTo(map);
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+    }
+
+    map.on('click', e => setMarker(e.latlng.lat, e.latlng.lng));
+
+    function onCoordInputChange() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            setMarker(lat, lng);
+            map.setView([lat, lng], PIN_ZOOM);
+        }
+    }
+    latInput.addEventListener('change', onCoordInputChange);
+    lngInput.addEventListener('change', onCoordInputChange);
+
+    return {
+        recenter(lat, lng, zoom) { map.setView([lat, lng], zoom || GOVERNORATE_ZOOM); },
+    };
+}
+
+/** Read-only single-pin map for the Zone Details page. */
+function initZoneReadonlyMap(mapElId, lat, lng, popupText) {
+    const map = L.map(mapElId, { zoomControl: true, dragging: true, scrollWheelZoom: false }).setView([lat, lng], PIN_ZOOM);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map).bindPopup(popupText).openPopup();
+}
+
+/** Overview map for the Zones Index "Map View" — plots every zone that has coordinates. */
+async function initZoneOverviewMap(mapElId, dataUrl, detailsUrlTemplate) {
+    const map = L.map(mapElId).setView(KUWAIT_CENTER, KUWAIT_ZOOM);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+
+    const zones = await (await fetch(dataUrl)).json();
+    const markers = [];
+    zones.forEach(z => {
+        const marker = L.marker([z.latitude, z.longitude]).addTo(map);
+        marker.bindPopup(
+            `<strong>${z.name}</strong><br>${z.areaName}, ${z.governorateName}<br>` +
+            `${z.assetCount} asset(s)<br><a href="${detailsUrlTemplate.replace('__ID__', z.id)}">View →</a>`
+        );
+        markers.push(marker);
+    });
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.2));
+    }
+}
+
+// Marker color per work order stage — mirrors the app's _StatusBadge palette closely enough
+// to be recognizable at a glance (green=done, blue=in progress, orange=blocked, gray=waiting).
+const WORK_ORDER_STAGE_COLORS = {
+    'Sent to Vendor': '#0d6efd',
+    'Blocked': '#fd7e14',
+    'Fixed - Pending Confirmation': '#ffc107',
+    'Closed': '#198754',
+};
+
+function workOrderStageIcon(stage) {
+    const color = WORK_ORDER_STAGE_COLORS[stage] || '#6c757d';
+    return L.divIcon({
+        className: '',
+        html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.5)"></div>`,
+        iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -8],
+    });
+}
+
+/** Overview map for the Vendor Portal "Map View" — plots every work order assigned to the
+ * signed-in vendor, at its asset's Zone location, color-coded by stage. Multiple work orders
+ * that share a Zone stack as separate markers at the same point (acceptable at this scale). */
+async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
+    const map = L.map(mapElId).setView(KUWAIT_CENTER, KUWAIT_ZOOM);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+
+    const workOrders = await (await fetch(dataUrl)).json();
+    const markers = [];
+    workOrders.forEach(w => {
+        const marker = L.marker([w.latitude, w.longitude], { icon: workOrderStageIcon(w.stage) }).addTo(map);
+        marker.bindPopup(
+            `<strong>${w.workOrderNumber}</strong> — ${w.stage}<br>` +
+            `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.areaName}, ${w.governorateName}<br>` +
+            `<a href="${detailsUrlTemplate.replace('__ID__', w.id)}">View →</a>`
+        );
+        markers.push(marker);
+    });
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.2));
+    }
+}

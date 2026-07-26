@@ -1,0 +1,202 @@
+@model ShiftFlow.Domain.Entities.InspectionOrder
+@{
+    ViewData["Title"] = Loc.T("Inspection Order");
+    var run = Model.InspectionRun!;
+    var assignedTo = Model.AssignedToUser?.FullName
+        ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber + " — " + Model.Title,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <partial name="_StatusBadge" model="@Model.Status" />
+    @if (Model.DueDate.HasValue)
+    {
+        <span class="text-muted small">@Loc.T("Due") @Model.DueDate.Value.ToString("dd/MM/yyyy")</span>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Description))
+    {
+        <span class="text-muted small">— @Model.Description</span>
+    }
+</div>
+
+<form>@Html.AntiForgeryToken()</form>
+<div id="inspectAlert"></div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 table-card-stack">
+            <thead>
+                <tr>
+                    <th>@Loc.T("Asset Tag")</th>
+                    <th>@Loc.T("Location")</th>
+                    <th>@Loc.T("Outcome")</th>
+                    <th>@Loc.T("Notes")</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in run.Items.OrderBy(i => i.Asset.AssetTag))
+                {
+                    <tr data-item-id="@item.Id" data-category-id="@item.Asset.CategoryId">
+                        <td class="small" data-label="@Loc.T("Asset Tag")">
+                            <a asp-controller="Assets" asp-action="Details" asp-route-id="@item.AssetId">@item.Asset.AssetTag</a>
+                            <div class="text-muted">@item.Asset.Name</div>
+                        </td>
+                        <td class="small" data-label="@Loc.T("Location")">
+                            @if (item.Asset.Zone != null)
+                            {
+                                <a asp-controller="Zones" asp-action="Details" asp-route-id="@item.Asset.ZoneId">@Loc.LocalizedName(item.Asset.Zone.Name, item.Asset.Zone.NameAr)</a>
+                                <div class="text-muted" style="font-size:.72rem">
+                                    @(item.Asset.Zone.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null), @(item.Asset.Zone.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null)
+                                    (@Loc.T("Block") @item.Asset.Zone.Block?.Number)
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(item.Asset.Zone.Address))
+                                {
+                                    <div class="text-muted" style="font-size:.72rem"><i class="bi bi-geo-alt me-1"></i>@item.Asset.Zone.Address</div>
+                                }
+                            }
+                        </td>
+                        <td class="outcome-cell" data-label="@Loc.T("Outcome")"><partial name="_StatusBadge" model="@item.Outcome" /></td>
+                        <td class="small notes-cell" data-label="@Loc.T("Notes")">
+                            @item.Notes
+                            @if (item.WorkOrderId.HasValue)
+                            {
+                                <a asp-controller="WorkOrders" asp-action="Details" asp-route-id="@item.WorkOrderId" class="d-block"><i class="bi bi-tools me-1"></i>@Loc.T("Work Order")</a>
+                            }
+                        </td>
+                        <td>
+                            @if (item.Outcome == "Pending")
+                            {
+                                <div class="d-flex gap-2 outcome-actions">
+                                    <button type="button" class="btn btn-sm btn-outline-success outcome-btn" data-outcome="OK">@Loc.T("OK")</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger outcome-btn" data-outcome="Defective">@Loc.T("Defective")</button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                    <tr class="d-none inline-form-row" data-form-for="@item.Id">
+                        <td colspan="5">
+                            <div class="row g-2 align-items-end p-2 bg-light rounded">
+                                <div class="col-md-3 defect-only d-none">
+                                    <label class="form-label small mb-1">@Loc.T("Action Type")</label>
+                                    <select class="form-select form-select-sm action-type-select"><option value="">—</option></select>
+                                </div>
+                                <div class="col-md-3 defect-only d-none">
+                                    <label class="form-label small mb-1">@Loc.T("Cause")</label>
+                                    <select class="form-select form-select-sm cause-select" disabled><option value="">—</option></select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-1">@Loc.T("Notes")</label>
+                                    <input type="text" class="form-control form-control-sm notes-input" />
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-sm btn-primary w-100 save-outcome-btn">@Loc.T("Save")</button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
+
+@section Scripts {
+<script>
+(function () {
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    const alertBox = document.getElementById('inspectAlert');
+    const jsFailed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Failed to save.")));
+    const jsActionTypeRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Action Type and Cause are required to report a defect.")));
+
+    function fillSelect(sel, items) {
+        sel.innerHTML = '<option value="">—</option>';
+        items.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.id; opt.textContent = i.name;
+            sel.appendChild(opt);
+        });
+        sel.disabled = items.length === 0;
+    }
+
+    document.querySelectorAll('.outcome-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const row = btn.closest('tr');
+            const itemId = row.dataset.itemId;
+            const categoryId = row.dataset.categoryId;
+            const outcome = btn.dataset.outcome;
+
+            row.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const formRow = document.querySelector(`tr.inline-form-row[data-form-for="${itemId}"]`);
+            formRow.classList.remove('d-none');
+            formRow.dataset.outcome = outcome;
+
+            const isDefect = outcome === 'Defective';
+            formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
+            if (isDefect) {
+                const actionTypeSel = formRow.querySelector('.action-type-select');
+                const causeSel = formRow.querySelector('.cause-select');
+                try {
+                    const resp = await fetch(`/AssetActionTypes/ByCategory?categoryId=${categoryId}`);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    fillSelect(actionTypeSel, await resp.json());
+                    alertBox.innerHTML = '';
+                } catch {
+                    alertBox.innerHTML = `<div class="alert alert-danger small">${jsFailed}</div>`;
+                    return;
+                }
+                if (!actionTypeSel.dataset.changeBound) {
+                    actionTypeSel.dataset.changeBound = '1';
+                    actionTypeSel.addEventListener('change', async () => {
+                        if (!actionTypeSel.value) { fillSelect(causeSel, []); return; }
+                        try {
+                            const resp = await fetch(`/AssetActionTypes/CausesByActionType?actionTypeId=${actionTypeSel.value}`);
+                            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                            fillSelect(causeSel, await resp.json());
+                        } catch {
+                            alertBox.innerHTML = `<div class="alert alert-danger small">${jsFailed}</div>`;
+                        }
+                    });
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll('.save-outcome-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const formRow = btn.closest('tr.inline-form-row');
+            const itemId = formRow.dataset.formFor;
+            const outcome = formRow.dataset.outcome;
+            const notes = formRow.querySelector('.notes-input').value;
+            const actionTypeId = formRow.querySelector('.action-type-select')?.value || '';
+            const causeId = formRow.querySelector('.cause-select')?.value || '';
+
+            if (outcome === 'Defective' && (!actionTypeId || !causeId)) {
+                alertBox.innerHTML = `<div class="alert alert-danger small">${jsActionTypeRequired}</div>`;
+                return;
+            }
+
+            btn.disabled = true;
+            const body = new URLSearchParams({ itemId, outcome, notes, actionTypeId, causeId });
+            const r = await fetch('/InspectionOrders/UpdateItem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                body,
+            });
+            btn.disabled = false;
+
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                alertBox.innerHTML = `<div class="alert alert-danger small">${err.error || jsFailed}</div>`;
+                return;
+            }
+            location.reload();
+        });
+    });
+})();
+</script>
+}

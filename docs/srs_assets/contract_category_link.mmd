@@ -1,0 +1,19 @@
+flowchart TD
+    A["Admin opens Contract<br/>Create/Edit form"] --> B["Linked Assets picker"]
+    B --> C{"Pick assets individually?"}
+    C -- Yes --> D["Type-ahead search<br/>/Assets/Search?q="]
+    D --> E["Click a result → added as chip"]
+    C -- "No, bulk by category" --> F["Choose top-level Category"]
+    F --> G["/AssetCategories/ByParent?parentId=X/"]
+    G --> H{"Has subcategories?"}
+    H -- Yes --> I["Show Subcategory dropdown"]
+    H -- No --> J["Subcategory control hidden entirely"]
+    I --> K["Optionally narrow to one subcategory"]
+    J --> L["Click Add All"]
+    K --> L
+    L --> M["/Assets/ByCategory?categoryId=X/<br/>Category itself + its subcategories"]
+    M --> N["Every returned asset added<br/>as a removable chip<br/>duplicates skipped"]
+    E --> O["Chips = hidden AssetIds[] inputs"]
+    N --> O
+    O --> P["Submit form"]
+    P --> Q["ContractService.CreateAsync/UpdateAsync<br/>replaces ContractAsset rows<br/>to match posted AssetIds"]

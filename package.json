@@ -1,0 +1,25 @@
+{
+  "name": "solution-1",
+  "version": "1.0.0",
+  "description": "A maintenance and operations management system for electrical utility infrastructure, built for the Ministry of Electricity, Water & Renewable Energy — Kuwait. Tracks work orders, emergency tickets, preventive maintenance, safety permits (PTW), assets, spare parts, shifts, and leave requests across multiple stations, with role-based access and bilingual (EN/AR, RTL) support.",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "seed:demo": "node scripts/seed-demo-data.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ahmed-Saeed-amek/shiftflow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Ahmed-Saeed-amek/shiftflow/issues"
+  },
+  "homepage": "https://github.com/Ahmed-Saeed-amek/shiftflow#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

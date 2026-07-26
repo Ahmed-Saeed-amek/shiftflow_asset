@@ -1,0 +1,160 @@
+Perform a complete architectural review and refactor of the authorization and permission system.
+
+The goal is to redesign the permission taxonomy into something that is enterprise-grade, scalable, self-documenting, and easy to maintain.
+
+Current requirements that must remain:
+- Users inherit permissions from one or more roles.
+- User-specific permission overrides are supported.
+- A user permission can:
+  - Explicitly Allow
+  - Explicitly Deny
+  - Inherit from assigned roles
+- User overrides always take precedence over role permissions.
+
+Refactor the entire permission catalog.
+
+Focus on:
+
+1. Permission Naming
+- Replace inconsistent names with a standardized convention.
+- Use predictable names such as:
+  Module.Resource.Action
+  or
+  Module.Action.Resource
+- Eliminate abbreviations.
+- Ensure every permission clearly communicates exactly what it grants.
+
+2. Permission Descriptions
+Rewrite every description to be administrator-friendly.
+
+Descriptions should explain:
+- What the permission allows.
+- Which screens/features it affects.
+- Whether it exposes data, modifies data, approves workflows, exports information, or performs administrative actions.
+
+Descriptions should be suitable for displaying directly in an admin portal.
+
+3. Permission Organization
+Completely reorganize permissions into logical functional modules.
+
+Examples:
+Dashboard
+Administration
+Identity & Security
+Users
+Roles
+Permissions
+Departments
+Assets
+Asset Categories
+Sub Assets
+Preventive Maintenance
+Work Orders
+Inventory
+Purchasing
+Vendors
+Schedules
+Notifications
+Reports
+Audit Logs
+Settings
+API
+etc.
+
+Each module should contain only permissions relevant to that feature.
+
+4. Permission Hierarchy
+Separate permissions into logical groups such as:
+
+View
+Create
+Edit
+Delete
+Approve
+Assign
+Import
+Export
+Archive
+Restore
+Manage
+Configure
+Execute
+
+Avoid generic "Manage" permissions unless truly necessary.
+
+5. Security Review
+Identify:
+- duplicate permissions
+- overlapping permissions
+- permissions that are too broad
+- permissions that violate least privilege
+- missing permissions
+
+Recommend improvements.
+
+6. Admin Experience
+Design the permission catalog so an administrator can quickly understand what each permission controls.
+
+Recommend grouping, ordering, icons, categories, collapsible sections, and search behavior.
+
+7. Future Scalability
+Design the permission model so future modules can be added without renaming existing permissions.
+
+8. Documentation
+Produce documentation containing:
+- Permission matrix
+- Naming conventions
+- Module hierarchy
+- Override precedence
+- Evaluation order
+- Best practices
+
+9. Preserve Existing Behavior
+Do not remove the existing inheritance model.
+
+The authorization evaluation must remain:
+
+User Explicit Deny
+↓
+User Explicit Allow
+↓
+Inherited Role Permissions
+↓
+Default Deny
+
+unless a more secure evaluation model is recommended and justified.
+
+10. Implementation
+After the redesign:
+- Update enums/constants.
+- Update seed data.
+- Update database mappings if necessary.
+- Update role seeds.
+- Preserve backward compatibility where possible.
+- Clearly identify required migrations.
+
+The final result should resemble the permission systems used by Microsoft, Azure, AWS IAM, ServiceNow, SAP, or enterprise ERP platforms rather than a small CRUD application.
+11. Permission-Based UI Visibility
+
+The user interface must be completely permission-aware.
+
+A user should only see pages, navigation links, menu items, action buttons, tabs, widgets, cards, context menu items, dropdown actions, and features that they have permission to access.
+
+Requirements:
+
+- If a user does not have permission to access a page, that page must not appear anywhere in the UI.
+- Navigation menus should automatically hide inaccessible modules.
+- Sidebar items should only display modules the user can access.
+- Dashboard cards and shortcuts should only be visible when the user has permission.
+- Action buttons (Create, Edit, Delete, Approve, Assign, Import, Export, Configure, etc.) must only be rendered when the corresponding permission exists.
+- Context menu actions and bulk actions must follow the same permission rules.
+- Tabs, accordions, and sections within a page should be hidden if the user lacks permission for that feature.
+- Empty menu groups should automatically collapse or disappear.
+- Users should never see disabled buttons for actions they are not authorized to perform. Unauthorized actions should be completely hidden unless there is a specific UX reason to indicate restricted functionality.
+- The UI should dynamically update whenever role assignments or user-specific permission overrides change.
+
+Backend security must still enforce all permissions regardless of what is shown in the UI. Hiding UI elements is a usability improvement and must never replace server-side authorization.
+
+Design a centralized authorization system so every view, navigation item, button, component, and API endpoint checks the same permission source. Avoid scattered permission checks throughout the codebase by creating reusable authorization helpers/components.
+
+The result should provide a seamless experience where each user only sees the features they are authorized to use, similar to enterprise platforms such as Microsoft 365 Admin Center, Azure Portal, ServiceNow, or SAP.

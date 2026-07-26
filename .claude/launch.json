@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ShiftFlow.Web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "ShiftFlow.Web/ShiftFlow.Web.csproj"],
+      "port": 55249
+    }
+  ]
+}

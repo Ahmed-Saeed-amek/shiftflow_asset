@@ -1,0 +1,111 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using ShiftFlow.Application.Services;
+using ShiftFlow.Domain.Entities;
+using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.ViewModels;
+
+namespace ShiftFlow.Web.Controllers;
+
+[Authorize]
+public class TeamsController : Controller
+{
+    private readonly ITeamService _teams;
+    private readonly UserManager<ApplicationUser> _um;
+
+    public TeamsController(ITeamService teams, UserManager<ApplicationUser> um)
+    {
+        _teams = teams;
+        _um = um;
+    }
+
+    private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+    [Authorize(Policy = PermissionCatalog.TeamView)]
+    public async Task<IActionResult> Index()
+    {
+        var teams = await _teams.GetAllAsync(includeInactive: true);
+        return View(teams);
+    }
+
+    [Authorize(Policy = PermissionCatalog.TeamView)]
+    public async Task<IActionResult> Details(int id)
+    {
+        var team = await _teams.GetByIdAsync(id);
+        if (team == null) return NotFound();
+        return View(team);
+    }
+
+    [Authorize(Policy = PermissionCatalog.TeamManage)]
+    public IActionResult Create() => View(new TeamCreateVm());
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> Create(TeamCreateVm vm)
+    {
+        if (!ModelState.IsValid) return View(vm);
+
+        try
+        {
+            var team = await _teams.CreateAsync(vm.Name, vm.NameAr, vm.Description, vm.MemberUserIds, CurrentUserId);
+            TempData["Success"] = $"Team \"{team.Name}\" created.";
+            return RedirectToAction(nameof(Details), new { id = team.Id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            return View(vm);
+        }
+    }
+
+    [Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var team = await _teams.GetByIdAsync(id);
+        if (team == null) return NotFound();
+        return View(new TeamEditVm { Id = team.Id, Name = team.Name, NameAr = team.NameAr, Description = team.Description, IsActive = team.IsActive });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> Edit(int id, TeamEditVm vm)
+    {
+        if (id != vm.Id) return BadRequest();
+        if (!ModelState.IsValid) return View(vm);
+
+        try
+        {
+            await _teams.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
+            await _teams.SetActiveAsync(id, vm.IsActive, CurrentUserId);
+            TempData["Success"] = "Team updated.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            return View(vm);
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> AddMember(int teamId, string userId)
+    {
+        await _teams.AddMemberAsync(teamId, userId, CurrentUserId);
+        return RedirectToAction(nameof(Details), new { id = teamId });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> RemoveMember(int teamId, string userId)
+    {
+        await _teams.RemoveMemberAsync(teamId, userId, CurrentUserId);
+        return RedirectToAction(nameof(Details), new { id = teamId });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
+    public async Task<IActionResult> SetActive(int id, bool isActive)
+    {
+        await _teams.SetActiveAsync(id, isActive, CurrentUserId);
+        TempData["Success"] = isActive ? "Team activated." : "Team deactivated.";
+        return RedirectToAction(nameof(Index));
+    }
+}

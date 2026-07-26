@@ -1,0 +1,67 @@
+erDiagram
+    WORKAREA ||--o{ SHIFTGROUP : has
+    WORKAREA ||--o{ SHIFTSCHEDULE : scopes
+    SHIFTGROUP ||--o{ USERGROUPMEMBERSHIP : "assigned members"
+    APPLICATIONUSER ||--o{ USERGROUPMEMBERSHIP : "belongs to"
+    ROTATIONTEMPLATE ||--o{ ROTATIONTEMPLATEDAY : "5 days"
+    ROTATIONTEMPLATE ||--o{ SHIFTSCHEDULE : "used by"
+    SHIFTSCHEDULE ||--o{ DAILYGROUPSHIFT : "day x group plan"
+    SHIFTGROUP ||--o{ DAILYGROUPSHIFT : "shift instance"
+    DAILYGROUPSHIFT ||--o{ SHIFTASSIGNMENT : "roster"
+    DAILYGROUPSHIFT ||--o{ OVERTIMEASSIGNMENT : "extra coverage"
+    DAILYGROUPSHIFT ||--o{ SHIFTTASK : "handover checklist"
+    DAILYGROUPSHIFT ||--o{ SHIFTREPORT : "closing report"
+    DAILYGROUPSHIFT ||--o{ SHIFTCHANGEREQUEST : "requested against"
+    SHIFTREPORT ||--o{ SHIFTINCIDENT : logs
+    SHIFTREPORT ||--o{ SHIFTREPORTATTACHMENT : files
+    SHIFTTASK ||--o{ SHIFTTASKCOMPLETION : "status history"
+    SHIFTTASK ||--o| SHIFTTASK : "rolled over from"
+    APPLICATIONUSER ||--o{ SHIFTASSIGNMENT : rostered
+    APPLICATIONUSER ||--o{ SHIFTCHANGEREQUEST : requests
+    SHIFTCHANGEREQUEST ||--o| EMPLOYEESHIFTEXCEPTION : materializes
+
+    WORKAREA {
+        int Id
+        string Name
+        bool IsActive
+    }
+    SHIFTGROUP {
+        int Id
+        string Name "A, B, C, D, F"
+        int WorkAreaId
+    }
+    ROTATIONTEMPLATE {
+        int Id
+        string Name
+        bool IsDefault
+    }
+    SHIFTSCHEDULE {
+        int Id
+        string Name
+        string Status "Draft, Published, Archived"
+        date StartDate
+        date EndDate
+    }
+    DAILYGROUPSHIFT {
+        int Id
+        date Date
+        string ShiftType "Morning, Evening, Night, Off"
+        string Status "Draft, Active, Closed"
+    }
+    SHIFTASSIGNMENT {
+        int Id
+        string AttendanceStatus
+        datetime ClockInTime
+        datetime ClockOutTime
+    }
+    SHIFTTASK {
+        int Id
+        string Title
+        string Status "Pending, InProgress, Done, HandedOver, Blocked"
+        bool IsMandatoryForHandover
+    }
+    SHIFTCHANGEREQUEST {
+        int Id
+        string RequestType
+        string Status "Pending, Approved, Rejected, Cancelled"
+    }

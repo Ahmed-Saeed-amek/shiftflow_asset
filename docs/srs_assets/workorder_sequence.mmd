@@ -1,0 +1,34 @@
+sequenceDiagram
+    actor Emp as Employee/Engineer
+    participant Sys as ShiftFlow.Web
+    actor Adm as Admin/Manager
+    actor Ven as Vendor (Portal)
+
+    Emp->>Sys: Report failure on Asset\n(WorkOrders/Report)
+    Sys->>Sys: Create WorkOrder (Stage=Draft)\n+ WorkOrderStageEvent
+    Sys-->>Adm: Visible in Work Orders list
+
+    Adm->>Sys: Open Draft, review details
+    Sys-->>Adm: GetActiveServiceVendorsAsync(assetId)\n(vendor candidates from Service contracts)
+    alt no active Service contract
+        Sys-->>Adm: Blocked — must link a Service contract first
+    else vendor(s) available
+        Adm->>Sys: Accept (choose vendor, set priority/description)
+        Sys->>Sys: Stage = Sent to Vendor
+        Sys-->>Ven: Work order appears in Vendor Portal
+    end
+
+    Ven->>Sys: Open work order details\n(VendorPortal/Details — ownership re-checked)
+    alt Vendor can fix
+        Ven->>Sys: Submit Fix (description, cost,\nparts, completion date, files)
+        Sys->>Sys: Stage = Fixed - Pending Confirmation
+        Sys-->>Adm: Fix report + attachments visible
+        Adm->>Sys: Confirm
+        Sys->>Sys: Stage = Closed (ClosedDate stamped)
+    else Vendor is blocked
+        Ven->>Sys: Submit Block (reason + detail)
+        Sys->>Sys: Stage = Blocked
+        Sys-->>Adm: Block reason/detail visible
+        Adm->>Sys: Resolve issue, click Resend
+        Sys->>Sys: Stage = Sent to Vendor (same vendor,\nblock fields cleared)
+    end

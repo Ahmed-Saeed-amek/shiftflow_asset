@@ -1,0 +1,98 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<AssetCategory>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Asset Categories");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetCategoryManage)).Succeeded;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Categories"),Subtitle=Loc.T("Add categories and subcategories, then edit or manage their actions below")})" />
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger small">@TempData["Error"]</div>
+}
+
+<div class="row g-3">
+    @foreach (var c in Model)
+    {
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+                    <span class="fw-semibold">@c.Name @(!string.IsNullOrWhiteSpace(c.NameAr) ? $"({c.NameAr})" : "")</span>
+                    @if (canManage)
+                    {
+                        <div>
+                            <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                            <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@c.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
+                        </div>
+                    }
+                </div>
+                <div class="list-group list-group-flush">
+                    @if (c.Subcategories.Count == 0)
+                    {
+                        <div class="list-group-item text-muted small text-center py-2">@Loc.T("No records found")</div>
+                    }
+                    @foreach (var sub in c.Subcategories.OrderBy(s => s.Name))
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                            <span class="small">↳ @sub.Name @(!string.IsNullOrWhiteSpace(sub.NameAr) ? $"({sub.NameAr})" : "")</span>
+                            @if (canManage)
+                            {
+                                <div>
+                                    <a asp-action="Edit" asp-route-id="@sub.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                                    <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@sub.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                @if (canManage)
+                {
+                    <div class="card-body pt-2">
+                        <form method="post" asp-action="Create" class="row g-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ParentCategoryId" value="@c.Id" />
+                            <div class="col">
+                                <input type="text" name="Name" class="form-control form-control-sm" placeholder="@Loc.T("Subcategory")" required />
+                            </div>
+                            <div class="col">
+                                <input type="text" name="NameAr" class="form-control form-control-sm" placeholder="@Loc.T("Name (Arabic)")" dir="rtl" />
+                            </div>
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">+ @Loc.T("Subcategory")</button>
+                            </div>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (canManage)
+    {
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("New Category")</div>
+                <div class="card-body">
+                    <form method="post" asp-action="Create" class="row g-2">
+                        @Html.AntiForgeryToken()
+                        <div class="col">
+                            <input type="text" name="Name" class="form-control form-control-sm" placeholder="@Loc.T("Name")" required />
+                        </div>
+                        <div class="col">
+                            <input type="text" name="NameAr" class="form-control form-control-sm" placeholder="@Loc.T("Name (Arabic)")" dir="rtl" />
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">+ @Loc.T("New Category")</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.Count == 0 && !canManage)
+{
+    <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-4">@Loc.T("No records found")</div></div>
+}

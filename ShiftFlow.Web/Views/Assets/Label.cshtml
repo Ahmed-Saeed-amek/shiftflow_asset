@@ -1,0 +1,47 @@
+@model Asset
+@{
+    ViewData["Title"] = Loc.T("Asset Label") + " — " + Model.AssetTag;
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="@Loc.Lang" dir="@(Loc.IsRTL ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 24px; background: #f4f4f4; }
+        .no-print { margin-bottom: 16px; }
+        .label {
+            width: 320px; border: 1px solid #333; border-radius: 4px; padding: 12px;
+            background: #fff; text-align: center; margin-bottom: 16px;
+        }
+        .label .tag { font-size: 20px; font-weight: bold; letter-spacing: 1px; margin-bottom: 4px; }
+        .label .name { font-size: 12px; color: #444; margin-bottom: 8px; }
+        .label .codes { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .label .codes img.qr { width: 90px; height: 90px; }
+        .label .codes img.barcode { width: 170px; height: 60px; }
+        .label .meta { font-size: 10px; color: #666; margin-top: 8px; border-top: 1px solid #ddd; padding-top: 6px; }
+        @@media print {
+            .no-print { display: none; }
+            body { background: #fff; padding: 0; }
+            .label { border: 1px solid #000; box-shadow: none; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">@Loc.T("Print")</button>
+        <a href="@Url.Action("Details", new { id = Model.Id })">@Loc.T("Back")</a>
+    </div>
+
+    <div class="label">
+        <div class="tag">@Model.AssetTag</div>
+        <div class="name">@Model.Name</div>
+        <div class="codes">
+            <img class="qr" src="@Url.Action("QrCode", new { id = Model.Id })" alt="QR" />
+            <img class="barcode" src="@Url.Action("Barcode", new { id = Model.Id })" alt="Barcode" />
+        </div>
+        <div class="meta">@Model.Category?.Name — @(Model.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null)</div>
+    </div>
+</body>
+</html>

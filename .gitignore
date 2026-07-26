@@ -1,0 +1,39 @@
+## .NET build output
+bin/
+obj/
+*.user
+*.suo
+
+## Visual Studio
+.vs/
+*.userosscache
+*.sln.docstates
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Logs
+logs/
+*.log
+
+## Uploaded files (runtime user content, not source)
+ShiftFlow.Web/wwwroot/uploads/
+ShiftFlow.Web/App_Data/uploads/
+
+## Local dev secrets (API keys) — do not commit
+ShiftFlow.Web/appsettings.Development.json
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Node / Playwright tooling
+node_modules/
+test-results/
+playwright-report/
+
+## Graphify tool output (local cache, not source)
+graphify-out/
+UsersAhmedDesktopgraphify/
+UsersAhmedDesktoprased/

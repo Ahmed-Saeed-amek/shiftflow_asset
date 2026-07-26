@@ -1,0 +1,45 @@
+@model List<ShiftFlow.Domain.Entities.Team>
+@using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Web.Authorization
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Teams");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
+    string actionsHtml = canManage
+        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Team") + "</a>"
+        : "";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Teams"),Subtitle=Loc.T("Reusable groups of employees for inspection orders"),ActionsHtml=actionsHtml})" />
+
+<div class="card border-0 shadow-sm">
+    @if (Model.Count == 0)
+    {
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
+            @Loc.T("No teams yet.")
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>@Loc.T("Name")</th><th>@Loc.T("Members")</th><th>@Loc.T("Status")</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@Loc.LocalizedName(t.Name, t.NameAr)</td>
+                            <td>@t.Members.Count</td>
+                            <td><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Open")</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

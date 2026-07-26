@@ -1,0 +1,25 @@
+stateDiagram-v2
+    [*] --> Draft: Employee reports a\nfailure/action (Asset.ReportAction)
+    [*] --> New: Admin creates a work\norder directly (WorkOrder.Manage)
+
+    Draft --> Rejected: Admin Rejects\n(reason recorded)
+    Draft --> SentToVendor: Admin Accepts\n(vendor auto-resolved from\nactive Service contract)
+    New --> SentToVendor: Admin Sends to Vendor\n(vendor chosen from active\nService contract(s))
+
+    SentToVendor --> FixedPending: Vendor submits Fix report\n(description, cost, parts,\ncompletion date, attachments)
+    SentToVendor --> Blocked: Vendor submits Block\n(categorized reason + detail)
+
+    Blocked --> SentToVendor: Admin Resends\n(same vendor, block\nfields cleared)
+
+    FixedPending --> Closed: Admin Confirms fix\n(ClosedDate stamped)
+
+    Rejected --> [*]
+    Closed --> [*]
+
+    note right of SentToVendor
+        Vendor resolved only from
+        Contract.ContractType == "Service"
+        active on the asset. Zero
+        matching contracts blocks
+        Accept/SendToVendor.
+    end note

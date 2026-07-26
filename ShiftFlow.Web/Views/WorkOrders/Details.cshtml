@@ -1,0 +1,263 @@
+@using Microsoft.AspNetCore.Authorization
+@model WorkOrder
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Model.WorkOrderNumber;
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+    var isDraft = Model.Stage == "Draft";
+    var isNew = Model.Stage == "New";
+    var isBlocked = Model.Stage == "Blocked";
+    var isFixedPending = Model.Stage == "Fixed - Pending Confirmation";
+    // Once a vendor is acting on the work order, priority is locked — re-prioritizing after the
+    // fact wouldn't reach the vendor and would just desync what they were actually told.
+    var canEditPriority = canManage && (isDraft || isNew);
+    var serviceVendors = ViewBag.ServiceVendors as List<ServiceVendorCandidate>;
+    // The Accept form below already shows Description/Notes as editable fields pre-filled
+    // with these same values — showing them again as static text here would just duplicate them.
+    var descriptionEditableBelow = isDraft && canManage && serviceVendors is { Count: > 0 };
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.WorkOrderNumber,Subtitle=Model.Asset?.AssetTag})" />
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger small">@TempData["Error"]</div>
+}
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <partial name="_WorkOrderStagePipeline" model="Model" />
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span class="text-muted small">@Loc.T("Type")</span>
+                    @if (Model.SourceContract != null)
+                    {
+                        <a asp-controller="Contracts" asp-action="Details" asp-route-id="@Model.SourceContractId"
+                           class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle text-decoration-none"
+                           title="@Loc.T("Auto-generated from this contract's Preventive Maintenance schedule.")">
+                            <i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance") — @(Model.SourceContract.ContractNumber ?? Model.SourceContractId.ToString())
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="small text-muted">@Loc.T("Manual")</span>
+                    }
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span class="text-muted small">@Loc.T("Priority")</span>
+                    @if (canEditPriority)
+                    {
+                        <form method="post" asp-action="UpdatePriority" asp-route-id="@Model.Id" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <select name="priority" class="form-select form-select-sm py-0" style="width:auto" onchange="this.form.submit()">
+                                @foreach (var p in WorkOrder.Priorities)
+                                {
+                                    <option value="@p" selected="@(Model.Priority==p)">@Loc.T(p)</option>
+                                }
+                            </select>
+                        </form>
+                    }
+                    else
+                    {
+                        <partial name="_StatusBadge" model="@Model.Priority" />
+                    }
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Zone")</span><span class="small">@(Model.Asset?.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(Model.Asset?.Zone?.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null))</span></span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Vendor")</span><span class="small">@(Model.Vendor?.Name ?? "—")</span></div>
+                @if (Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku)))
+                {
+                    <div class="mt-2 pt-2 border-top">
+                        <div class="text-muted small mb-1 fw-semibold">@Loc.T("Asset Specifications")</div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Manufacturer")</span><span class="small">@Model.Asset.Manufacturer</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Model))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Model")</span><span class="small">@Model.Asset.Model</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Sku))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("SKU")</span><span class="small font-monospace">@Model.Asset.Sku</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.SerialNumber))
+                        {
+                            <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Serial Number")</span><span class="small font-monospace">@Model.Asset.SerialNumber</span></div>
+                        }
+                    </div>
+                }
+                @if (Model.ActionType != null)
+                {
+                    <div class="mt-2 pt-2 border-top">
+                        <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Action Type")</span><span class="small">@Model.ActionType.Name</span></div>
+                        <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Cause")</span><span class="small">@Model.Cause?.Name</span></div>
+                        <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Reported By")</span><span class="small">@Model.CreatedByUser?.FullName</span></div>
+                    </div>
+                }
+                @if (!descriptionEditableBelow)
+                {
+                    @if (!string.IsNullOrWhiteSpace(Model.Description))
+                    {
+                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Description")</div><div class="small">@Model.Description</div></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                    {
+                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small">@Model.Notes</div></div>
+                    }
+                }
+            </div>
+        </div>
+
+        @if (isDraft && canManage)
+        {
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Accept")</div>
+                <div class="card-body">
+                    @if (serviceVendors == null || serviceVendors.Count == 0)
+                    {
+                        <div class="alert alert-warning small mb-2">@Loc.T("No active Service contract covers this asset — link one before sending a work order to a vendor.")</div>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="Accept" asp-route-id="@Model.Id">
+                            @Html.AntiForgeryToken()
+                            <label class="form-label small">@Loc.T("Choose Vendor")</label>
+                            <select name="vendorId" class="form-select form-select-sm mb-2">
+                                @foreach (var v in serviceVendors)
+                                {
+                                    <option value="@v.VendorId">@v.VendorName (@v.ContractNumber)</option>
+                                }
+                            </select>
+                            <input type="hidden" name="priority" value="@Model.Priority" />
+                            <label class="form-label small">@Loc.T("Description")</label>
+                            <textarea name="description" class="form-control form-control-sm mb-2" rows="2">@Model.Description</textarea>
+                            <label class="form-label small">@Loc.T("Notes")</label>
+                            <textarea name="notes" class="form-control form-control-sm mb-2" rows="2">@Model.Notes</textarea>
+                            <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Accept")</button>
+                        </form>
+                    }
+                    <form method="post" asp-action="Reject" asp-route-id="@Model.Id" class="mt-2">
+                        @Html.AntiForgeryToken()
+                        <input type="text" name="reason" class="form-control form-control-sm mb-2" placeholder="@Loc.T("Rejection reason (optional)")" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">@Loc.T("Reject")</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (isNew && canManage)
+        {
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Send to Vendor")</div>
+                <div class="card-body">
+                    @if (serviceVendors == null || serviceVendors.Count == 0)
+                    {
+                        <div class="alert alert-warning small mb-0">@Loc.T("No active Service contract covers this asset — link one before sending a work order to a vendor.")</div>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="SendToVendor" asp-route-id="@Model.Id">
+                            @Html.AntiForgeryToken()
+                            <select name="vendorId" class="form-select form-select-sm mb-2">
+                                @foreach (var v in serviceVendors)
+                                {
+                                    <option value="@v.VendorId">@v.VendorName (@v.ContractNumber)</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Send to Vendor")</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.Stage == "Sent to Vendor")
+        {
+            <div class="alert alert-info small mb-3"><i class="bi bi-hourglass-split me-1"></i>@Loc.T("Waiting on the vendor to respond via their portal.")</div>
+        }
+
+        @if (isBlocked && canManage)
+        {
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Resend")</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Block Reason")</span><span class="small">@Model.BlockReason?.Name</span></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.BlockDetail))
+                    {
+                        <div class="mt-2 mb-2"><div class="text-muted small mb-1">@Loc.T("Block Detail")</div><div class="small">@Model.BlockDetail</div></div>
+                    }
+                    <form method="post" asp-action="Resend" asp-route-id="@Model.Id" class="mt-2">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Resend")</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (isFixedPending && canManage)
+        {
+            <form method="post" asp-action="Confirm" asp-route-id="@Model.Id">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary w-100">@Loc.T("Confirm")</button>
+            </form>
+        }
+    </div>
+    <div class="col-lg-8">
+        @if (isFixedPending || Model.Stage == "Closed")
+        {
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Fix Report")</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Fix Cost")</span><span class="small">@Model.FixCost</span></div>
+                    <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Completion Date")</span><span class="small">@Model.FixCompletionDate?.ToString("yyyy-MM-dd")</span></div>
+                    @if (!string.IsNullOrWhiteSpace(Model.FixDescription))
+                    {
+                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Fix Description")</div><div class="small">@Model.FixDescription</div></div>
+                    }
+                    @if (Model.Parts.Count > 0)
+                    {
+                        <div class="mt-2 pt-2 border-top">
+                            <div class="text-muted small mb-1">@Loc.T("Parts Used")</div>
+                            <ul class="small mb-0">
+                                @foreach (var p in Model.Parts)
+                                {
+                                    <li>@p.Name × @p.Quantity</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    @if (Model.Attachments.Count > 0)
+                    {
+                        <div class="mt-2 pt-2 border-top">
+                            <div class="text-muted small mb-1">@Loc.T("Attachments")</div>
+                            @foreach (var a in Model.Attachments)
+                            {
+                                <a asp-action="DownloadAttachment" asp-route-attachmentId="@a.Id" class="d-block small"><i class="bi bi-paperclip me-1"></i>@a.FileName</a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Stage History")</div>
+            <div class="list-group list-group-flush">
+                @foreach (var e in Model.StageEvents.OrderByDescending(e => e.ChangedAt))
+                {
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <partial name="_StatusBadge" model="@e.Stage" />
+                            <span class="small text-muted ms-2">@e.ChangedByUser?.FullName</span>
+                        </div>
+                        <span class="small text-muted">@e.ChangedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

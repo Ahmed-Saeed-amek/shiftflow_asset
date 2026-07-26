@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor Mgr as Manager<br/>(Schedule.Create)
+    participant Ctrl as ShiftMakerController
+    participant Svc as ShiftScheduleService
+    participant DB as Database
+
+    Mgr->>Ctrl: Create schedule<br/>(name, work area, dates,<br/>rotation template or inline days)
+    Ctrl->>Ctrl: Validate EndDate >= StartDate
+    opt Custom rotation entered inline
+        Ctrl->>DB: Create ad-hoc RotationTemplate<br/>"{ScheduleName} (auto)"
+    end
+    Ctrl->>Svc: CreateFromTemplateAsync(...)
+    Svc->>DB: Insert ShiftSchedule (Status = Draft)
+    Ctrl->>Svc: FillFromRotationAsync(scheduleId)
+    Svc->>DB: Wipe + regenerate DailyGroupShift rows<br/>(5 groups x N days, using rotation<br/>template or DefaultRotation fallback)
+    Ctrl->>Svc: GenerateAssignmentsAsync(scheduleId)
+    Svc->>DB: Wipe + regenerate ShiftAssignment rows<br/>(one per active UserGroupMembership<br/>per plan slot)
+    Svc-->>Ctrl: Done
+    Ctrl-->>Mgr: Redirect to Details (calendar view)
+
+    Mgr->>Ctrl: Publish
+    Ctrl->>Svc: PublishScheduleAsync
+    Svc->>DB: Status = Published
+    Note over Mgr,DB: Non-scheduler employees can only<br/>see a schedule once Published.

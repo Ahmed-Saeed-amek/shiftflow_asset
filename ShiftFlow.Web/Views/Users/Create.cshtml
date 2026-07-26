@@ -1,0 +1,210 @@
+@model UserCreateViewModel
+@{
+    ViewData["Title"] = Loc.T("New User");
+    var roles = (List<string>)ViewBag.Roles;
+    var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
+    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New User")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post" id="createUserForm">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Full Name")</label>
+                    <input asp-for="FullName" class="form-control" autocomplete="off" />
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Email")</label>
+                    <input asp-for="Email" class="form-control" autocomplete="off" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <div id="directorySearchStatus" class="text-muted small"></div>
+                    <div id="directorySearchResults" class="list-group"></div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Role")</label>
+                    <select asp-for="Role" class="form-select">
+                        @foreach (var r in roles) { <option value="@r">@RoleLabel(r)</option> }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Employee Number")</label>
+                    <input asp-for="EmployeeNumber" class="form-control" />
+                    <span asp-validation-for="EmployeeNumber" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Department")</label>
+                    <input asp-for="Department" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Phone")</label>
+                    <input asp-for="Phone" class="form-control" />
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-4 mb-0 d-flex align-items-start gap-2" id="manualPasswordNotice">
+                <i class="bi bi-envelope-check fs-5 flex-shrink-0 mt-1"></i>
+                <div class="small">
+                    @Loc.T("A temporary password will be") <strong>@Loc.T("generated automatically")</strong> @Loc.T("and emailed to the address above. The user will be prompted to choose a new password on their first login.")
+                </div>
+            </div>
+            <div class="alert alert-success mt-4 mb-0 d-flex align-items-start gap-2 d-none" id="directoryMatchNotice">
+                <i class="bi bi-microsoft fs-5 flex-shrink-0 mt-1"></i>
+                <div class="small">
+                    @Loc.T("Matched to the Microsoft directory") — <span id="directoryMatchName"></span>.
+                    @Loc.T("This account will sign in with Microsoft — no password will be generated.")
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Create User")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const fullNameInput = document.getElementById('FullName');
+            const emailInput = document.getElementById('Email');
+            const departmentInput = document.getElementById('Department');
+            const employeeNumberInput = document.getElementById('EmployeeNumber');
+            const phoneInput = document.getElementById('Phone');
+            const roleSelect = document.getElementById('Role');
+            const status = document.getElementById('directorySearchStatus');
+            const results = document.getElementById('directorySearchResults');
+            const manualNotice = document.getElementById('manualPasswordNotice');
+            const matchNotice = document.getElementById('directoryMatchNotice');
+            const matchName = document.getElementById('directoryMatchName');
+            const form = document.getElementById('createUserForm');
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            let debounceTimer = null;
+            let matchedUser = null; // the currently-selected directory match, or null
+            const searchingLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Searching…")));
+            const searchFailedLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Search failed.")));
+
+            function escapeHtml(s) {
+                return (s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+
+            function clearMatch() {
+                matchedUser = null;
+                matchNotice.classList.add('d-none');
+                manualNotice.classList.remove('d-none');
+            }
+
+            function applyMatch(u) {
+                matchedUser = u;
+                fullNameInput.value = u.displayName || fullNameInput.value;
+                emailInput.value = u.email || emailInput.value;
+                if (u.department) departmentInput.value = u.department;
+                if (u.employeeId) employeeNumberInput.value = u.employeeId;
+                if (u.mobilePhone) phoneInput.value = u.mobilePhone;
+                matchName.textContent = `${u.displayName} (${u.email})`;
+                manualNotice.classList.add('d-none');
+                matchNotice.classList.remove('d-none');
+                results.innerHTML = '';
+                status.textContent = '';
+            }
+
+            function renderResults(items) {
+                if (items.length === 0) {
+                    results.innerHTML = '<div class="text-muted small py-2">@Loc.T("No matches found.")</div>';
+                    return;
+                }
+                results.innerHTML = items.map((u, i) => {
+                    const sub = [u.jobTitle, u.department].filter(Boolean).join(' · ');
+                    if (u.alreadyImported) {
+                        return `<div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div><div class="fw-semibold">${escapeHtml(u.displayName)}</div>
+                            <div class="small text-muted">${escapeHtml(u.email)}${sub ? ' · ' + escapeHtml(sub) : ''}</div></div>
+                            <span class="badge bg-secondary">@Loc.T("Already added")</span>
+                        </div>`;
+                    }
+                    return `<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2"
+                                    data-result-index="${i}">
+                            <div class="me-auto"><div class="fw-semibold">${escapeHtml(u.displayName)}</div>
+                            <div class="small text-muted">${escapeHtml(u.email)}${sub ? ' · ' + escapeHtml(sub) : ''}</div></div>
+                            <i class="bi bi-check2 text-success"></i>
+                        </button>`;
+                }).join('');
+
+                results.querySelectorAll('[data-result-index]').forEach(btn => {
+                    btn.addEventListener('click', () => applyMatch(items[Number(btn.dataset.resultIndex)]));
+                });
+            }
+
+            function runSearch(q) {
+                if (q.trim().length < 2) {
+                    results.innerHTML = '';
+                    status.textContent = '';
+                    return;
+                }
+                status.textContent = searchingLabel;
+                fetch('@Url.Action("SearchDirectory")?q=' + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            status.textContent = data.error;
+                            results.innerHTML = '';
+                            return;
+                        }
+                        status.textContent = '';
+                        renderResults(data.results || []);
+                    })
+                    .catch(() => { status.textContent = searchFailedLabel; });
+            }
+
+            function onTypingInput(getQuery) {
+                return function () {
+                    // Any manual edit invalidates a previous match unless the email still
+                    // matches exactly — re-checked on submit too, this just keeps the notice honest live.
+                    if (matchedUser && emailInput.value !== matchedUser.email) clearMatch();
+                    clearTimeout(debounceTimer);
+                    const q = getQuery();
+                    debounceTimer = setTimeout(() => runSearch(q), 350);
+                };
+            }
+
+            fullNameInput.addEventListener('input', onTypingInput(() => fullNameInput.value));
+            emailInput.addEventListener('input', onTypingInput(() => emailInput.value));
+
+            form.addEventListener('submit', function (e) {
+                if (!matchedUser || emailInput.value !== matchedUser.email) return; // normal Create submit
+
+                e.preventDefault();
+                const hidden = document.createElement('form');
+                hidden.method = 'post';
+                hidden.action = '@Url.Action("ImportFromDirectory")';
+
+                const addField = (name, value) => {
+                    const el = document.createElement('input');
+                    el.type = 'hidden';
+                    el.name = name;
+                    el.value = value ?? '';
+                    hidden.appendChild(el);
+                };
+
+                addField('__RequestVerificationToken', token);
+                addField('email', emailInput.value);
+                addField('fullName', fullNameInput.value);
+                addField('department', departmentInput.value);
+                addField('employeeNumber', employeeNumberInput.value);
+                addField('phone', phoneInput.value);
+                addField('role', roleSelect.value);
+
+                document.body.appendChild(hidden);
+                hidden.submit();
+            });
+        })();
+    </script>
+}

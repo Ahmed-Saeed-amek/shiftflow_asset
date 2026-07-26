@@ -1,0 +1,39 @@
+@model WorkOrder
+@{
+    var currentIndex = Array.IndexOf(WorkOrder.Stages, Model.Stage);
+}
+@if (Model.Stage == "Draft" || Model.Stage == "Rejected")
+{
+    <div class="d-flex align-items-center gap-2">
+        <partial name="_StatusBadge" model="@Model.Stage" />
+        <span class="small text-muted">
+            @(Model.Stage == "Draft" ? Loc.T("Awaiting admin review — not yet a published work order.") : Loc.T("This report was rejected and will not become a work order."))
+        </span>
+    </div>
+}
+else if (Model.Stage == "Blocked")
+{
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <partial name="_StatusBadge" model="@Model.Stage" />
+        <span class="small text-muted">
+            @Loc.T("The vendor can't proceed")@(Model.BlockReason != null ? $" — {Model.BlockReason.Name}" : "")@(!string.IsNullOrWhiteSpace(Model.BlockDetail) ? $": {Model.BlockDetail}" : "").
+        </span>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-1">
+        @for (var i = 0; i < WorkOrder.Stages.Length; i++)
+        {
+            var stage = WorkOrder.Stages[i];
+            var isDone = i < currentIndex;
+            var isActive = i == currentIndex;
+            var cls = isDone ? "bg-success text-white" : isActive ? "bg-primary text-white" : "bg-light text-muted";
+            <span class="badge rounded-pill @cls px-3 py-2">@(i + 1). @Loc.T(stage)</span>
+            if (i < WorkOrder.Stages.Length - 1)
+            {
+                <i class="bi bi-chevron-right text-muted small"></i>
+            }
+        }
+    </div>
+}

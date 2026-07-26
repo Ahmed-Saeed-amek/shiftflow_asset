@@ -1,0 +1,35 @@
+Act as a senior ASP.NET Core software architect and enterprise asset management (EAM) expert.
+
+Your task is to redesign and implement the Asset Management module of this system by creating a feature set that closely matches the functionality and user experience of Microsoft Dynamics 365 Asset Management (formerly Dynamics 365 Finance & Operations Asset Management), while integrating seamlessly into the existing application.
+
+Objectives
+Study and understand the complete Microsoft Dynamics 365 Asset Management module, including its documentation, workflows, entities, relationships, maintenance processes, planning features, and best practices.
+Analyze the existing project architecture before making any changes.
+Produce a detailed implementation plan before writing code.
+Implement the module incrementally without breaking existing functionality.
+Requirements
+Replicate as many Microsoft Asset Management features as practical.
+Preserve and integrate the existing:
+Asset image functionality.
+Preventive maintenance functionality.
+Sub-asset hierarchy.
+Expand these features where necessary so they fit naturally into the new architecture.
+Maintain compatibility with the current database and application architecture whenever possible.
+Localization
+Support both Arabic and English throughout the module.
+Ensure RTL/LTR compatibility.
+All UI elements, validation messages, reports, and lookup data must support localization.
+Deliverables
+Analyze the current Asset Management implementation.
+Research SharepointEmpower Asset Management documentation thoroughly.
+Compare the current implementation against SharepointEmpower feature set.
+Identify missing entities, pages, workflows, and business logic.
+Design the complete database schema and entity relationships.
+Design navigation, permissions, dashboards, forms, and maintenance workflows.
+Produce a phased implementation roadmap.
+After approval of the plan, implement each phase carefully while preserving existing functionality.
+Constraints
+Do not remove existing features unless replacing them with a superior equivalent.
+Preserve backward compatibility whenever feasible.
+Follow the project's existing ASP.NET Core architecture, coding standards, naming conventions, and design patterns.
+Build a scalable, maintainable, enterprise-grade module that closely mirrors SharepointEmpower Asset Management while remaining fully integrated into this application.

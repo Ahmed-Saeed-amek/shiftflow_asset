@@ -1,0 +1,116 @@
+using Microsoft.EntityFrameworkCore;
+using ShiftFlow.Domain.Entities;
+using ShiftFlow.Infrastructure.Data;
+
+namespace ShiftFlow.Application.Services;
+
+public class ContractService : IContractService
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IAuditService _audit;
+    public ContractService(ApplicationDbContext db, IAuditService audit) { _db = db; _audit = audit; }
+
+    public async Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId)
+    {
+        contract.CreatedDate = DateTime.UtcNow;
+        contract.AssetLinks = assetIds.Select(id => new ContractAsset { AssetId = id }).ToList();
+        _db.Contracts.Add(contract);
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Create", "Contract", contract.Id.ToString(), userId, newValue: contract.ContractNumber);
+        return contract;
+    }
+
+    public async Task UpdateAsync(Contract contract, List<int> assetIds, string userId)
+    {
+        var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
+            ?? throw new InvalidOperationException("Contract not found.");
+        existing.VendorId = contract.VendorId; existing.ContractType = contract.ContractType; existing.ContractNumber = contract.ContractNumber;
+        existing.StartDate = contract.StartDate; existing.EndDate = contract.EndDate; existing.Cost = contract.Cost; existing.Notes = contract.Notes;
+        existing.PmCadence = contract.PmCadence;
+
+        var toRemove = existing.AssetLinks.Where(l => !assetIds.Contains(l.AssetId)).ToList();
+        var toAdd = assetIds.Where(id => !existing.AssetLinks.Any(l => l.AssetId == id)).Select(id => new ContractAsset { ContractId = existing.Id, AssetId = id });
+        _db.ContractAssets.RemoveRange(toRemove);
+        _db.ContractAssets.AddRange(toAdd);
+
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Update", "Contract", existing.Id.ToString(), userId, newValue: existing.ContractNumber);
+    }
+
+    public async Task<Vendor?> GetDerivedVendorAsync(int assetId)
+    {
+        var result = await GetDerivedVendorsAsync([assetId]);
+        return result.GetValueOrDefault(assetId);
+    }
+
+    public async Task<Dictionary<int, Vendor?>> GetDerivedVendorsAsync(IEnumerable<int> assetIds)
+    {
+        var today = DateTime.UtcNow.Date;
+        var contracts = await _db.ContractAssets
+            .Where(ca => assetIds.Contains(ca.AssetId))
+            .Select(ca => new { ca.AssetId, ca.Contract!.VendorId, ca.Contract.Vendor, ca.Contract.StartDate, ca.Contract.EndDate })
+            .ToListAsync();
+
+        var result = new Dictionary<int, Vendor?>();
+        foreach (var group in contracts.GroupBy(c => c.AssetId))
+        {
+            var active = group.Where(c => c.EndDate == null || c.EndDate >= today).OrderByDescending(c => c.StartDate).FirstOrDefault();
+            var pick = active ?? group.OrderByDescending(c => c.StartDate).First();
+            result[group.Key] = pick.Vendor;
+        }
+        return result;
+    }
+
+    public async Task<List<ServiceVendorCandidate>> GetActiveServiceVendorsAsync(int assetId)
+    {
+        var today = DateTime.UtcNow.Date;
+        return await _db.ContractAssets
+            .Where(ca => ca.AssetId == assetId
+                && ca.Contract!.ContractType == "Service"
+                && (ca.Contract.EndDate == null || ca.Contract.EndDate >= today))
+            .Select(ca => new ServiceVendorCandidate
+            {
+                VendorId = ca.Contract!.VendorId,
+                VendorName = ca.Contract.Vendor!.Name,
+                ContractId = ca.ContractId,
+                ContractNumber = ca.Contract.ContractNumber,
+            })
+            .Distinct()
+            .ToListAsync();
+    }
+
+    public async Task<List<PmScheduleRow>> GetPreventiveMaintenanceScheduleAsync(int contractId)
+    {
+        var contract = await _db.Contracts.Include(c => c.AssetLinks).ThenInclude(l => l.Asset)
+            .FirstOrDefaultAsync(c => c.Id == contractId);
+        if (contract is null || contract.ContractType != "Preventive Maintenance"
+            || contract.PmCadence is null || contract.EndDate is null)
+            return [];
+
+        var dueDates = Contract.ComputeOccurrenceDueDates(contract.StartDate, contract.EndDate.Value, contract.PmCadence);
+
+        var generated = await _db.WorkOrders
+            .Where(w => w.SourceContractId == contractId)
+            .Select(w => new { w.AssetId, w.ScheduledDate, w.Id, w.WorkOrderNumber })
+            .ToListAsync();
+        var lookup = generated.ToDictionary(w => (w.AssetId, w.ScheduledDate!.Value.Date), w => (w.Id, w.WorkOrderNumber));
+
+        var rows = new List<PmScheduleRow>();
+        foreach (var link in contract.AssetLinks)
+        {
+            foreach (var due in dueDates)
+            {
+                lookup.TryGetValue((link.AssetId, due), out var match);
+                rows.Add(new PmScheduleRow
+                {
+                    AssetId = link.AssetId,
+                    AssetLabel = $"{link.Asset!.AssetTag} — {link.Asset.Name}",
+                    DueDate = due,
+                    WorkOrderId = match.Id == 0 ? null : match.Id,
+                    WorkOrderNumber = match.WorkOrderNumber,
+                });
+            }
+        }
+        return rows.OrderBy(r => r.DueDate).ThenBy(r => r.AssetLabel).ToList();
+    }
+}

@@ -1,0 +1,56 @@
+@using ShiftFlow.Domain.Entities
+@{
+    ViewData["Title"] = Loc.T("My Home");
+    var recentOrders = (List<InspectionOrder>)ViewBag.RecentOrders;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Welcome back") + ", " + (string)ViewBag.UserName,Subtitle=Loc.T("Here's what's on your plate today")})" />
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-6">
+        <a href="@Url.Action("MyOrders","InspectionOrders")" class="text-decoration-none">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("My Open Inspection Orders"),Value=ViewBag.OpenOrderCount.ToString(),Icon="bi-clipboard-check",Color="amber"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-6">
+        <a href="@Url.Action("MyOrders","InspectionOrders")" class="text-decoration-none">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue"),Value=ViewBag.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" />
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-clipboard-check me-2 text-primary"></i>@Loc.T("Recent Inspection Orders")</div>
+            <div class="list-group list-group-flush">
+                @if (recentOrders.Count == 0)
+                {
+                    <div class="list-group-item text-muted small text-center py-3">@Loc.T("No open inspection orders — you're all caught up.")</div>
+                }
+                @foreach (var o in recentOrders)
+                {
+                    <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="small fw-semibold">@o.OrderNumber — @o.Title</div>
+                                <div class="small text-muted">@(o.DueDate.HasValue ? Loc.T("Due") + " " + o.DueDate.Value.ToString("dd/MM/yyyy") : "")</div>
+                            </div>
+                            <partial name="_StatusBadge" model="@o.Status" />
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-grid me-2"></i>@Loc.T("Quick Links")</div>
+            <div class="list-group list-group-flush">
+                <a asp-controller="InspectionOrders" asp-action="MyOrders" class="list-group-item list-group-item-action"><i class="bi bi-clipboard-check me-2 text-muted"></i>@Loc.T("My Orders")</a>
+                <a asp-controller="Users" asp-action="MyMetrics" class="list-group-item list-group-item-action"><i class="bi bi-graph-up-arrow me-2 text-muted"></i>@Loc.T("My Metrics")</a>
+                <a asp-controller="Users" asp-action="MyTasks" class="list-group-item list-group-item-action"><i class="bi bi-check2-square me-2 text-muted"></i>@Loc.T("My Tasks")</a>
+            </div>
+        </div>
+    </div>
+</div>

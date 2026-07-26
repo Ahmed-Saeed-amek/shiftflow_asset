@@ -1,0 +1,367 @@
+@model List<ApplicationUser>
+@{
+    ViewData["Title"] = Loc.T("Permissions Management");
+    var roles        = (List<ApplicationRole>)ViewBag.Roles;
+    var rolesByUser  = (Dictionary<string, IList<string>>)ViewBag.RolesByUser;
+    var roleNames    = roles.Select(r => r.Name!).OrderBy(n => n).ToList();
+    var roleNameArByName = roles.ToDictionary(r => r.Name!, r => r.NameAr);
+    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+    var selectAtLeastOneUserJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Select at least one user."));
+    var pickAtLeastOneRoleJson   = System.Text.Json.JsonSerializer.Serialize(Loc.T("Pick at least one role to add or remove."));
+}
+
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title    = Loc.T("Permissions Management"),
+    Subtitle = Loc.T("Manage roles and user-level permissions")
+})" />
+
+@if (TempData["Success"] is string ok)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-3">
+        <i class="bi bi-check-circle me-2"></i>@ok
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-3">
+        <i class="bi bi-exclamation-circle me-2"></i>@err
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row g-4">
+
+    <!-- ═══════════════════════════════════════════════════
+         LEFT: Roles panel
+    ════════════════════════════════════════════════════ -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom d-flex align-items-center gap-2 py-3">
+                <i class="bi bi-shield-lock text-primary fs-5"></i>
+                <span class="fw-semibold">@Loc.T("Roles")</span>
+                <span class="badge bg-primary ms-auto">@roles.Count</span>
+            </div>
+
+            <!-- Add role -->
+            <div class="px-3 py-2 border-bottom bg-light">
+                <form method="post" asp-action="CreateRole" class="d-flex flex-column gap-2">
+                    @Html.AntiForgeryToken()
+                    <div class="d-flex gap-2">
+                        <input name="roleName" class="form-control form-control-sm"
+                               placeholder="@Loc.T("New role name…")" maxlength="50" required />
+                        <button class="btn btn-sm btn-primary text-nowrap">
+                            <i class="bi bi-plus-lg me-1"></i>@Loc.T("Add")
+                        </button>
+                    </div>
+                    <input name="roleNameAr" class="form-control form-control-sm" dir="rtl"
+                           placeholder="@Loc.T("Arabic name (optional)")" maxlength="100" />
+                </form>
+            </div>
+
+            <div class="list-group list-group-flush">
+                @foreach (var role in roles)
+                {
+                    var memberCount = rolesByUser.Values.Count(r => r.Contains(role.Name!));
+                    <div class="list-group-item d-flex align-items-center gap-2 py-2 px-3">
+                        <a href="@Url.Action("RolePermissions","Rbac",new{roleId=role.Id})"
+                           class="d-flex align-items-center gap-2 flex-grow-1 text-decoration-none text-body overflow-hidden">
+                            <span class="badge rounded-circle bg-primary-subtle text-primary p-2 flex-shrink-0">
+                                <i class="bi bi-shield-fill"></i>
+                            </span>
+                            <div class="overflow-hidden">
+                                <div class="fw-semibold text-truncate">@RoleLabel(role.Name!)</div>
+                                <div class="small text-muted">@memberCount @Loc.T("user(s)")</div>
+                            </div>
+                            <i class="bi bi-chevron-right text-muted small ms-auto"></i>
+                        </a>
+                        <form method="post" asp-action="DeleteRole" class="flex-shrink-0"
+                              onsubmit="return confirm('@Loc.T("Delete role") \'@RoleLabel(role.Name!)\'?')">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="roleId" value="@role.Id" />
+                            <button class="btn btn-sm btn-outline-danger py-1 px-2"
+                                    title="@(memberCount > 0 ? Loc.T("Remove all users first") : Loc.T("Delete role"))"
+                                    @(memberCount > 0 ? "disabled" : "")>
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+        <p class="text-muted small mt-2 px-1">
+            <i class="bi bi-info-circle me-1"></i>@Loc.T("Delete is disabled while users are in the role.")
+        </p>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         RIGHT: Users panel with bulk selection
+    ════════════════════════════════════════════════════ -->
+    <div class="col-lg-8">
+
+        <!-- Bulk action bar (hidden until ≥1 user checked) -->
+        <div id="bulkBar" class="card border-0 shadow-sm mb-3 d-none">
+            <div class="card-body py-2 px-3 bg-primary-subtle border border-primary-subtle rounded">
+                <form method="post" asp-action="BulkAssignRoles" id="bulkForm">
+                    @Html.AntiForgeryToken()
+                    <!-- selected user ids injected by JS -->
+                    <div id="bulkUserInputs"></div>
+
+                    <div class="d-flex flex-wrap align-items-end gap-3">
+                        <div class="fw-semibold text-primary">
+                            <i class="bi bi-people-fill me-1"></i>
+                            <span id="selCount">0</span> @Loc.T("user(s) selected")
+                        </div>
+
+                        <!-- ADD roles -->
+                        <div>
+                            <label class="form-label small mb-1 fw-semibold text-success">@Loc.T("Add roles")</label>
+                            <div class="d-flex flex-wrap gap-2" id="addRoleChecks">
+                                @foreach (var rn in roleNames)
+                                {
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input border-success" type="checkbox"
+                                               name="addRoles" value="@rn" id="add-@rn" />
+                                        <label class="form-check-label small" for="add-@rn">@RoleLabel(rn)</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- REMOVE roles -->
+                        <div>
+                            <label class="form-label small mb-1 fw-semibold text-danger">@Loc.T("Remove roles")</label>
+                            <div class="d-flex flex-wrap gap-2" id="removeRoleChecks">
+                                @foreach (var rn in roleNames)
+                                {
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input border-danger" type="checkbox"
+                                               name="removeRoles" value="@rn" id="rem-@rn" />
+                                        <label class="form-check-label small" for="rem-@rn">@RoleLabel(rn)</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-sm btn-primary px-3 ms-auto"
+                                onclick="return injectUserIds()">
+                            <i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Apply to selected")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Users table -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom py-2 px-3">
+                <!-- row 1: title + select-all -->
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-people text-success fs-5"></i>
+                    <span class="fw-semibold">@Loc.T("Users")</span>
+                    <span class="badge bg-success" id="visibleCount">@Model.Count</span>
+                    <div class="form-check mb-0 ms-auto" title="@Loc.T("Select all visible")">
+                        <input class="form-check-input" type="checkbox" id="checkAll" />
+                        <label class="form-check-label small text-muted" for="checkAll">@Loc.T("Select all")</label>
+                    </div>
+                </div>
+                <!-- row 2: filters -->
+                <div class="d-flex gap-2 flex-wrap">
+                    <input id="filterName" type="search" class="form-control form-control-sm"
+                           placeholder="@Loc.T("Search by name or email…")" style="max-width:240px" />
+                    <select id="filterRole" class="form-select form-select-sm" style="max-width:180px">
+                        <option value="">@Loc.T("All roles")</option>
+                        @foreach (var rn in roleNames)
+                        {
+                            <option value="@rn">@RoleLabel(rn)</option>
+                        }
+                        <option value="__none__">@Loc.T("No role assigned")</option>
+                    </select>
+                    <button id="clearFilters" class="btn btn-sm btn-outline-secondary d-none">
+                        <i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")
+                    </button>
+                </div>
+            </div>
+
+            <div style="max-height:620px;overflow-y:auto" class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <tbody>
+                    @foreach (var user in Model)
+                    {
+                        var userRoles = rolesByUser[user.Id];
+                        <tr class="user-row"
+                            data-name="@user.FullName.ToLower() @user.Email.ToLower()"
+                            data-roles="@string.Join(" ", userRoles).ToLower()"
+                            data-hasroles="@(userRoles.Any() ? "yes" : "no")"
+                            data-rolecount="@userRoles.Count">
+                            <!-- Checkbox -->
+                            <td class="ps-3" style="width:40px">
+                                <input class="form-check-input user-check" type="checkbox"
+                                       value="@user.Id" />
+                            </td>
+
+                            <!-- Avatar + name -->
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center
+                                                justify-content-center flex-shrink-0"
+                                         style="width:36px;height:36px">
+                                        <span class="fw-bold text-secondary small">@user.FullName[0]</span>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold small">@user.FullName</div>
+                                        <div class="text-muted" style="font-size:.75rem">@user.Email</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Roles badges -->
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var r in userRoles)
+                                    {
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle">@RoleLabel(r)</span>
+                                    }
+                                    @if (!userRoles.Any())
+                                    {
+                                        <span class="text-muted small">@Loc.T("No roles")</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <!-- Per-user permissions link -->
+                            <td class="text-end pe-3">
+                                <a href="@Url.Action("UserPermissions","Rbac",new{userId=user.Id})"
+                                   class="btn btn-sm btn-outline-secondary py-1 px-2"
+                                   title="@Loc.T("Edit permission overrides")">
+                                    <i class="bi bi-shield-lock"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No users found.")</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const checkAll      = document.getElementById('checkAll');
+    const bulkBar       = document.getElementById('bulkBar');
+    const selCount      = document.getElementById('selCount');
+    const userInputsDiv = document.getElementById('bulkUserInputs');
+    const filterName    = document.getElementById('filterName');
+    const filterRole    = document.getElementById('filterRole');
+    const clearBtn      = document.getElementById('clearFilters');
+    const visibleCount  = document.getElementById('visibleCount');
+    const allRows       = [...document.querySelectorAll('.user-row')];
+
+    // ── Filtering ──────────────────────────────────────────────────
+    function applyFilters() {
+        const name = filterName.value.trim().toLowerCase();
+        const role = filterRole.value;
+        const hasFilter = name !== '' || role !== '';
+
+        clearBtn.classList.toggle('d-none', !hasFilter);
+
+        let visible = 0;
+        allRows.forEach(row => {
+            const matchName = !name || row.dataset.name.includes(name);
+            let matchRole = true;
+            if (role === '__none__')      matchRole = row.dataset.hasroles === 'no';
+            else if (role !== '')         matchRole = row.dataset.roles.split(' ').includes(role.toLowerCase());
+
+            const show = matchName && matchRole;
+            row.classList.toggle('d-none', !show);
+            if (show) visible++;
+        });
+
+        visibleCount.textContent = visible;
+
+        // Uncheck hidden rows so they don't sneak into bulk actions
+        allRows.forEach(row => {
+            if (row.classList.contains('d-none'))
+                row.querySelector('.user-check').checked = false;
+        });
+        refreshBulk();
+    }
+
+    filterName.addEventListener('input',  applyFilters);
+    filterRole.addEventListener('change', applyFilters);
+    clearBtn.addEventListener('click', () => {
+        filterName.value = '';
+        filterRole.value = '';
+        applyFilters();
+    });
+
+    // ── Bulk selection ─────────────────────────────────────────────
+    function visibleChecks() {
+        return allRows
+            .filter(r => !r.classList.contains('d-none'))
+            .map(r => r.querySelector('.user-check'));
+    }
+
+    function getChecked() {
+        return visibleChecks().filter(cb => cb.checked);
+    }
+
+    function refreshBulk() {
+        const checked = getChecked();
+        selCount.textContent = checked.length;
+        bulkBar.classList.toggle('d-none', checked.length === 0);
+        const vis = visibleChecks();
+        checkAll.checked        = vis.length > 0 && checked.length === vis.length;
+        checkAll.indeterminate  = checked.length > 0 && checked.length < vis.length;
+    }
+
+    checkAll.addEventListener('change', () => {
+        visibleChecks().forEach(cb => cb.checked = checkAll.checked);
+        refreshBulk();
+    });
+
+    document.querySelectorAll('.user-check').forEach(cb =>
+        cb.addEventListener('change', refreshBulk));
+
+    // ── Add / Remove mutual exclusion ──────────────────────────────
+    document.querySelectorAll('[name=addRoles]').forEach(cb =>
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                const m = document.getElementById('rem-' + cb.value);
+                if (m) m.checked = false;
+            }
+        }));
+    document.querySelectorAll('[name=removeRoles]').forEach(cb =>
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                const m = document.getElementById('add-' + cb.value);
+                if (m) m.checked = false;
+            }
+        }));
+
+    // ── Submit ─────────────────────────────────────────────────────
+    window.injectUserIds = function () {
+        userInputsDiv.innerHTML = '';
+        const checked = getChecked();
+        if (checked.length === 0) { alert(@Html.Raw(selectAtLeastOneUserJson)); return false; }
+
+        const add = [...document.querySelectorAll('[name=addRoles]:checked')];
+        const rem = [...document.querySelectorAll('[name=removeRoles]:checked')];
+        if (add.length === 0 && rem.length === 0) {
+            alert(@Html.Raw(pickAtLeastOneRoleJson)); return false;
+        }
+
+        checked.forEach(cb => {
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'userIds'; inp.value = cb.value;
+            userInputsDiv.appendChild(inp);
+        });
+        return true;
+    };
+})();
+</script>

@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.idea/
+.git/
+.claude/
+logs/
+*.log
+node_modules/
+test-results/
+playwright-report/
+tests/
+graphify-out/
+UsersAhmedDesktopgraphify/
+UsersAhmedDesktoprased/

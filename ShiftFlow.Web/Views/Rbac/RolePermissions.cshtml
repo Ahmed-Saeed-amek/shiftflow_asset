@@ -1,0 +1,162 @@
+@model IReadOnlyList<ShiftFlow.Domain.Entities.Permission>
+@{
+    var role = (ApplicationRole)ViewBag.Role;
+    var roleLabel = Loc.LocalizedName(role.Name!, role.NameAr);
+    var rolePerms = (HashSet<string>)ViewBag.RolePerms;
+    // Group permissions by category
+    var groups = Model.GroupBy(p => p.Category).OrderBy(g => g.Key);
+    var toggleAllLabelJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Toggle all"));
+    ViewData["Title"] = $"{Loc.T("Permissions")} — {roleLabel}";
+}
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="@Url.Action("Index","Rbac")" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
+    </a>
+    <div>
+        <h4 class="mb-0 fw-bold">
+            <i class="bi bi-shield-lock text-primary me-2"></i>@roleLabel
+            <span class="text-muted fw-normal fs-6 ms-1">— @Loc.T("Role Permissions")</span>
+        </h4>
+        <small class="text-muted">@Loc.T("Check the permissions this role should have. Changes apply to all users in this role.")</small>
+    </div>
+</div>
+
+@if (TempData["Success"] is string msg)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@msg
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<form method="post" asp-action="SaveRolePermissions" asp-route-roleId="@role.Id">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-3 mb-4">
+        @foreach (var group in groups)
+        {
+            @* Locations feature is dormant (nav link commented out in _Layout.cshtml) — hide its permission card too until it's reactivated. *@
+            if (group.Key == "Locations") { continue; }
+
+            var pairsInGroup = PermissionDisplay.Pairs.Where(p => group.Any(x => x.Name == p.ReadPermission)).ToList();
+            var standalone = group.Where(p => !PermissionDisplay.PairedPermissionNames.Contains(p.Name)).ToList();
+            <div class="col-md-6 col-xl-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-transparent border-bottom py-2 px-3">
+                        <span class="fw-semibold small text-uppercase text-muted">@Loc.T(group.Key)</span>
+                    </div>
+                    <div class="card-body py-2 px-3">
+                        @foreach (var pair in pairsInGroup)
+                        {
+                            var readPerm  = group.First(x => x.Name == pair.ReadPermission);
+                            var writePerm = group.First(x => x.Name == pair.WritePermission);
+                            bool hasRead  = rolePerms.Contains(pair.ReadPermission);
+                            bool hasWrite = rolePerms.Contains(pair.WritePermission);
+                            string state  = hasRead && hasWrite ? "both" : hasWrite ? "write" : hasRead ? "read" : "none";
+                            <div class="py-2 border-bottom border-light-subtle rw-pair">
+                                <div class="d-flex align-items-start justify-content-between gap-2">
+                                    <div>
+                                        <span class="fw-medium d-block">@Loc.T(pair.Label)</span>
+                                        <span class="text-muted small">@Loc.T(readPerm.Description)</span>
+                                    </div>
+                                    <div class="btn-group btn-group-sm flex-shrink-0" role="group">
+                                        <input type="radio" class="btn-check rw-radio" name="rw-@pair.ReadPermission" id="none-@readPerm.Id"
+                                               value="none" @(state == "none" ? "checked" : "") />
+                                        <label class="btn btn-outline-secondary py-1 px-2" for="none-@readPerm.Id" title="@Loc.T("No access")">
+                                            <i class="bi bi-dash"></i>
+                                        </label>
+
+                                        <input type="radio" class="btn-check rw-radio" name="rw-@pair.ReadPermission" id="read-@readPerm.Id"
+                                               value="read" @(state == "read" ? "checked" : "") />
+                                        <label class="btn btn-outline-info py-1 px-2" for="read-@readPerm.Id" title="@Loc.T("Read only") — @Loc.T(readPerm.Description)">
+                                            <i class="bi bi-eye"></i>
+                                        </label>
+
+                                        <input type="radio" class="btn-check rw-radio" name="rw-@pair.ReadPermission" id="write-@readPerm.Id"
+                                               value="write" @(state == "write" ? "checked" : "") />
+                                        <label class="btn btn-outline-primary py-1 px-2" for="write-@readPerm.Id" title="@Loc.T("Write only") — @Loc.T(writePerm.Description)">
+                                            <i class="bi bi-pencil"></i>
+                                        </label>
+
+                                        <input type="radio" class="btn-check rw-radio" name="rw-@pair.ReadPermission" id="both-@readPerm.Id"
+                                               value="both" @(state == "both" ? "checked" : "") />
+                                        <label class="btn btn-outline-success py-1 px-2" for="both-@readPerm.Id" title="@Loc.T("Read + Write")">
+                                            <i class="bi bi-check-all"></i>
+                                        </label>
+                                    </div>
+                                </div>
+                                <input type="checkbox" class="d-none rw-checkbox" data-role="read"
+                                       name="granted" value="@pair.ReadPermission" @(hasRead ? "checked" : "") />
+                                <input type="checkbox" class="d-none rw-checkbox" data-role="write"
+                                       name="granted" value="@pair.WritePermission" @(hasWrite ? "checked" : "") />
+                            </div>
+                        }
+                        @foreach (var perm in standalone)
+                        {
+                            bool isGranted = rolePerms.Contains(perm.Name);
+                            <div class="form-check py-2 border-bottom border-light-subtle">
+                                <input class="form-check-input standalone-checkbox" type="checkbox"
+                                       name="granted" value="@perm.Name"
+                                       id="perm-@perm.Id"
+                                       @(isGranted ? "checked" : "") />
+                                <label class="form-check-label w-100" for="perm-@perm.Id">
+                                    <span class="fw-medium d-block">@Loc.T(PermissionDisplay.GetTitle(perm.Name))</span>
+                                    <span class="text-muted small">@Loc.T(perm.Description)</span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-2"></i>@Loc.T("Save Permissions")
+        </button>
+        <a href="@Url.Action("Index","Rbac")" class="btn btn-outline-secondary px-4">@Loc.T("Cancel")</a>
+    </div>
+</form>
+
+<script>
+// A None/Read/Write/Both control drives two hidden checkboxes that are the
+// actual "granted" form fields SaveRolePermissions reads — this keeps the
+// server-side save logic unchanged while the UI shows one friendly control.
+function setPairState(pairEl, state) {
+    const readBox = pairEl.querySelector('.rw-checkbox[data-role="read"]');
+    const writeBox = pairEl.querySelector('.rw-checkbox[data-role="write"]');
+    const radio = pairEl.querySelector(`.rw-radio[value="${state}"]`);
+    if (radio) radio.checked = true;
+    readBox.checked = state === 'read' || state === 'both';
+    writeBox.checked = state === 'write' || state === 'both';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.rw-pair').forEach(pairEl => {
+        pairEl.querySelectorAll('.rw-radio').forEach(radio => {
+            radio.addEventListener('change', () => { if (radio.checked) setPairState(pairEl, radio.value); });
+        });
+    });
+
+    // Quick select helpers
+    document.querySelectorAll('.card').forEach(card => {
+        const header = card.querySelector('.card-header');
+        if (!header) return;
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn btn-link btn-sm p-0 float-end text-muted';
+        toggleBtn.textContent = @Html.Raw(toggleAllLabelJson);
+        toggleBtn.onclick = () => {
+            const boxes = [...card.querySelectorAll('input.standalone-checkbox')];
+            const pairs = [...card.querySelectorAll('.rw-pair')];
+            const anyUnchecked = boxes.some(b => !b.checked) ||
+                pairs.some(p => !p.querySelector('.rw-radio[value="both"]').checked);
+            boxes.forEach(b => b.checked = anyUnchecked);
+            pairs.forEach(p => setPairState(p, anyUnchecked ? 'both' : 'none'));
+        };
+        header.appendChild(toggleBtn);
+    });
+});
+</script>

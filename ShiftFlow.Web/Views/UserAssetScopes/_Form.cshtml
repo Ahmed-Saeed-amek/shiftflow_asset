@@ -1,0 +1,78 @@
+@model UserAssetScopeViewModel
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("User")</label>
+                    <partial name="_EmployeePicker" model='new EmployeePickerModel {
+                        Name = "UserId", SelectedId = Model.UserId, SelectedLabel = ViewBag.SelectedUserName as string,
+                        Placeholder = Loc.T("Search by name or email…") }' />
+                    <span asp-validation-for="UserId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Scope Type")</label>
+                    <select id="scopeTypeSelect" class="form-select">
+                        @foreach (var t in UserAssetScope.ScopeTypes)
+                        {
+                            <option value="@t" selected="@(Model.ScopeType==t)">@Loc.T(t)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Value")</label>
+                    <select id="zoneValueSelect" class="form-select scope-value-select" data-type="Zone">
+                        @foreach (var z in (List<Zone>)ViewBag.Zones)
+                        {
+                            <option value="@z.Id" selected="@(Model.ScopeType=="Zone" && Model.ScopeValueId==z.Id)">@Loc.LocalizedName(z.Name, z.NameAr)</option>
+                        }
+                    </select>
+                    <select id="areaValueSelect" class="form-select scope-value-select d-none" data-type="Area">
+                        @foreach (var a in (List<Area>)ViewBag.Areas)
+                        {
+                            <option value="@a.Id" selected="@(Model.ScopeType=="Area" && Model.ScopeValueId==a.Id)">@Loc.LocalizedName(a.Name, a.NameAr)</option>
+                        }
+                    </select>
+                    <select id="categoryValueSelect" class="form-select scope-value-select d-none" data-type="Category">
+                        @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
+                        {
+                            <option value="@c.Id" selected="@(Model.ScopeType=="Category" && Model.ScopeValueId==c.Id)">@c.Name</option>
+                        }
+                    </select>
+                    <input type="hidden" asp-for="ScopeValueId" id="scopeValueIdHidden" />
+                    <input type="hidden" asp-for="ScopeType" id="scopeTypeHidden" />
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const typeSel = document.getElementById('scopeTypeSelect');
+    const typeHidden = document.getElementById('scopeTypeHidden');
+    const valueHidden = document.getElementById('scopeValueIdHidden');
+    const valueSelects = document.querySelectorAll('.scope-value-select');
+
+    function showForType(type) {
+        valueSelects.forEach(sel => {
+            const match = sel.dataset.type === type;
+            sel.classList.toggle('d-none', !match);
+            if (match) valueHidden.value = sel.value;
+        });
+        typeHidden.value = type;
+    }
+
+    valueSelects.forEach(sel => sel.addEventListener('change', () => { if (sel.dataset.type === typeSel.value) valueHidden.value = sel.value; }));
+    typeSel.addEventListener('change', () => showForType(typeSel.value));
+
+    showForType(typeSel.value);
+})();
+</script>

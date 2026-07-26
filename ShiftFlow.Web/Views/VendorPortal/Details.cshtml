@@ -1,0 +1,168 @@
+@model WorkOrder
+@{
+    ViewData["Title"] = Model.WorkOrderNumber;
+    var isSentToVendor = Model.Stage == "Sent to Vendor";
+    var blockReasons = ViewBag.BlockReasons as List<WorkOrderBlockReason>;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.WorkOrderNumber,Subtitle=Model.Asset?.AssetTag})" />
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger small">@TempData["Error"]</div>
+}
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success small">@TempData["Success"]</div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Details")</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span class="text-muted small">@Loc.T("Type")</span>
+                    @if (Model.SourceContractId != null)
+                    {
+                        <span class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle"><i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance")</span>
+                    }
+                    else
+                    {
+                        <span class="small text-muted">@Loc.T("Manual")</span>
+                    }
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Priority")</span><partial name="_StatusBadge" model="@Model.Priority" /></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Stage")</span><partial name="_StatusBadge" model="@Model.Stage" /></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Asset")</span><span class="small">@Model.Asset?.Name (@Model.Asset?.AssetTag)</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Category")</span><span class="small">@Model.Asset?.Category?.Name</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Zone")</span><span class="small">@(Model.Asset?.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(Model.Asset?.Zone?.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null) / @(Model.Asset?.Zone?.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null))</span></span></div>
+                @if (Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku)))
+                {
+                    <div class="mt-2 pt-2 border-top">
+                        <div class="text-muted small mb-1 fw-semibold">@Loc.T("Asset Specifications")</div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Manufacturer")</span><span class="small">@Model.Asset.Manufacturer</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Model))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Model")</span><span class="small">@Model.Asset.Model</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.Sku))
+                        {
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("SKU")</span><span class="small font-monospace">@Model.Asset.Sku</span></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Asset.SerialNumber))
+                        {
+                            <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Serial Number")</span><span class="small font-monospace">@Model.Asset.SerialNumber</span></div>
+                        }
+                    </div>
+                }
+                @if (Model.ActionType != null)
+                {
+                    <div class="mt-2 pt-2 border-top">
+                        <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Action Type")</span><span class="small">@Model.ActionType.Name</span></div>
+                        <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Cause")</span><span class="small">@Model.Cause?.Name</span></div>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Description")</div><div class="small">@Model.Description</div></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small">@Model.Notes</div></div>
+                }
+            </div>
+        </div>
+
+        @if (Model.Stage == "Blocked")
+        {
+            <div class="alert alert-warning small mb-3">
+                <div class="fw-semibold">@Loc.T("Block Reason"): @Model.BlockReason?.Name</div>
+                @if (!string.IsNullOrWhiteSpace(Model.BlockDetail)) { <div>@Model.BlockDetail</div> }
+                <div class="mt-1">@Loc.T("Waiting on admin to resolve and resend.")</div>
+            </div>
+        }
+        @if (Model.Stage == "Fixed - Pending Confirmation")
+        {
+            <div class="alert alert-info small mb-3">@Loc.T("Fix report submitted — waiting on admin confirmation.")</div>
+        }
+        @if (Model.Stage == "Closed")
+        {
+            <div class="alert alert-success small mb-3">@Loc.T("This work order is closed.")</div>
+        }
+    </div>
+
+    @if (isSentToVendor)
+    {
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Submit Fix")</div>
+                <div class="card-body">
+                    <form method="post" asp-action="Fix" asp-route-id="@Model.Id" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <label class="form-label small">@Loc.T("Fix Description")</label>
+                        <textarea name="Description" class="form-control form-control-sm mb-2" rows="3"></textarea>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small">@Loc.T("Fix Cost")</label>
+                                <input type="number" step="0.01" name="Cost" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">@Loc.T("Completion Date")</label>
+                                <input type="date" name="CompletionDate" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+                        <label class="form-label small">@Loc.T("Parts Used")</label>
+                        <div id="partsList">
+                            <div class="row g-2 mb-1">
+                                <div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>
+                                <div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="addPartRow()">@Loc.T("Add Part")</button>
+                        <label class="form-label small d-block">@Loc.T("Attachments")</label>
+                        <input type="file" name="Files" class="form-control form-control-sm mb-2" multiple />
+                        <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Submit Fix")</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Submit Block")</div>
+                <div class="card-body">
+                    <form method="post" asp-action="Block" asp-route-id="@Model.Id">
+                        @Html.AntiForgeryToken()
+                        <label class="form-label small">@Loc.T("Block Reason")</label>
+                        <select name="blockReasonId" class="form-select form-select-sm mb-2" required>
+                            @if (blockReasons != null)
+                            {
+                                @foreach (var r in blockReasons)
+                                {
+                                    <option value="@r.Id">@r.Name</option>
+                                }
+                            }
+                        </select>
+                        <label class="form-label small">@Loc.T("Block Detail")</label>
+                        <textarea name="detail" class="form-control form-control-sm mb-2" rows="2"></textarea>
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">@Loc.T("Submit Block")</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        function addPartRow() {
+            var list = document.getElementById('partsList');
+            var row = document.createElement('div');
+            row.className = 'row g-2 mb-1';
+            row.innerHTML = '<div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>'
+                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
+            list.appendChild(row);
+        }
+    </script>
+}

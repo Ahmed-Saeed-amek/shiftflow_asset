@@ -1,0 +1,150 @@
+@using Microsoft.AspNetCore.Authorization
+@model Asset
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Model.AssetTag;
+    var canManageWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+    var canManageAsset = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
+    var canReportAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
+    string actionsHtml = "<a href='" + Url.Action("Label", new { id = Model.Id }) + "' target='_blank' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-upc-scan me-1\"></i>" + Loc.T("Print Label") + "</a> ";
+    if (canReportAction)
+        actionsHtml += "<a href='" + Url.Action("Report", "WorkOrders", new { assetId = Model.Id }) + "' class='btn btn-outline-warning btn-sm'><i class=\"bi bi-flag me-1\"></i>" + Loc.T("Report Action") + "</a> ";
+    if (canManageWorkOrders)
+        actionsHtml += "<a href='" + Url.Action("Create", "WorkOrders", new { assetId = Model.Id }) + "' class='btn btn-outline-primary btn-sm'><i class=\"bi bi-tools me-1\"></i>" + Loc.T("New Work Order") + "</a> ";
+    if (canManageAsset)
+        actionsHtml += "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.AssetTag,Subtitle=Model.Name,ActionsHtml=actionsHtml})" />
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Status")</span><partial name="_StatusBadge" model="@Model.Status" /></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Category")</span><span class="small fw-semibold">@Model.Category?.Name</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span class="text-muted small">@Loc.T("Zone")</span>
+                    <span class="small fw-semibold">
+                        @if (Model.Zone != null)
+                        {
+                            <a asp-controller="Zones" asp-action="Details" asp-route-id="@Model.Zone.Id">@Loc.LocalizedName(Model.Zone.Name, Model.Zone.NameAr)</a>
+                            <span class="text-muted">(@(Model.Zone.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null), @(Model.Zone.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null))</span>
+                        }
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span class="text-muted small">@Loc.T("Vendor")</span>
+                    <span class="small">
+                        @{ var derivedVendor = (Vendor?)ViewBag.DerivedVendor; }
+                        @if (derivedVendor != null)
+                        {
+                            <a asp-controller="Vendors" asp-action="Details" asp-route-id="@derivedVendor.Id">@derivedVendor.Name</a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">@Loc.T("No linked contract")</span>
+                        }
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Manufacturer")</span><span class="small">@Model.Manufacturer</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Model")</span><span class="small">@Model.Model</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Serial Number")</span><span class="small font-monospace">@Model.SerialNumber</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("SKU")</span><span class="small font-monospace">@Model.Sku</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Assigned To")</span><span class="small">@Model.AssignedToUser?.FullName</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Purchase Date")</span><span class="small">@Model.PurchaseDate?.ToString("yyyy-MM-dd")</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Warranty Expiry")</span><span class="small">@Model.WarrantyExpiry?.ToString("yyyy-MM-dd")</span></div>
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small">@Model.Notes</div></div>
+                }
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-body text-center">
+                <div class="d-flex align-items-center justify-content-center gap-3">
+                    <img src="@Url.Action("QrCode", new { id = Model.Id })" alt="QR" style="width:80px;height:80px" />
+                    <img src="@Url.Action("Barcode", new { id = Model.Id })" alt="Barcode" style="width:150px;height:55px" />
+                </div>
+                <a href="@Url.Action("Label", new { id = Model.Id })" target="_blank" class="small d-block mt-2"><i class="bi bi-printer me-1"></i>@Loc.T("Print Label")</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Contracts")</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Contract Number")</th><th>@Loc.T("Vendor")</th><th>@Loc.T("Contract Type")</th><th>@Loc.T("End Date")</th></tr></thead>
+                    <tbody>
+                        @if (Model.ContractLinks.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                        }
+                        @foreach (var link in Model.ContractLinks)
+                        {
+                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "Contracts", new { id = link.ContractId })'">
+                                <td class="small font-monospace">@link.Contract?.ContractNumber</td>
+                                <td class="small">@link.Contract?.Vendor?.Name</td>
+                                <td><partial name="_StatusBadge" model="@link.Contract?.ContractType" /></td>
+                                <td class="small">@(link.Contract?.EndDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Work Orders")</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th>@Loc.T("Vendor")</th></tr></thead>
+                    <tbody>
+                        @if (Model.WorkOrders.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                        }
+                        @foreach (var w in Model.WorkOrders.OrderByDescending(w => w.CreatedDate))
+                        {
+                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "WorkOrders", new { id = w.Id })'">
+                                <td class="small font-monospace">@w.WorkOrderNumber</td>
+                                <td><partial name="_StatusBadge" model="@w.Priority" /></td>
+                                <td><partial name="_StatusBadge" model="@w.Stage" /></td>
+                                <td class="small">@w.Vendor?.Name</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm mt-3">
+            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Inspection History")</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Inspected At")</th><th>@Loc.T("Outcome")</th><th>@Loc.T("Inspected By")</th><th>@Loc.T("Notes")</th><th></th></tr></thead>
+                    <tbody>
+                        @{ var inspections = (List<InspectionRunAsset>)ViewBag.Inspections; }
+                        @if (inspections.Count == 0)
+                        {
+                            <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No inspections yet")</td></tr>
+                        }
+                        @foreach (var insp in inspections)
+                        {
+                            <tr>
+                                <td class="small">@insp.InspectedAt?.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td><partial name="_StatusBadge" model="@insp.Outcome" /></td>
+                                <td class="small">@insp.InspectedByUser?.FullName</td>
+                                <td class="small">@insp.Notes</td>
+                                <td class="small">
+                                    @if (insp.WorkOrderId.HasValue)
+                                    {
+                                        <a asp-controller="WorkOrders" asp-action="Details" asp-route-id="@insp.WorkOrderId">@Loc.T("Work Order")</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

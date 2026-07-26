@@ -1,0 +1,4 @@
+@model ContractViewModel
+@{ ViewData["Title"] = Loc.T("New Contract"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Contract")})" />
+<partial name="_Form" model="Model" />

@@ -1,0 +1,40 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<Vendor>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Vendors");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorManage)).Succeeded;
+    string actionsHtml = canManage
+        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Vendor") + "</a>"
+        : "";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Vendors"),ActionsHtml=actionsHtml})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Contact Name")</th><th>@Loc.T("Specialization")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var v in Model)
+                {
+                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = v.Id })'">
+                        <td>@v.Name</td>
+                        <td class="small">@v.ContactName</td>
+                        <td class="small">@v.Specialization</td>
+                        <td><partial name="_StatusBadge" model="@v.Status" /></td>
+                        <td onclick="event.stopPropagation()">
+                            @if (canManage)
+                            {
+                                <a asp-action="Edit" asp-route-id="@v.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

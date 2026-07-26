@@ -1,0 +1,80 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<WorkOrder>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Work Orders");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+    var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderExport)).Succeeded;
+    string actionsHtml = "";
+    if (canExport)
+        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
+                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
+    if (canManage)
+        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Work Order") + "</a>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Work Orders"),ActionsHtml=actionsHtml})" />
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+    <div class="col-auto">
+        <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Stage")</option>
+            @foreach (var s in WorkOrder.AllDisplayStages)
+            {
+                <option value="@s" selected="@(ViewBag.Stage==s)">@Loc.T(s)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Priority")</option>
+            @foreach (var p in WorkOrder.Priorities)
+            {
+                <option value="@p" selected="@(ViewBag.Priority==p)">@Loc.T(p)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Type")</option>
+            <option value="PM" selected="@((string?)ViewBag.Type=="PM")">@Loc.T("Preventive Maintenance")</option>
+            <option value="Manual" selected="@((string?)ViewBag.Type=="Manual")">@Loc.T("Manual")</option>
+        </select>
+    </div>
+    <div class="col-auto ms-auto text-muted small">@Model.Count @Loc.T("records")</div>
+</form>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Type")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th>@Loc.T("Vendor")</th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var w in Model)
+                {
+                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = w.Id })'">
+                        <td class="small font-monospace">@w.WorkOrderNumber</td>
+                        <td class="small">@w.Asset?.AssetTag</td>
+                        <td>
+                            @if (w.SourceContractId != null)
+                            {
+                                <span class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle" title="@Loc.T("Auto-generated from this contract's Preventive Maintenance schedule.")">
+                                    <i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">@Loc.T("Manual")</span>
+                            }
+                        </td>
+                        <td><partial name="_StatusBadge" model="@w.Priority" /></td>
+                        <td><partial name="_StatusBadge" model="@w.Stage" /></td>
+                        <td class="small">@w.Vendor?.Name</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

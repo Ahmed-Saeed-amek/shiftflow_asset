@@ -1,0 +1,127 @@
+@model ZoneViewModel
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="post" id="zoneForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Governorate")</label>
+                            <select id="governorateSelect" class="form-select">
+                                <option value="">—</option>
+                                @foreach (var g in (List<Governorate>)ViewBag.Governorates)
+                                {
+                                    <option value="@g.Id" data-lat="@g.CenterLat" data-lng="@g.CenterLng" selected="@(Model.GovernorateId==g.Id)">@Loc.LocalizedName(g.Name, g.NameAr)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Area")</label>
+                            <select id="areaSelect" class="form-select" disabled>
+                                <option value="">—</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Block")</label>
+                            <select asp-for="BlockId" id="blockSelect" class="form-select" disabled>
+                                <option value="">—</option>
+                            </select>
+                            <span asp-validation-for="BlockId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Name")</label>
+                            <input asp-for="Name" class="form-control" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <input asp-for="NameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Address")</label>
+                            <textarea asp-for="Address" class="form-control" rows="2" placeholder="@Loc.T("e.g. Building 12, Street 4")"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Latitude")</label>
+                            <input asp-for="Latitude" id="latInput" type="number" step="any" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Longitude")</label>
+                            <input asp-for="Longitude" id="lngInput" type="number" step="any" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-text">@Loc.T("Click the map to set exact coordinates (optional)")</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                        <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div id="zoneMap" style="height:420px;border-radius:2px"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const govSel = document.getElementById('governorateSelect');
+    const areaSel = document.getElementById('areaSelect');
+    const blockSel = document.getElementById('blockSelect');
+    const latInput = document.getElementById('latInput');
+    const lngInput = document.getElementById('lngInput');
+    const isArabic = @(Loc.IsRTL ? "true" : "false");
+    const selectedAreaId = @Html.Raw(Model.AreaId > 0 ? Model.AreaId.ToString() : "null");
+    const selectedBlockId = @Html.Raw(Model.BlockId > 0 ? Model.BlockId.ToString() : "null");
+    const initialLat = @Html.Raw(Model.Latitude.HasValue ? Model.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
+    const initialLng = @Html.Raw(Model.Longitude.HasValue ? Model.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
+
+    const mapCtl = initZonePickerMap('zoneMap', 'latInput', 'lngInput', initialLat, initialLng);
+
+    function fillSelect(sel, items, selectedId) {
+        sel.innerHTML = '<option value="">—</option>';
+        items.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.id; opt.textContent = (isArabic && i.nameAr) ? i.nameAr : i.name;
+            if (selectedId && i.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.disabled = false;
+    }
+
+    async function loadAreas(governorateId, preselectAreaId) {
+        if (!governorateId) { areaSel.innerHTML = '<option value="">—</option>'; areaSel.disabled = true; fillSelect(blockSel, [], null); blockSel.disabled = true; return; }
+        const areas = await (await fetch(`/Areas/ByGovernorate?governorateId=${governorateId}`)).json();
+        fillSelect(areaSel, areas, preselectAreaId);
+        if (preselectAreaId) await loadBlocks(preselectAreaId, selectedBlockId);
+        else { fillSelect(blockSel, [], null); blockSel.disabled = true; }
+    }
+
+    async function loadBlocks(areaId, preselectBlockId) {
+        if (!areaId) { blockSel.innerHTML = '<option value="">—</option>'; blockSel.disabled = true; return; }
+        const blocks = await (await fetch(`/Blocks/ByArea?areaId=${areaId}`)).json();
+        fillSelect(blockSel, blocks, preselectBlockId);
+    }
+
+    govSel.addEventListener('change', () => {
+        loadAreas(govSel.value ? Number(govSel.value) : null, null);
+        const opt = govSel.selectedOptions[0];
+        if (opt && opt.dataset.lat && !latInput.value) mapCtl.recenter(Number(opt.dataset.lat), Number(opt.dataset.lng));
+    });
+    areaSel.addEventListener('change', () => loadBlocks(areaSel.value ? Number(areaSel.value) : null, null));
+
+    if (govSel.value) loadAreas(Number(govSel.value), selectedAreaId);
+})();
+</script>

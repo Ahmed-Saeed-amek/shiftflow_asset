@@ -1,0 +1,702 @@
+@{
+    ViewData["Title"] = Loc.T("AI Assistant");
+}
+
+<style>
+    .ai-page-header {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        padding: 0 .25rem 1rem;
+    }
+
+    .ai-page-header i { font-size: 1.6rem; color: #0EA5E9; }
+    .ai-page-header h4 { margin: 0; font-weight: 700; }
+    .ai-page-header p { margin: 0; font-size: .85rem; color: #6b7280; }
+
+    /* Two-column layout: fixed-width avatar/controls sidebar + flexible chat panel.
+       Stacks to a single column below the tablet breakpoint. */
+    .ai-layout {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.25rem;
+    }
+
+    .ai-side {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 320px;
+        flex-shrink: 0;
+    }
+
+    .ai-side-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 16px rgba(14,165,233,.08);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .9rem;
+    }
+
+    .ai-side-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .ai-side-card-header h6 { margin: 0; font-weight: 600; font-size: .9rem; color: #374151; }
+
+    .ai-powered-by {
+        background: rgba(14,165,233,.06);
+        border: 1px solid rgba(14,165,233,.15);
+        border-radius: 12px;
+        padding: .9rem 1rem;
+        font-size: .72rem;
+        color: #0369a1;
+    }
+
+    .ai-powered-by p { margin: 0 0 .4rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .7; }
+    .ai-powered-by ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .2rem; }
+
+    .ai-chat-wrap {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        height: calc(100vh - 180px);
+        min-height: 500px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 16px rgba(14,165,233,.08);
+        overflow: hidden;
+    }
+
+    @@media (max-width: 900px) {
+        .ai-layout { flex-direction: column; }
+        .ai-side { width: 100%; flex-direction: row; flex-wrap: wrap; }
+        .ai-side-card { flex: 1; min-width: 260px; }
+        .ai-powered-by { flex-basis: 100%; }
+        .ai-chat-wrap { height: calc(100vh - 340px); min-height: 420px; }
+    }
+
+    .ai-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+    }
+
+    .ai-bubble {
+        max-width: 72%;
+        padding: .6rem 1rem;
+        border-radius: 12px;
+        line-height: 1.5;
+        font-size: .9rem;
+        word-break: break-word;
+    }
+
+    .ai-bubble.assistant {
+        align-self: flex-start;
+        background: #F3F4F6;
+        border-bottom-left-radius: 4px;
+        color: #0EA5E9;
+    }
+
+    .ai-bubble.user {
+        align-self: flex-end;
+        background: #0EA5E9;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+    }
+
+    .ai-bubble p { margin: 0 0 .5rem; }
+    .ai-bubble p:last-child { margin-bottom: 0; }
+    .ai-bubble ul, .ai-bubble ol { margin: 0 0 .5rem; padding-inline-start: 1.25rem; }
+    .ai-bubble li { margin-bottom: .15rem; }
+    .ai-bubble strong { font-weight: 600; }
+
+    .ai-typing {
+        align-self: flex-start;
+        display: none;
+        gap: 4px;
+        padding: .6rem 1rem;
+    }
+
+    .ai-typing span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #F59E0B;
+        display: inline-block;
+        animation: bounce .9s infinite;
+    }
+
+    .ai-typing span:nth-child(2) { animation-delay: .15s; }
+    .ai-typing span:nth-child(3) { animation-delay: .3s; }
+
+    @@keyframes bounce {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-6px); }
+    }
+
+    .ai-quick-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        padding: .75rem 1.25rem;
+        border-top: 1px solid #eee;
+        background: #fafafa;
+    }
+
+    .ai-chip {
+        padding: .3rem .75rem;
+        border-radius: 20px;
+        border: 1px solid #F59E0B;
+        color: #0EA5E9;
+        font-size: .8rem;
+        cursor: pointer;
+        background: #fff;
+        transition: background .15s;
+    }
+
+    .ai-chip:hover { background: #FEF3C7; }
+
+    .ai-mic-standalone {
+        margin: .75rem auto 0;
+        display: flex;
+    }
+
+    .ai-input-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .75rem 1.25rem;
+        border-top: 1px solid #eee;
+        background: #fff;
+    }
+
+    .ai-input-row input {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: .5rem 1rem;
+        font-size: .9rem;
+        outline: none;
+    }
+
+    .ai-input-row input:focus { border-color: #0EA5E9; }
+
+    .btn-mic {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #F3F4F6;
+        color: #0EA5E9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: background .15s;
+        flex-shrink: 0;
+    }
+
+    .btn-mic.listening {
+        background: #F59E0B;
+        color: #fff;
+        animation: pulse 1.2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
+        50% { box-shadow: 0 0 0 8px rgba(245,158,11,0); }
+    }
+
+    .btn-send {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #0EA5E9;
+        color: #F59E0B;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: opacity .15s;
+        flex-shrink: 0;
+    }
+
+    .btn-send:disabled { opacity: .4; cursor: default; }
+
+    .ai-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        background: #0EA5E9;
+        color: #fff;
+    }
+
+    .ai-header h6 { margin: 0; font-weight: 600; font-size: .95rem; }
+
+    .btn-clear {
+        background: none;
+        border: 1px solid rgba(255,255,255,.3);
+        color: #F59E0B;
+        padding: .2rem .6rem;
+        border-radius: 6px;
+        font-size: .75rem;
+        cursor: pointer;
+    }
+
+    .ai-avatar-scene {
+        position: relative;
+        width: 100%;
+        max-width: 260px;
+        aspect-ratio: 9 / 16;
+        margin: 0 auto;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #F3F4F6;
+        border: 2px solid #e5e7eb;
+        transition: border-color .4s, box-shadow .4s;
+        flex-shrink: 0;
+    }
+
+    .ai-avatar-scene video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .ai-avatar-scene.state-listening { border-color: #0EA5E9; box-shadow: 0 0 20px rgba(14,165,233,.35); }
+    .ai-avatar-scene.state-thinking  { border-color: #F59E0B; box-shadow: 0 0 20px rgba(245,158,11,.35); }
+    .ai-avatar-scene.state-speaking  { border-color: #22c55e; box-shadow: 0 0 20px rgba(34,197,94,.35); }
+
+    .ai-avatar-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        background: rgba(243,244,246,.92);
+        font-size: .7rem;
+        color: #64748b;
+        text-align: center;
+        padding: .5rem;
+    }
+
+    .ai-avatar-overlay.error { background: rgba(254,242,242,.95); color: #dc2626; }
+    .ai-avatar-overlay.hidden { display: none; }
+
+    .ai-avatar-spinner {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #0EA5E9;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: aiAvatarSpin .8s linear infinite;
+    }
+
+    @@keyframes aiAvatarSpin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="ai-page-header">
+    <i class="bi bi-robot"></i>
+    <div>
+        <h4>@Loc.T("AI Assistant")</h4>
+        <p>@Loc.T("Ask about your shifts, tasks, and requests — by voice or text.")</p>
+    </div>
+</div>
+
+<div class="ai-layout">
+    <div class="ai-side">
+        <div class="ai-side-card">
+            <div class="ai-side-card-header">
+                <h6>@Loc.T("AI Assistant")</h6>
+            </div>
+
+            <div class="ai-avatar-scene" id="avatarScene">
+                <video id="avatarVideo" autoplay playsinline muted></video>
+                <audio id="avatarAudio" autoplay></audio>
+                <div class="ai-avatar-overlay" id="avatarOverlay">
+                    <div class="ai-avatar-spinner"></div>
+                    <span>@Loc.T("Connecting avatar…")</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-powered-by">
+            <p>@Loc.T("Powered by")</p>
+            <ul>
+                <li>Azure AI TTS Avatar (Harry)</li>
+                <li>Azure AI Speech (STT)</li>
+                <li>OpenAI GPT-4o</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="ai-chat-wrap">
+        <div class="ai-header">
+            <h6>@Loc.T("Conversation")</h6>
+            <button class="btn-clear" onclick="clearChat()">@Loc.T("Clear")</button>
+        </div>
+
+        <div class="ai-messages" id="aiMessages">
+            <div class="ai-bubble assistant">
+                @Loc.T("Hello! I'm your ShiftFlow AI assistant. I can help you check your shift, view tasks and work orders, submit swap or absence requests, and more. What can I do for you today?")
+            </div>
+            <div class="ai-typing" id="aiTyping">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <button class="btn-mic ai-mic-standalone" id="btnMic" title="@Loc.T("Voice input")" onclick="toggleMic()">
+            <i class="bi bi-mic" id="micIcon"></i>
+        </button>
+
+        <div class="ai-input-row">
+            <input type="text" id="aiInput" placeholder="@Loc.T("Ask me anything about your shifts...")" maxlength="500"
+                   onkeydown="if(event.key==='Enter')sendMessage()" />
+            <button class="btn-send" id="btnSend" onclick="sendMessage()" title="@Loc.T("Send")">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+
+        @* onclick is a normal HTML attribute, not a <script> body — Razor's default HTML-encoding
+           (turning the JSON string's own quotes into &quot; etc.) is exactly what's needed here;
+           the browser decodes entities in attribute values before handing the string to JS.
+           Html.Raw() here would leak the JSON's literal quotes and break the attribute. *@
+        <div class="ai-quick-chips">
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("What is my shift today?")))">@Loc.T("My shift today")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my current tasks")))">@Loc.T("My tasks")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my work orders")))">@Loc.T("My work orders")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show my change requests")))">@Loc.T("My requests")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("What are the dashboard KPIs?")))">@Loc.T("Dashboard KPIs")</button>
+        </div>
+    </div>
+</div>
+
+@{
+    // Localized strings must be JSON-serialized + Html.Raw'd inside <script> bodies —
+    // Razor HTML-encodes @-expressions there (turning Arabic into &#x...; entities),
+    // and script bodies are NOT entity-decoded by the browser.
+    var noResponseJson  = System.Text.Json.JsonSerializer.Serialize(Loc.T("No response received."));
+    var genericErrJson  = System.Text.Json.JsonSerializer.Serialize(Loc.T("An error occurred. Please try again."));
+    var networkErrJson  = System.Text.Json.JsonSerializer.Serialize(Loc.T("Network error. Please check your connection and try again."));
+    var clearedJson     = System.Text.Json.JsonSerializer.Serialize(Loc.T("Chat cleared. How can I help you?"));
+    var speechLocale    = Loc.Lang == "ar" ? "ar-SA" : "en-US";
+    var speechVoice     = Loc.Lang == "ar" ? "ar-SA-ZariyahNeural" : "en-US-JennyNeural";
+    // Real-time Avatar uses its own character/style/voice config, independent of the plain-audio
+    // fallback voice above — matches the reference config (character "harry", style "business").
+    var avatarVoice     = Loc.Lang == "ar" ? "ar-KW-FahedNeural" : "en-US-GuyNeural";
+    var avatarErrJson   = System.Text.Json.JsonSerializer.Serialize(Loc.T("Avatar unavailable — voice replies still work."));
+}
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@latest/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js" crossorigin="anonymous"></script>
+<script>
+    const messages = [];
+    let speechConfig = null;
+    let recognizer = null;
+    let synthesizer = null;
+    let isListening = false;
+    let isBusy = false;
+
+    // Real-time Avatar (video) state — separate from the plain-audio speechConfig above.
+    let avatarSynth = null;
+    let avatarPc = null;
+    let avatarReady = false;
+
+    // Load speech token + avatar session on startup (fire-and-forget, non-blocking)
+    initSpeech();
+    initAvatar();
+
+    async function initSpeech() {
+        try {
+            const r = await fetch('/AiAssistant/SpeechToken');
+            if (!r.ok) return;
+            const d = await r.json();
+            speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(d.token, d.region);
+            speechConfig.speechRecognitionLanguage = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(speechLocale));
+            speechConfig.speechSynthesisVoiceName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(speechVoice));
+        } catch (e) { console.warn('AI Assistant: speech unavailable —', e); }
+        document.getElementById('btnMic').style.display = speechConfig ? '' : 'none';
+    }
+
+    function setAvatarState(state) {
+        const scene = document.getElementById('avatarScene');
+        scene.classList.remove('state-listening', 'state-thinking', 'state-speaking');
+        if (state) scene.classList.add('state-' + state);
+    }
+
+    function showAvatarOverlay(text, isError) {
+        const overlay = document.getElementById('avatarOverlay');
+        overlay.querySelector('span').textContent = text;
+        overlay.classList.toggle('error', !!isError);
+        overlay.classList.remove('hidden');
+    }
+
+    function hideAvatarOverlay() {
+        document.getElementById('avatarOverlay').classList.add('hidden');
+    }
+
+    async function initAvatar() {
+        try {
+            const [speechResp, iceResp] = await Promise.all([
+                fetch('/AiAssistant/SpeechToken').then(r => r.ok ? r.json() : Promise.reject(new Error('speech token failed'))),
+                fetch('/AiAssistant/AvatarIceToken').then(r => r.ok ? r.json() : Promise.reject(new Error('avatar not configured'))),
+            ]);
+
+            const avatarSpeechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechResp.token, speechResp.region);
+            avatarSpeechConfig.speechSynthesisVoiceName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(avatarVoice));
+
+            const videoFormat = new SpeechSDK.AvatarVideoFormat();
+            const avatarConfig = new SpeechSDK.AvatarConfig('harry', 'business', videoFormat);
+            avatarConfig.backgroundColor = '#F3F4F6FF';
+
+            const videoStream = new MediaStream();
+            const audioStream = new MediaStream();
+            avatarPc = new RTCPeerConnection({
+                iceServers: [{ urls: iceResp.Urls, username: iceResp.Username, credential: iceResp.Password }],
+            });
+            avatarPc.ontrack = e => {
+                if (e.track.kind === 'video') {
+                    videoStream.addTrack(e.track);
+                    document.getElementById('avatarVideo').srcObject = videoStream;
+                } else {
+                    audioStream.addTrack(e.track);
+                    document.getElementById('avatarAudio').srcObject = audioStream;
+                }
+            };
+            avatarPc.addTransceiver('video', { direction: 'sendrecv' });
+            avatarPc.addTransceiver('audio', { direction: 'sendrecv' });
+
+            avatarSynth = new SpeechSDK.AvatarSynthesizer(avatarSpeechConfig, avatarConfig);
+            const result = await avatarSynth.startAvatarAsync(avatarPc);
+
+            if (result.reason === SpeechSDK.ResultReason.Canceled) {
+                const details = SpeechSDK.CancellationDetails.fromResult(result);
+                throw new Error(details.errorDetails || 'Avatar failed to start');
+            }
+            avatarReady = true;
+            hideAvatarOverlay();
+        } catch (e) {
+            console.warn('AI Assistant: avatar unavailable —', e);
+            showAvatarOverlay(@Html.Raw(avatarErrJson), true);
+        }
+    }
+
+    // A tab close/refresh never runs cleanup below, so without this the avatar session
+    // lingers server-side until Azure's own idle timeout reclaims it.
+    window.addEventListener('pagehide', () => {
+        avatarSynth?.close();
+        avatarPc?.close();
+    });
+
+    function toggleMic() {
+        if (!speechConfig) return;
+        if (isListening) stopListening();
+        else startListening();
+    }
+
+    function startListening() {
+        isListening = true;
+        document.getElementById('btnMic').classList.add('listening');
+        document.getElementById('micIcon').className = 'bi bi-mic-fill';
+        setAvatarState('listening');
+
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+        recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+        recognizer.recognizeOnceAsync(result => {
+            stopListening();
+            if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech && result.text) {
+                document.getElementById('aiInput').value = result.text;
+                sendMessage();
+            }
+        }, () => stopListening());
+    }
+
+    function stopListening() {
+        isListening = false;
+        document.getElementById('btnMic').classList.remove('listening');
+        document.getElementById('micIcon').className = 'bi bi-mic';
+        setAvatarState(null);
+        recognizer?.close();
+        recognizer = null;
+    }
+
+    async function speakText(text, voice) {
+        setAvatarState('speaking');
+
+        // Prefer the real-time video Avatar when its WebRTC session is up — it carries its own
+        // audio track (routed to #avatarAudio via ontrack), so no separate audio-only synth runs
+        // alongside it. Falls back to plain audio-only TTS if the avatar never came up (e.g. the
+        // region/tier doesn't support the real-time Avatar feature).
+        if (avatarReady && avatarSynth) {
+            try {
+                const result = await avatarSynth.speakTextAsync(text);
+                if (result.reason === SpeechSDK.ResultReason.Canceled) {
+                    const details = SpeechSDK.CancellationDetails.fromResult(result);
+                    throw new Error(details.errorDetails || 'Avatar speech failed');
+                }
+            } catch (e) {
+                console.warn('AI Assistant: avatar speech failed, falling back to audio-only —', e);
+                speakTextAudioOnly(text, voice);
+            } finally {
+                setAvatarState(null);
+            }
+            return;
+        }
+
+        speakTextAudioOnly(text, voice);
+    }
+
+    function speakTextAudioOnly(text, voice) {
+        if (!speechConfig) { setAvatarState(null); return; }
+        if (voice) speechConfig.speechSynthesisVoiceName = voice;
+        const audioConfig = SpeechSDK.AudioConfig.fromDefaultSpeakerOutput();
+        const synth = new SpeechSDK.SpeechSynthesizer(speechConfig, audioConfig);
+        const stopSpeaking = () => { setAvatarState(null); synth.close(); };
+        synth.speakTextAsync(text, stopSpeaking, stopSpeaking);
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('aiInput');
+        const text = input.value.trim();
+        if (!text || isBusy) return;
+        input.value = '';
+        await doSend(text);
+    }
+
+    function sendQuick(text) {
+        document.getElementById('aiInput').value = text;
+        sendMessage();
+    }
+
+    async function doSend(text) {
+        isBusy = true;
+        document.getElementById('btnSend').disabled = true;
+
+        addBubble(text, 'user');
+        messages.push({ role: 'user', text });
+        showTyping(true);
+        setAvatarState('thinking');
+        scrollBottom();
+
+        try {
+            const resp = await fetch('/AiAssistant/Query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, history: messages.slice(0, -1) })
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                const answer = data.answerText || @Html.Raw(noResponseJson);
+                showTyping(false);
+                addBubble(answer, 'assistant');
+                messages.push({ role: 'assistant', text: answer });
+                if (data.voice) await speakText(answer, data.voice);
+                else setAvatarState(null);
+            } else {
+                showTyping(false);
+                setAvatarState(null);
+                addBubble(data.error || @Html.Raw(genericErrJson), 'assistant');
+            }
+        } catch {
+            showTyping(false);
+            setAvatarState(null);
+            addBubble(@Html.Raw(networkErrJson), 'assistant');
+        } finally {
+            isBusy = false;
+            document.getElementById('btnSend').disabled = false;
+            scrollBottom();
+        }
+    }
+
+    // Minimal, safe Markdown-ish formatter for assistant replies: escapes HTML first
+    // (the text still ultimately comes from an LLM completion, so never trust it as raw
+    // HTML), then applies a small set of well-understood patterns — bold, numbered/bulleted
+    // lists, line breaks — rather than pulling in a full markdown library for a chat bubble.
+    function formatAiText(text) {
+        const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const lines = text.split('\n');
+        let html = '';
+        let listType = null; // 'ul' | 'ol' | null
+
+        function closeList() {
+            if (listType) { html += `</${listType}>`; listType = null; }
+        }
+
+        for (const rawLine of lines) {
+            const line = escapeHtml(rawLine).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
+            const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+
+            if (bullet) {
+                if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+                html += `<li>${bullet[1]}</li>`;
+            } else if (numbered) {
+                // Nested bullets between numbered items break the <ol> into separate
+                // elements (each restarting at 1) — pin the original number via value=
+                // so e.g. "6." followed by sub-bullets then "7." doesn't render as "1."/"2.".
+                if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+                html += `<li value="${numbered[1]}">${numbered[2]}</li>`;
+            } else {
+                closeList();
+                if (line.trim() === '') html += '<br>';
+                else html += `<p>${line}</p>`;
+            }
+        }
+        closeList();
+        return html;
+    }
+
+    function addBubble(text, role) {
+        const msgs = document.getElementById('aiMessages');
+        const typing = document.getElementById('aiTyping');
+        const div = document.createElement('div');
+        div.className = `ai-bubble ${role}`;
+        if (role === 'assistant') div.innerHTML = formatAiText(text);
+        else div.textContent = text;
+        msgs.insertBefore(div, typing);
+    }
+
+    function showTyping(show) {
+        document.getElementById('aiTyping').style.display = show ? 'flex' : 'none';
+        if (show) scrollBottom();
+    }
+
+    function scrollBottom() {
+        const msgs = document.getElementById('aiMessages');
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function clearChat() {
+        messages.length = 0;
+        const msgs = document.getElementById('aiMessages');
+        const typing = document.getElementById('aiTyping');
+        // Remove all bubbles except the typing indicator
+        [...msgs.children].filter(c => c !== typing && c.classList.contains('ai-bubble')).forEach(c => c.remove());
+        // Re-add greeting
+        const greeting = document.createElement('div');
+        greeting.className = 'ai-bubble assistant';
+        greeting.textContent = @Html.Raw(clearedJson);
+        msgs.insertBefore(greeting, typing);
+    }
+</script>
+}

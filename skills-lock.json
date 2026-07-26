@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
+    },
+    "owasp-security": {
+      "source": "agamm/claude-code-owasp",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/owasp-security/SKILL.md",
+      "computedHash": "281accdc7e1b4ad71bea13ed2fd4e93ff14a73e81175d52fdb15e2b5bdf371da"
+    },
+    "skill-adapter": {
+      "source": "jeremylongshore/claude-code-plugins-plus-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/skill-adapter/SKILL.md",
+      "computedHash": "07186734b7b994d3daef91d866b8a4c569c10d1b5276cbb0c1f9e644de05fae5"
+    }
+  }
+}

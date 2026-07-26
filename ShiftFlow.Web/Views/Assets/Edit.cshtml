@@ -1,0 +1,4 @@
+@model AssetViewModel
+@{ ViewData["Title"] = Model.AssetTag; }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.AssetTag,Subtitle=Model.Name})" />
+<partial name="_Form" model="Model" />

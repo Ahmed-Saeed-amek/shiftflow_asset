@@ -1,0 +1,42 @@
+@model WorkOrderViewModel
+@{ ViewData["Title"] = Loc.T("New Work Order"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Work Order")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Assets")</label>
+                    <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
+                        Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
+                        SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
+                    <span asp-validation-for="AssetId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Priority")</label>
+                    <select asp-for="Priority" class="form-select">
+                        @foreach (var p in (string[])ViewBag.Priorities)
+                        {
+                            <option value="@p">@Loc.T(p)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Description")</label>
+                    <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>

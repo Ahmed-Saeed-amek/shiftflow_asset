@@ -1,0 +1,20 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=SQL5101.site4now.net;Database=db_acbc2c_ahmedamek;User Id=db_acbc2c_ahmedamek_admin;Password=Infernus2000;TrustServerCertificate=True;Encrypt=True;"
+  },
+    "AzureAd": {
+      "Instance": "https://login.microsoftonline.com/",
+      "TenantId": "8d1bfd63-d0f4-4015-8577-30dda9a4b743",
+      "ClientId": "4927f27c-0573-474a-8026-b65990a40a19",
+      "ClientSecret": "XjO8Q~gxUE7DVDmFusgTaZ72sp.Od-UeBiv_4c7O",
+      "CallbackPath": "/signin-oidc-entra"
+    },
+ "Smtp": {
+     "Host": "smtp.gmail.com",
+     "Port": "587",
+     "EnableSsl": "true",
+     "User": "saeedahmedsuper@gmail.com",
+     "Password": "gtun reud ckom cbol",
+     "From": "saeedahmedsuper@gmail.com"
+   }
+}

@@ -1,0 +1,568 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+:root {
+  /* MEW (Ministry of Electricity, Water and Renewable Energy) design system tokens
+     — palette inspired by the UrbanHub admin template, primary retinted to light blue */
+  --background: 187 29% 94%;   /* #EBF3F4 — UrbanHub's exact pale blue-grey canvas */
+  --foreground: 215 28% 17%;
+  --card: 0 0% 100%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 199 89% 48%;
+  --success: 152 69% 31%;
+  --warning: 38 92% 50%;
+  --destructive: 354 70% 54%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 199 89% 48%;
+
+  --chart-1: 199 89% 48%;
+  --chart-2: 38 92% 50%;
+  --chart-3: 152 69% 31%;
+  --chart-4: 354 70% 54%;
+  --chart-5: 262 52% 47%;
+
+  --radius: 0.625rem;      /* 10px — buttons, inputs, badges */
+  --radius-lg: 0.875rem;   /* 14px — cards, modals, dropdowns */
+  --font-heading: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+
+  --sidebar-background: 0 0% 100%;     /* UrbanHub's actual sidebar is white, not grey */
+  --sidebar-primary: 199 89% 48%;
+  --sidebar-accent: 199 89% 48%;
+  --sidebar-border: 220 13% 91%;
+
+  /* Bootstrap variable remap */
+  --bs-primary: hsl(var(--primary));
+  --bs-primary-rgb: 14, 165, 233;
+  --bs-secondary: hsl(var(--muted-foreground));
+  --bs-success: hsl(var(--success));
+  --bs-warning: hsl(var(--warning));
+  --bs-danger: hsl(var(--destructive));
+  --bs-info: hsl(var(--primary));
+  --bs-light: hsl(var(--secondary));
+  --bs-border-color: hsl(var(--border));
+  --bs-border-radius: var(--radius);
+  --bs-border-radius-sm: 0.5rem;
+  --bs-border-radius-lg: var(--radius-lg);
+  --bs-body-font-family: var(--font-body);
+  --bs-body-font-size: 0.875rem;
+  --bs-body-bg: hsl(var(--background));
+  --bs-body-color: hsl(var(--foreground));
+  --bs-link-color: hsl(var(--primary));
+  --bs-link-hover-color: hsl(var(--primary));
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: .875rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  /* Belongs here, not on #wrapper: overflow-x:hidden on a flex row with no
+     matching overflow-y forces overflow-y:auto per spec, turning it into a
+     scroll container. That silently becomes the sticky containing block for
+     #sidebar, and since #wrapper never actually scrolls (the window does),
+     the sidebar stops tracking scroll partway down tall pages instead of
+     staying pinned. Guarding overflow-x on body avoids creating that
+     scroll container while still preventing horizontal page overflow. */
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Arabic / RTL font override */
+:lang(ar), [dir="rtl"] {
+  font-family: 'IBM Plex Sans Arabic', 'Geeza Pro', 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.625;
+}
+
+.btn-primary {
+  background-color: #0EA5E9;
+  border-color: #0EA5E9;
+  color: #fff;
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #0284C7;
+  border-color: #0284C7;
+}
+.btn-outline-primary {
+  color: #0EA5E9;
+  border-color: #0EA5E9;
+}
+.btn-outline-primary:hover {
+  background-color: #0EA5E9;
+  border-color: #0EA5E9;
+  color: #fff;
+}
+.btn, .btn-sm { border-radius: var(--radius); }
+.text-primary { color: #0EA5E9 !important; }
+
+/* Guarantees the footer sits at the true viewport bottom even when
+   #sidebar drops out of flow (its position:fixed mobile breakpoint below)
+   and would otherwise leave #wrapper/main to shrink-to-fit short pages. */
+#wrapper {
+  min-height: 100vh;
+}
+
+/* Sidebar — white, matching UrbanHub's actual light-theme chrome */
+#sidebar {
+  background-color: #fff;
+  border-inline-end: 1px solid hsl(var(--border));
+  width: 260px;
+  /* height (not min-height) caps it at the viewport instead of letting it
+     grow to fit all nav content — without a cap, .sidebar-nav-scroll below
+     never has anything to scroll internally since its flex parent just
+     grows past the viewport instead. position:sticky keeps the sidebar in
+     place while <main> scrolls (mobile overrides both via its own
+     position:fixed rule further down, which wins the cascade there). */
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  transition: transform .25s ease, width .25s ease, padding .25s ease;
+}
+/* Touch-scrollable nav list — momentum scrolling on iOS. No
+   overscroll-behavior here: on desktop, when the list has nothing left to
+   scroll, "contain" swallows the wheel event instead of letting it fall
+   through to scroll the page — a dead zone right where the mouse sits.
+   Scoped to the mobile drawer below, where containing scroll-chaining into
+   the backdrop behind it is actually needed. */
+.sidebar-nav-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Bootstrap's .nav sets flex-wrap:wrap; .flex-column only overrides
+     flex-direction, not that. Combined with a real height cap on #sidebar
+     (needed for the scroll fix above), column+wrap makes the list start a
+     new column to the right once it runs out of vertical room instead of
+     just overflowing vertically — a wide, horizontally-scrolling mess. */
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 991.98px) {
+  .sidebar-nav-scroll { overscroll-behavior: contain; }
+}
+#sidebar .border-bottom,
+#sidebar .border-secondary {
+  border-color: hsl(var(--border)) !important;
+}
+#sidebar .nav-section-label {
+  font-size: .7rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #0EA5E9;
+  padding: .25rem .5rem;
+}
+#sidebar .nav-link {
+  display: flex;
+  align-items: center;
+  padding: .55rem .85rem;
+  transition: all .15s;
+  border-radius: var(--radius);
+  color: hsl(var(--foreground));
+  border-inline-start: 3px solid transparent;
+}
+#sidebar .nav-link i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  background: rgba(17,24,39,.06);
+  transition: all .15s;
+  flex-shrink: 0;
+}
+#sidebar .nav-link:hover,
+#sidebar .nav-link.active {
+  background: rgba(14,165,233,.08);
+  color: #0EA5E9 !important;
+}
+#sidebar .nav-link.active { font-weight: 600; }
+#sidebar .nav-link:hover i,
+#sidebar .nav-link.active i {
+  background: #0EA5E9;
+  color: #fff;
+}
+#sidebar .text-white-50 { color: hsl(var(--muted-foreground)) !important; }
+#sidebar .btn-outline-light,
+#sidebar .btn-outline-secondary {
+  color: hsl(var(--muted-foreground));
+  border-color: hsl(var(--border));
+  background: transparent;
+}
+#sidebar .btn-outline-light:hover,
+#sidebar .btn-outline-secondary:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Mobile/tablet sidebar — below lg (992px) the sidebar becomes an overlay
+   drawer (closed by default, opened via #sidebarToggle) instead of a
+   static in-flow column, so narrow viewports don't lose content width
+   to a permanent 260px rail. */
+/* Flex items default to min-width:auto, so a deeply nested wide element
+   (e.g. a table with an explicit min-width for horizontal scroll) forces
+   the whole flex chain to grow instead of scrolling internally where
+   intended. Both #wrapper's content-column child and <main> itself are
+   flex items along that chain and need min-width:0 so overflow is
+   contained by whichever inner wrapper actually wants it (e.g.
+   .table-responsive), not leaked out to the whole page. */
+#wrapper > .flex-grow-1, main { min-width: 0; }
+#sidebarBackdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1044;
+}
+#sidebarBackdrop.show { display: block; }
+body.sidebar-locked { overflow: hidden; }
+@media (max-width: 991.98px) {
+  #sidebar {
+    position: fixed;
+    inset-inline-start: 0;
+    top: 0;
+    z-index: 1045;
+    transform: translateX(-100%);
+  }
+  html[dir="rtl"] #sidebar { transform: translateX(100%); }
+  #sidebar.show,
+  html[dir="rtl"] #sidebar.show { transform: translateX(0); }
+}
+
+/* Desktop collapse — unlike the mobile drawer (an overlay that leaves
+   layout untouched), collapsing on desktop actually frees the width so
+   <main> expands into it. State is persisted to localStorage by site.js
+   and re-applied via the sidebar-collapsed-pref class set on <html> in
+   _Layout.cshtml's <head> (before first paint, to avoid a FOUC flash). */
+@media (min-width: 992px) {
+  html.sidebar-collapsed-pref #sidebar {
+    width: 0;
+    min-width: 0;
+    /* Bootstrap's .p-3 utility class carries !important by default
+       (Bootstrap 5's utility API), so overriding it here needs !important
+       too — specificity alone isn't enough against an !important rule. */
+    padding: 0 !important;
+    border: none;
+    overflow: hidden;
+  }
+}
+
+/* Cards */
+.card {
+  background-color: hsl(var(--card));
+  border-radius: var(--radius-lg);
+  border-color: hsl(var(--border));
+  box-shadow: 0 4px 12px rgba(17,24,39,.12), 0 2px 4px rgba(17,24,39,.08);
+}
+.card:hover.card-hover {
+  box-shadow: 0 10px 24px rgba(17,24,39,.16) !important;
+  transition: box-shadow .2s;
+}
+/* Bootstrap's default card-header/card-footer use a subtly tinted overlay
+   (rgba(body-color,.03)) distinct from the card body — force them to match
+   the same pure white so a card reads as one solid surface, title bar included. */
+.card-header, .card-footer {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+/* List groups */
+/* Same issue/fix as .table below: Bootstrap's own .list-group rule sets
+   --bs-list-group-bg: var(--bs-body-bg) directly on the class, which always
+   wins over a value inherited from :root — so the override must target
+   .list-group itself, after bootstrap.min.css loads. */
+.list-group {
+  --bs-list-group-bg: hsl(var(--card));
+}
+
+/* Tables */
+/* Bootstrap's own .table rule sets --bs-table-bg: var(--bs-body-bg) directly on
+   the table element, which always wins over a value inherited from :root — so
+   the override has to target .table itself, after bootstrap.min.css loads. */
+.table {
+  --bs-table-bg: #fff;
+}
+.table thead th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+  font-size: .8rem;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+/* Tables inside cards default to square corners — clip them to the same
+   roundness as the card that contains them so the header/body read as one
+   continuous rounded surface instead of a sharp rectangle floating in it. */
+/* overflow-x stays auto (not hidden) so a table wider than its card — e.g.
+   a deliberately horizontal-scrollable table on narrow viewports — can
+   still scroll; only overflow-y is clipped for the rounded-corner effect,
+   since table-responsive has no legitimate vertical overflow to preserve. */
+.card .table-responsive,
+.card > table,
+.card-body > table {
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Opt-in table→card stacking for data-dense tables on phones. Most tables
+   default to horizontal scroll via the existing .table-responsive wrapper
+   (acceptable and cheaper); reserve .table-card-stack for a table where
+   scrolling would hide too much at once. Usage: add class="table-card-stack"
+   to the <table>, and data-label="Column Name" to each <td> whose header
+   should stay visible when the row becomes a stacked card. */
+@media (max-width: 767.98px) {
+  .table-card-stack thead { display: none; }
+  .table-card-stack, .table-card-stack tbody, .table-card-stack tr, .table-card-stack td {
+    display: block;
+    width: 100%;
+  }
+  .table-card-stack tr {
+    margin-bottom: .75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    /* Not overflow:hidden — that rounds the corners but also clips any dropdown
+       menu (e.g. "Mark Attendance" in Shift.cshtml) opened inside the row,
+       making its options invisible on phones. Cells have no distinct
+       background of their own, so square corners peeking through are a
+       non-issue in practice. */
+    overflow: visible;
+  }
+  .table-card-stack td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem;
+    border-top: 1px solid hsl(var(--border));
+    text-align: end;
+  }
+  .table-card-stack td:first-child { border-top: none; }
+  .table-card-stack td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: .75rem;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    text-align: start;
+  }
+  /* A colspan cell holding its own Bootstrap grid (see InspectionChecklist.cshtml's
+     inline defect-report form) shouldn't be squeezed by the label/value flex layout
+     meant for simple cells — let it render as a normal block so its own row/col
+     grid stacks the way it already does everywhere else in the app. */
+  .table-card-stack .inline-form-row td { display: block; justify-content: normal; }
+  /* Outcome action buttons (see InspectionChecklist.cshtml) — full-width, side by
+     side, for easy tapping instead of tiny inline buttons. */
+  .outcome-actions .outcome-btn { flex: 1 1 0; }
+  /* .table-responsive sets overflow-x:auto, which makes browsers implicitly pair
+     overflow-y:auto too — clipping any absolutely-positioned dropdown menu (e.g.
+     "Mark Attendance") that opens inside a stacked card and overflows past the
+     wrapper's auto-fit height. Horizontal scrolling is irrelevant once the table
+     has collapsed into cards, so drop the clipping entirely at this breakpoint. */
+  .table-responsive:has(.table-card-stack) { overflow: visible; }
+}
+
+/* Swipeable nav-tabs strip (see Shift.cshtml) — keep each tab at its
+   natural width so the row scrolls instead of squeezing labels onto
+   multiple lines. */
+.nav-tabs.overflow-x-auto .nav-item { flex-shrink: 0; }
+
+/* Task-row status select (see Shift.cshtml) — fixed 130px reads fine once
+   the row has wrapped onto its own line at narrow widths (flex-wrap on the
+   task-row), but should still cap out rather than stretch full-width next
+   to the icon/history/delete buttons on that wrapped line. */
+.task-status-select { width: 130px; max-width: 100%; }
+
+/* Mobile-only collapsible sections (see Shift.cshtml "Add Task"/"Report
+   Incident" forms) — collapsed by default on phones so the tab opens on
+   the list the user came to check, not a form; always expanded at md+
+   where there's room for both. */
+@media (min-width: 768px) {
+  .mobile-collapsible.collapse:not(.show) { display: block; }
+}
+
+/* Task row trailing action cluster (status select/history/delete, see
+   Shift.cshtml) — once it wraps to its own line on a narrow screen it
+   should fill the row and spread its items apart rather than clumping to
+   the start. Bootstrap's stock CDN build has no responsive width utilities
+   (w-md-auto doesn't exist), hence a small dedicated class instead. */
+@media (max-width: 767.98px) {
+  .task-actions { width: 100%; justify-content: space-between; }
+}
+
+/* Badges & form controls */
+.badge { font-size: .76rem; font-weight: 500; border-radius: 0.5rem; }
+.bg-purple { background-color: #a78bfa !important; } /* "HandedOver" task status badge */
+.btn-sm, .form-control, .form-select { border-radius: var(--radius); }
+/* Bootstrap's .form-control/.form-select set background-color: var(--bs-body-bg)
+   directly on the class, same issue as .list-group/.table above — the page-bg
+   remap otherwise makes inputs disappear against the page wherever they aren't
+   sitting inside a white card. */
+.form-control, .form-select {
+  border-color: hsl(var(--border));
+  background-color: hsl(var(--card));
+}
+.form-control:focus, .form-select:focus {
+  border-color: #0EA5E9;
+  box-shadow: 0 0 0 0.2rem rgba(14,165,233,0.15);
+}
+
+/* Dropdowns / popovers */
+.dropdown-menu { box-shadow: 0 4px 12px rgba(17,24,39,.08); border-color: hsl(var(--border)); border-radius: var(--radius-lg); }
+
+/* KPI card icon chip */
+.kpi-icon-chip {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+}
+
+/* Chart.js canvas wrapper — a bare <canvas height="200"> keeps that pixel
+   height fixed regardless of viewport, so charts don't shrink on phones and
+   can force horizontal overflow in a narrow card. Wrap the canvas in this
+   div (no height attribute on the canvas itself) and pass
+   `maintainAspectRatio:false` in the Chart.js config so it fills the
+   wrapper's CSS-controlled height instead. */
+.chart-wrap { position: relative; height: 240px; }
+.chart-wrap canvas { width: 100% !important; height: 100% !important; }
+
+/* Responsive grid conventions (apply as Bootstrap column classes on the
+   markup, not CSS — documented here as the single source of truth so every
+   page's grid degrades the same way instead of skipping breakpoints):
+   - 3-4up stat/KPI card row: col-6 col-sm-6 col-md-4 col-lg-3
+   - chart row (2-3 charts):  col-12 col-md-6 col-lg-4
+   Never jump straight from col-12 to col-lg-*/col-md-* without the
+   intermediate col-sm-* step — that's what causes 2-3 cards/charts to be
+   cramped into ~33-50% width on small tablets instead of stacking there. */
+
+/* Fixed-width inline styles (style="width:Npx"/"min-width:Npx" on inputs,
+   selects, search boxes) don't shrink on narrow viewports and are a common
+   source of horizontal overflow. Replace with `w-100 w-sm-auto` on the
+   element (full-width on phones, intrinsic width from sm/576px up) plus
+   `flex-grow-1`/`flex-wrap` on the containing flex row as needed — judge
+   per instance, this isn't a class to apply blindly. */
+
+/* RTL support */
+html[dir="rtl"] body { text-align: right; }
+html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px solid hsl(var(--border)); }
+
+/* Shift calendar */
+.cal-nav-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: #fff;
+  color: hsl(var(--foreground));
+  transition: background .15s;
+}
+.cal-nav-btn:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.cal-weekday {
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  padding: .6rem 0;
+}
+.cal-weekday:first-child { border-start-start-radius: var(--radius-lg); }
+.cal-weekday:last-child { border-start-end-radius: var(--radius-lg); }
+
+.cal-cell {
+  min-height: 92px;
+  padding: .4rem .45rem;
+  border-bottom: 1px solid hsl(var(--border));
+  border-inline-end: 1px solid transparent;
+}
+.cal-cell.cal-outside { background: hsl(var(--muted) / 0.6); }
+.cal-cell.cal-outside .cal-daynum { color: hsl(var(--muted-foreground)); }
+.cal-daynum { font-size: .85rem; font-weight: 500; margin-bottom: .25rem; }
+.cal-cell.cal-today {
+  border: 2px solid #0EA5E9;
+  border-radius: var(--radius);
+  margin: -1px;
+}
+.cal-cell.cal-today .cal-daynum { color: #0EA5E9; font-weight: 700; }
+.cal-chip {
+  display: block;
+  font-size: .7rem;
+  background: rgba(14,165,233,0.10);
+  color: #0EA5E9;
+  border-radius: 0.5rem;
+  padding: .05rem .35rem;
+  margin-bottom: .15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+}
+.cal-chip:hover { background: rgba(14,165,233,0.18); color: #0EA5E9; }
+.cal-more { font-size: .7rem; color: hsl(var(--muted-foreground)); }
+
+/* Compact calendar on phones/small tablets — shrink cells instead of letting
+   7 columns compress into illegible slivers. Weekday labels can use two
+   spans, `<span class="d-none d-md-inline">Monday</span><span
+   class="d-md-none">Mon</span>`, to swap to abbreviations under the same
+   breakpoint. If content still doesn't fit at 320px even compacted, wrap
+   .cal-grid in a `.cal-scroll` container to fall back to horizontal scroll
+   rather than cramming unreadable columns. */
+@media (max-width: 767.98px) {
+  .cal-cell { min-height: 56px; padding: .25rem; font-size: .75rem; }
+  .cal-daynum { font-size: .75rem; margin-bottom: .1rem; }
+  .cal-chip { font-size: .65rem; padding: .02rem .25rem; }
+}
+.cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cal-scroll .cal-grid { min-width: 640px; }
+
+/* Floating AI avatar widget */
+#floatingAvatar {
+  position: fixed;
+  bottom: 1.5rem;
+  inset-inline-end: 1.5rem;
+  z-index: 1050;
+}
+#floatingAvatar .avatar-bubble {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #0EA5E9;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(14,165,233,0.35);
+  cursor: pointer;
+  transition: transform .2s;
+}
+#floatingAvatar .avatar-bubble:hover { transform: scale(1.05); }
+#floatingAvatar .avatar-card {
+  position: absolute;
+  bottom: 76px;
+  inset-inline-end: 0;
+  width: 220px;
+  background: #fff;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px rgba(17,24,39,.08);
+  padding: .75rem;
+  display: none;
+}
+#floatingAvatar.open .avatar-card { display: block; }

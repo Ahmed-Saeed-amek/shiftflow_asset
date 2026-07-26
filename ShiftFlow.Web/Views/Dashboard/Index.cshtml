@@ -1,0 +1,121 @@
+@model ShiftFlow.Application.Services.DashboardKpis
+@using ShiftFlow.Domain.Entities
+@{
+    ViewData["Title"] = Loc.T("Executive Dashboard");
+    var recentOrders = (List<InspectionOrder>)ViewBag.RecentOrders;
+    var overdueOrders = (List<InspectionOrder>)ViewBag.OverdueOrders;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait")})" />
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=Model.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=Model.InspectionOrdersOverdue.ToString(),Icon="bi-alarm",Color="red"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Teams"),Value=Model.ActiveTeams.ToString(),Icon="bi-people",Color="violet"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Total Engineers"),Value=Model.TotalEngineers.ToString(),Icon="bi-person-badge",Color="blue"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{Model.DefectiveAssets}/{Model.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=Model.OpenWorkOrders.ToString(),Subtitle=Model.CriticalOpenWorkOrders>0?$"{Model.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" /></div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold border-0">@Loc.T("Inspection Orders by Status")</div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="orderStatusChart"></canvas></div></div></div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+                <span class="fw-semibold">@Loc.T("Overdue Orders")</span>
+                <a asp-controller="InspectionOrders" asp-action="Index" class="small text-decoration-none">@Loc.T("View all")</a>
+            </div>
+            <div class="list-group list-group-flush">
+                @if (overdueOrders.Count == 0)
+                {
+                    <div class="list-group-item text-muted small text-center py-3">@Loc.T("No overdue orders")</div>
+                }
+                @foreach (var o in overdueOrders)
+                {
+                    <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="small fw-semibold">@o.OrderNumber — @o.Title</div>
+                                <div class="small text-muted">@(o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? Loc.T("Team") + ": " + o.AssignedToTeam.Name : "—")) · @Loc.T("Due") @o.DueDate?.ToString("dd/MM/yyyy")</div>
+                            </div>
+                            <partial name="_StatusBadge" model="@o.Status" />
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+                <span class="fw-semibold">@Loc.T("Recent Inspection Orders")</span>
+                <a asp-controller="InspectionOrders" asp-action="Index" class="small text-decoration-none">@Loc.T("View all")</a>
+            </div>
+            <div class="list-group list-group-flush">
+                @if (recentOrders.Count == 0)
+                {
+                    <div class="list-group-item text-muted small text-center py-3">@Loc.T("No inspection orders yet")</div>
+                }
+                @foreach (var o in recentOrders)
+                {
+                    <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="small fw-semibold">@o.OrderNumber — @o.Title</div>
+                                <div class="small text-muted">@(o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? Loc.T("Team") + ": " + o.AssignedToTeam.Name : "—")) · @o.CreatedAt.ToString("dd/MM/yyyy")</div>
+                            </div>
+                            <partial name="_StatusBadge" model="@o.Status" />
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const statusColors = { Open: '#fbbf24', InProgress: '#38bdf8', Done: '#34d399' };
+
+    const valueLabelPlugin = {
+        id: 'valueLabel',
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            chart.getDatasetMeta(0).data.forEach((bar, i) => {
+                const value = chart.data.datasets[0].data[i];
+                if (!value) return;
+                const pos = bar.tooltipPosition();
+                ctx.save();
+                ctx.fillStyle = '#374151';
+                ctx.font = "600 11px 'Inter Tight', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(value, pos.x, pos.y - 10);
+                ctx.restore();
+            });
+        }
+    };
+
+    const orderLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusLabels));
+    const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusData));
+    new Chart(document.getElementById('orderStatusChart'), {
+        type: 'bar',
+        data: {
+            labels: orderLabels,
+            datasets: [{ data: orderData, backgroundColor: orderLabels.map(l => statusColors[l] || '#94a3b8'), borderRadius: 4 }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            layout: { padding: { top: 16 } },
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        },
+        plugins: [valueLabelPlugin]
+    });
+</script>
+}
