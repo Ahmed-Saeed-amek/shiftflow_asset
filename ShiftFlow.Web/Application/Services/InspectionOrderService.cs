@@ -20,7 +20,7 @@ public class InspectionOrderService : IInspectionOrderService
     }
 
     public async Task<InspectionOrder> CreateAsync(string title, string? description, string? assignedToUserId, int? assignedToTeamId,
-        int? zoneId, List<int>? assetIds, DateTime? dueDate, string createdByUserId)
+        List<int>? assetIds, DateTime? dueDate, string createdByUserId)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new InvalidOperationException("Title is required.");
@@ -30,12 +30,15 @@ public class InspectionOrderService : IInspectionOrderService
         if (hasUser == hasTeam)
             throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
 
-        var resolvedAssetIds = zoneId.HasValue
-            ? await _db.Assets.Where(a => a.ZoneId == zoneId.Value).Select(a => a.Id).ToListAsync()
-            : assetIds ?? [];
-
+        var resolvedAssetIds = assetIds ?? [];
         if (resolvedAssetIds.Count == 0)
-            throw new InvalidOperationException("Select a zone or at least one asset to inspect.");
+            throw new InvalidOperationException("Select at least one asset to inspect.");
+
+        // Provenance only (not used for resolution): if every picked asset happens to share one
+        // Zone, record it so Zone-scoped reporting/display can rely on it; else left null.
+        var distinctZoneIds = await _db.Assets.Where(a => resolvedAssetIds.Contains(a.Id))
+            .Select(a => a.ZoneId).Distinct().ToListAsync();
+        int? singleZoneId = distinctZoneIds.Count == 1 ? distinctZoneIds[0] : null;
 
         var year = DateTime.UtcNow.Year;
         var seq = await _db.InspectionOrders.CountAsync(o => o.CreatedAt.Year == year) + 1;
@@ -53,7 +56,7 @@ public class InspectionOrderService : IInspectionOrderService
             Status = "Open",
             InspectionRun = new InspectionRun
             {
-                ZoneId = zoneId,
+                ZoneId = singleZoneId,
                 Items = resolvedAssetIds.Select(id => new InspectionRunAsset { AssetId = id }).ToList(),
             },
         };

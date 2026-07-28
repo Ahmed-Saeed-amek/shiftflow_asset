@@ -317,7 +317,7 @@
     <i class="bi bi-robot"></i>
     <div>
         <h4>@Loc.T("AI Assistant")</h4>
-        <p>@Loc.T("Ask about your shifts, tasks, and requests — by voice or text.")</p>
+        <p>@Loc.T("Ask about inspection orders, teams, and more — by voice or text.")</p>
     </div>
 </div>
 
@@ -356,7 +356,7 @@
 
         <div class="ai-messages" id="aiMessages">
             <div class="ai-bubble assistant">
-                @Loc.T("Hello! I'm your ShiftFlow AI assistant. I can help you check your shift, view tasks and work orders, submit swap or absence requests, and more. What can I do for you today?")
+                @Loc.T("Hi! I'm your ShiftFlow AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?")
             </div>
             <div class="ai-typing" id="aiTyping">
                 <span></span><span></span><span></span>
@@ -368,7 +368,7 @@
         </button>
 
         <div class="ai-input-row">
-            <input type="text" id="aiInput" placeholder="@Loc.T("Ask me anything about your shifts...")" maxlength="500"
+            <input type="text" id="aiInput" placeholder="@Loc.T("Ask me anything about inspection orders...")" maxlength="500"
                    onkeydown="if(event.key==='Enter')sendMessage()" />
             <button class="btn-send" id="btnSend" onclick="sendMessage()" title="@Loc.T("Send")">
                 <i class="bi bi-send-fill"></i>
@@ -380,10 +380,10 @@
            the browser decodes entities in attribute values before handing the string to JS.
            Html.Raw() here would leak the JSON's literal quotes and break the attribute. *@
         <div class="ai-quick-chips">
-            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("What is my shift today?")))">@Loc.T("My shift today")</button>
-            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my current tasks")))">@Loc.T("My tasks")</button>
-            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my work orders")))">@Loc.T("My work orders")</button>
-            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show my change requests")))">@Loc.T("My requests")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my inspection orders")))">@Loc.T("My Orders")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Which of my inspection orders are overdue?")))">@Loc.T("Overdue Orders")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("List my teams")))">@Loc.T("My Teams")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Help me create a new inspection order")))">@Loc.T("New Order")</button>
             <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("What are the dashboard KPIs?")))">@Loc.T("Dashboard KPIs")</button>
         </div>
     </div>

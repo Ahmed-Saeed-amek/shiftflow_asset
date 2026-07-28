@@ -60,10 +60,6 @@ function initEmployeePickers(){
     var search=pk.querySelector('[data-ep-search]');
     var results=pk.querySelector('[data-ep-results]');
     var role=pk.dataset.role||'';
-    var workArea=pk.dataset.workArea||'';
-    var shiftSchedule=pk.dataset.shiftSchedule||'';
-    var shiftDate=pk.dataset.shiftDate||'';
-    var excludeGroup=pk.dataset.excludeGroup||'';
     var timer=null;
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
@@ -82,8 +78,7 @@ function initEmployeePickers(){
       var q=search.value.trim();
       // typing invalidates a previous selection until a row is chosen
       hidden.value='';
-      var url='/api/users/search?q='+encodeURIComponent(q)+(role?'&role='+encodeURIComponent(role):'')+(workArea?'&workAreaId='+encodeURIComponent(workArea):'')+
-        (shiftSchedule?'&shiftScheduleId='+encodeURIComponent(shiftSchedule):'')+(shiftDate?'&shiftDate='+encodeURIComponent(shiftDate):'')+(excludeGroup?'&excludeGroupId='+encodeURIComponent(excludeGroup):'');
+      var url='/api/users/search?q='+encodeURIComponent(q)+(role?'&role='+encodeURIComponent(role):'');
       fetch(url,{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():[];}).then(render).catch(hide);
     }
     search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(query,220);});

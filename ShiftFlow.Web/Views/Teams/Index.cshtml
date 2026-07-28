@@ -34,7 +34,7 @@
                             <td>@t.Members.Count</td>
                             <td><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
                             <td class="text-end">
-                                <a asp-action="Details" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Open")</a>
+                                <a asp-action="Details" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
                             </td>
                         </tr>
                     }

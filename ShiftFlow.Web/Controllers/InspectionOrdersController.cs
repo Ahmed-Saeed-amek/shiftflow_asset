@@ -67,7 +67,7 @@ public class InspectionOrdersController : Controller
                 vm.Title, vm.Description,
                 vm.AssigneeType == "User" ? vm.AssignedToUserId : null,
                 vm.AssigneeType == "Team" ? vm.AssignedToTeamId : null,
-                vm.ZoneId, vm.AssetIds, vm.DueDate, CurrentUserId);
+                vm.AssetIds, vm.DueDate, CurrentUserId);
 
             TempData["Success"] = $"Inspection order {order.OrderNumber} created.";
             return RedirectToAction(nameof(Details), new { id = order.Id });
@@ -82,7 +82,7 @@ public class InspectionOrdersController : Controller
 
     private async Task LoadCreateViewBagAsync()
     {
-        ViewBag.Zones = await _db.Zones.OrderBy(z => z.Name).ToListAsync();
+        ViewBag.Governorates = await _db.Governorates.OrderBy(g => g.Name).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.Teams = await _teams.GetAllAsync();
     }

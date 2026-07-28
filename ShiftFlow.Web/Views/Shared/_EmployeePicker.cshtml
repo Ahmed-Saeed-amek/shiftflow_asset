@@ -8,8 +8,7 @@
     form-post contracts (asp-for / name) are unchanged.
 *@
 @model ShiftFlow.Web.ViewModels.EmployeePickerModel
-<div class="employee-picker position-relative" data-employee-picker data-role="@Model.Role" data-work-area="@Model.WorkAreaId"
-     data-shift-schedule="@Model.ShiftScheduleId" data-shift-date="@(Model.ShiftDate?.ToString("yyyy-MM-dd"))" data-exclude-group="@Model.ExcludeGroupId">
+<div class="employee-picker position-relative" data-employee-picker data-role="@Model.Role">
     <input type="hidden" name="@Model.Name" value="@Model.SelectedId" data-ep-value />
     <input type="text" class="form-control @Model.CssClass" autocomplete="off"
            placeholder="@(Model.Placeholder ?? Loc.T("Search by name or email…"))"

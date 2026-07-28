@@ -35,7 +35,7 @@ public class DashboardKpis{public int TotalEngineers{get;set;}public int OpenIns
 public interface IInspectionOrderService
 {
     Task<InspectionOrder> CreateAsync(string title, string? description, string? assignedToUserId, int? assignedToTeamId,
-        int? zoneId, List<int>? assetIds, DateTime? dueDate, string createdByUserId);
+        List<int>? assetIds, DateTime? dueDate, string createdByUserId);
     Task<InspectionOrder?> GetByIdAsync(int id);
     Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false);
     Task<List<InspectionOrder>> GetAllAsync(string? status, string? search);

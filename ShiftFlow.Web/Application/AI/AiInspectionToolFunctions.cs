@@ -123,7 +123,16 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     public async Task<object> CreateInspectionOrderAsync(string title, string? description, string? assignedToUserId,
         int? assignedToTeamId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct)
     {
-        var order = await _orders.CreateAsync(title, description, assignedToUserId, assignedToTeamId, zoneId, assetIds, dueDate, userId);
+        // zoneId is an AI-facing convenience ("inspect zone X") — resolve it to concrete asset ids
+        // here since the service now always takes a resolved AssetIds list.
+        var resolvedAssetIds = assetIds != null ? new List<int>(assetIds) : new List<int>();
+        if (zoneId.HasValue)
+        {
+            var zoneAssetIds = await _db.Assets.Where(a => a.ZoneId == zoneId.Value).Select(a => a.Id).ToListAsync(ct);
+            foreach (var id in zoneAssetIds)
+                if (!resolvedAssetIds.Contains(id)) resolvedAssetIds.Add(id);
+        }
+        var order = await _orders.CreateAsync(title, description, assignedToUserId, assignedToTeamId, resolvedAssetIds, dueDate, userId);
         return new { success = true, id = order.Id, orderNumber = order.OrderNumber };
     }
 

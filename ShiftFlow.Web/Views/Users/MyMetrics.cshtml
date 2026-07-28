@@ -76,7 +76,7 @@
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-transparent border-0 fw-semibold">@Loc.T("Order breakdown")</div>
-            <div class="card-body" style="height:260px"><canvas id="orderChart"></canvas></div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="orderChart"></canvas></div></div>
         </div>
     </div>
 </div>
@@ -134,7 +134,7 @@
                     borderWidth: 2
                 }]
             },
-            options: { plugins: { legend: { position: 'right' } }, cutout: '60%' }
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } }, cutout: '60%' }
         });
     }
 </script>

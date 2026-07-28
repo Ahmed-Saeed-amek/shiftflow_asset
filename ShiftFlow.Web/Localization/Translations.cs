@@ -125,6 +125,9 @@ public static class Translations
         ["Add Part"] = "إضافة قطعة",
         ["New Location"] = "موقع جديد",
         ["New User"] = "مستخدم جديد",
+        ["Seed Data"] = "تعبئة البيانات الأولية",
+        ["Seed data applied successfully."] = "تمت تعبئة البيانات الأولية بنجاح.",
+        ["This adds missing roles, permissions, and reference data. Safe to run again — nothing gets duplicated or overwritten. Continue?"] = "هذا يضيف الأدوار والصلاحيات والبيانات المرجعية الناقصة فقط. آمن لإعادة التشغيل، لن يتكرر أو يُستبدل أي شيء موجود. متابعة؟",
         ["Create Shift"] = "إنشاء وردية",
         ["New Request"] = "طلب جديد",
 
@@ -147,7 +150,7 @@ public static class Translations
         ["Completed"] = "مكتمل",
         ["Cancelled"] = "ملغى",
         ["New"] = "جديد",
-        ["Open"] = "مفتوح",
+        ["Open"] = "قائمة",
         ["Closed"] = "مغلق",
         ["Critical"] = "حرج",
         ["High"] = "مرتفع",
@@ -315,7 +318,7 @@ public static class Translations
         ["New Work Order"] = "أمر عمل جديد",
         ["New Category"] = "فئة جديدة",
         ["Defective Assets"] = "أصول معطلة",
-        ["Open Work Orders"] = "أوامر عمل مفتوحة",
+        ["Open Work Orders"] = "أوامر عمل قائمة",
         ["critical"] = "حرج",
         ["Search"] = "بحث",
         ["records"] = "سجلات",
@@ -391,17 +394,64 @@ public static class Translations
         ["Print Label"] = "طباعة الملصق",
         ["Asset Label"] = "ملصق الأصل",
         ["Regular"] = "عادية",
-        ["Inspect"] = "تفتيش",
-        ["Inspection Checklist"] = "قائمة التفتيش",
+        ["Inspect"] = "معاينة",
+        ["Inspection Checklist"] = "قائمة المعاينة",
         ["Checked"] = "تم الفحص",
         ["Outcome"] = "النتيجة",
-        ["Inspection History"] = "سجل التفتيش",
+        ["Inspection History"] = "سجل المعاينة",
         ["Inspected By"] = "تم الفحص بواسطة",
         ["Inspected At"] = "تاريخ الفحص",
-        ["No inspections yet"] = "لا توجد عمليات تفتيش بعد",
+        ["No inspections yet"] = "لا توجد عمليات معاينة بعد",
         ["Pick assets individually instead"] = "اختر الأصول يدويًا بدلاً من ذلك",
-        ["Select a zone or at least one asset to inspect."] = "اختر موضعًا أو أصلًا واحدًا على الأقل للتفتيش.",
+        ["Select a zone or at least one asset to inspect."] = "اختر موضعًا أو أصلًا واحدًا على الأقل للمعاينة.",
         ["Failed to save."] = "فشل الحفظ.",
+
+        // Teams
+        ["Team"] = "فريق",
+        ["Teams"] = "الفرق",
+        ["Reusable groups of employees for inspection orders"] = "مجموعات موظفين قابلة لإعادة الاستخدام لأوامر المعاينة",
+        ["New Team"] = "فريق جديد",
+        ["Members"] = "الأعضاء",
+        ["Combine filters"] = "دمج الفلاتر",
+        ["Both"] = "كلاهما",
+        ["Arabic Name"] = "الاسم بالعربية",
+        ["Create Team"] = "إنشاء الفريق",
+        ["Create a reusable group of employees"] = "أنشئ مجموعة موظفين قابلة لإعادة الاستخدام",
+        ["Edit Team"] = "تعديل الفريق",
+        ["No teams yet."] = "لا توجد فرق حتى الآن.",
+
+        // Inspection Orders
+        ["Inspection Order"] = "أمر معاينة",
+        ["Inspection Orders"] = "أوامر المعاينة",
+        ["New Inspection Order"] = "أمر معاينة جديد",
+        ["Assign one or more assets to an employee or a team"] = "اختر الأصول ووزّعها على موظف أو فريق",
+        ["What needs to be inspected?"] = "ما الذي تريد معاينته؟",
+        ["Select a team"] = "اختر فريق",
+        ["Create Order"] = "إنشاء الأمر",
+        ["New Order"] = "أمر جديد",
+        ["All Orders"] = "كل الأوامر",
+        ["Assigned Via"] = "طريقة التعيين",
+        ["No inspection orders assigned yet."] = "لا توجد أوامر معاينة مسندة حتى الآن.",
+        ["No inspection orders in this period."] = "لا توجد أوامر معاينة في هذه الفترة.",
+        ["Order breakdown"] = "تفاصيل الأوامر",
+        ["Orders Assigned"] = "الأوامر المسندة",
+        ["Assign inspections to employees or teams"] = "وزّع مهام المعاينة على الموظفين أو الفرق",
+        ["Search by order # or title..."] = "ابحث برقم الأمر أو العنوان...",
+        ["No inspection orders found."] = "لا توجد أوامر معاينة حالياً.",
+        ["Order #"] = "رقم الأمر",
+        ["My Orders"] = "أوامري",
+        ["Inspection orders assigned to you or your teams"] = "أوامر المعاينة المسندة لك أو لفريقك",
+        ["No inspection orders assigned to you."] = "لا توجد أوامر معاينة مسندة لك.",
+        ["No open inspection orders — you're all caught up."] = "رائع! لا توجد أوامر معاينة قائمة حالياً.",
+        ["Assigned to"] = "مسند إلى",
+        ["Open Inspection Orders"] = "أوامر المعاينة القائمة",
+        ["Overdue Orders"] = "أوامر متأخرة",
+        ["Active Teams"] = "الفرق النشطة",
+        ["Inspection Orders by Status"] = "أوامر المعاينة حسب الحالة",
+        ["No overdue orders"] = "لا توجد أوامر متأخرة",
+        ["Recent Inspection Orders"] = "آخر أوامر المعاينة",
+        ["No inspection orders yet"] = "لا توجد أوامر معاينة حتى الآن",
+        ["My Open Inspection Orders"] = "أوامر معاينتي القائمة",
         ["Work Order"] = "أمر عمل",
         ["Action Type"] = "نوع الإجراء",
         ["New Action Type"] = "نوع إجراء جديد",
@@ -1004,7 +1054,6 @@ public static class Translations
         Ar["No shift report submitted yet. Close the shift to generate one."] = "لم يتم تقديم تقرير نوبة حتى الآن. أغلق النوبة لإنشاء واحد.";
         Ar["No tasks found for this work area in the selected period."] = "لم يتم العثور على مهام لمنطقة العمل هذه في الفترة المحددة.";
         Ar["Off today"] = "إجازة اليوم";
-        Ar["Open"] = "مفتوح";
         Ar["open"] = "مفتوح";
         Ar["Open planner"] = "فتح المخطط";
         Ar["Open schedule"] = "جدول زمني مفتوح";
@@ -1553,20 +1602,17 @@ public static class Translations
     {
         // AI Assistant chat page
         Ar["Clear"] = "مسح";
-        Ar["Hello! I'm your ShiftFlow AI assistant. I can help you check your shift, view tasks and work orders, submit swap or absence requests, and more. What can I do for you today?"]
-            = "مرحباً! أنا مساعدك الذكي في ShiftFlow. يمكنني مساعدتك في معرفة ورديتك، وعرض المهام وأوامر العمل، وتقديم طلبات التبديل أو الغياب، والمزيد. كيف يمكنني مساعدتك اليوم؟";
-        Ar["My shift today"] = "وردية اليوم";
-        Ar["What is my shift today?"] = "ما هي ورديتي اليوم؟";
-        Ar["My tasks"] = "مهامي";
-        Ar["Show me my current tasks"] = "أظهر لي مهامي الحالية";
-        Ar["My work orders"] = "أوامر العمل";
-        Ar["Show me my work orders"] = "أظهر لي أوامر العمل الخاصة بي";
-        Ar["My requests"] = "طلباتي";
-        Ar["Show my change requests"] = "أظهر طلبات التغيير الخاصة بي";
+        Ar["Hi! I'm your ShiftFlow AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?"]
+            = "أهلاً! أنا مساعدك الذكي في ShiftFlow. أقدر أساعدك تتابع أوامر المعاينة، تدير الفرق، تبلّغ عن حالة الأصول، وأكثر. وش أقدر أساعدك فيه اليوم؟";
+        Ar["My Teams"] = "فرقي";
+        Ar["Show me my inspection orders"] = "أظهر لي أوامر المعاينة الخاصة بي";
+        Ar["Which of my inspection orders are overdue?"] = "وش الأوامر المتأخرة عندي؟";
+        Ar["List my teams"] = "أظهر لي فرقي";
+        Ar["Help me create a new inspection order"] = "ساعدني أنشئ أمر معاينة جديد";
         Ar["Dashboard KPIs"] = "مؤشرات الأداء";
         Ar["What are the dashboard KPIs?"] = "ما هي مؤشرات الأداء في لوحة التحكم؟";
         Ar["Voice input"] = "إدخال صوتي";
-        Ar["Ask me anything about your shifts..."] = "اسألني أي شيء عن ورديتك...";
+        Ar["Ask me anything about inspection orders..."] = "اسألني أي شيء عن أوامر المعاينة...";
         Ar["Send"] = "إرسال";
         Ar["No response received."] = "لم يتم استلام أي رد.";
         Ar["An error occurred. Please try again."] = "حدث خطأ. يرجى المحاولة مرة أخرى.";
@@ -1577,7 +1623,7 @@ public static class Translations
         Ar["An error occurred processing your request. Please try again."] = "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.";
         Ar["Connecting avatar…"] = "جارٍ الاتصال بالمساعد المرئي...";
         Ar["Avatar unavailable — voice replies still work."] = "المساعد المرئي غير متاح حالياً — الردود الصوتية لا تزال تعمل.";
-        Ar["Ask about your shifts, tasks, and requests — by voice or text."] = "اسأل عن ورديتك ومهامك وطلباتك — بالصوت أو بالنص.";
+        Ar["Ask about inspection orders, teams, and more — by voice or text."] = "اسأل عن أوامر المعاينة والفرق والمزيد — بالصوت أو بالنص.";
         Ar["Conversation"] = "المحادثة";
         Ar["Powered by"] = "بدعم من";
         Ar["Only employees with a scheduled, not-yet-opened shift that day are shown. They will return automatically after this shift."]
@@ -1599,9 +1645,6 @@ public static class Translations
         Ar["or"] = "أو";
         Ar["Sign in with Microsoft"] = "تسجيل الدخول عبر مايكروسوفت";
 
-        // AI Assistant
-        Ar["Hello! I'm your ShiftFlow AI assistant. I can help you check your shift, view tasks and work orders, submit swap or absence requests, and more. What can I do for you today?"]
-            = "مرحباً! أنا مساعدك الذكي في ShiftFlow. يمكنني مساعدتك في الاطلاع على ورديتك، وعرض المهام وأوامر العمل، وتقديم طلبات التبديل أو الغياب، وغير ذلك. كيف يمكنني مساعدتك اليوم؟";
         Ar["Ask me anything about the system!"] = "اسألني أي شيء عن النظام!";
         Ar["Open Chat"] = "فتح المحادثة";
 

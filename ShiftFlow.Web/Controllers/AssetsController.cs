@@ -195,6 +195,32 @@ public class AssetsController : Controller
         return Json(results);
     }
 
+    /// <summary>All assets at or under a location scope — most-specific-wins (Zone > Block > Area >
+    /// Governorate), same response shape as ByCategory, for bulk "Add All" in the asset multi-picker.
+    /// An optional categoryId ANDs in the same category/subcategory expansion as ByCategory, for the
+    /// picker's "match both filters" (intersection) mode.</summary>
+    public async Task<IActionResult> ByLocation(int? governorateId, int? areaId, int? blockId, int? zoneId, int? categoryId)
+    {
+        var query = _db.Assets.AsQueryable();
+        if (zoneId.HasValue) query = query.Where(a => a.ZoneId == zoneId.Value);
+        else if (blockId.HasValue) query = query.Where(a => a.Zone!.BlockId == blockId.Value);
+        else if (areaId.HasValue) query = query.Where(a => a.Zone!.Block!.AreaId == areaId.Value);
+        else if (governorateId.HasValue) query = query.Where(a => a.Zone!.Block!.Area!.GovernorateId == governorateId.Value);
+        else if (!categoryId.HasValue) return Json(Array.Empty<object>());
+
+        if (categoryId.HasValue)
+        {
+            var categoryIds = await _db.AssetCategories
+                .Where(c => c.Id == categoryId.Value || c.ParentCategoryId == categoryId.Value)
+                .Select(c => c.Id).ToListAsync();
+            query = query.Where(a => categoryIds.Contains(a.CategoryId));
+        }
+
+        var results = await query.OrderBy(a => a.AssetTag)
+            .Select(a => new { id = a.Id, assetTag = a.AssetTag, name = a.Name }).ToListAsync();
+        return Json(results);
+    }
+
     [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
     public async Task<IActionResult> ExportExcel()
     {

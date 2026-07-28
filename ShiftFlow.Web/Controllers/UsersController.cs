@@ -64,6 +64,25 @@ public class UsersController : Controller
         return View(users);
     }
 
+    // Re-runs the same idempotent seeder used at first startup (DbSeeder.SeedAsync only adds
+    // what's missing by key/code, never duplicates or overwrites existing data) — lets an admin
+    // top up reference data (roles, permissions, locations, demo accounts) after a fresh deploy
+    // without needing shell/DB access.
+    [HttpPost, Authorize(Policy = PermissionCatalog.IsAdmin), ValidateAntiForgeryToken]
+    public async Task<IActionResult> SeedData()
+    {
+        try
+        {
+            await DbSeeder.SeedAsync(_db, _um, _rm);
+            TempData["Success"] = "Seed data applied successfully.";
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Seeding failed: {ex.Message}";
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> Profile(string id)
     {
@@ -445,12 +464,12 @@ public class UsersController : Controller
         }
         catch (DbUpdateException)
         {
-            // Shift assignments, group memberships, and audit log entries are deliberately
-            // Restrict/NoAction on the user FK, so deleting anyone with real activity history
-            // fails at the DB level — that's intentional, it protects shift/audit records
-            // from being silently orphaned or lost. Deactivating instead revokes access
-            // without touching that history.
-            TempData["Error"] = $"'{user.FullName}' has shift or audit history and cannot be deleted. " +
+            // Inspection order assignments/reports, team memberships, and audit log entries are
+            // deliberately Restrict/NoAction on the user FK, so deleting anyone with real activity
+            // history fails at the DB level — that's intentional, it protects those records from
+            // being silently orphaned or lost. Deactivating instead revokes access without touching
+            // that history.
+            TempData["Error"] = $"'{user.FullName}' has inspection order or audit history and cannot be deleted. " +
                 "Deactivate the account instead to remove their access.";
         }
 

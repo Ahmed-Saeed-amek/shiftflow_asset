@@ -110,12 +110,14 @@
     const alertBox = document.getElementById('inspectAlert');
     const jsFailed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Failed to save.")));
     const jsActionTypeRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Action Type and Cause are required to report a defect.")));
+    const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
+    const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
     function fillSelect(sel, items) {
         sel.innerHTML = '<option value="">—</option>';
         items.forEach(i => {
             const opt = document.createElement('option');
-            opt.value = i.id; opt.textContent = i.name;
+            opt.value = i.id; opt.textContent = localName(i);
             sel.appendChild(opt);
         });
         sel.disabled = items.length === 0;

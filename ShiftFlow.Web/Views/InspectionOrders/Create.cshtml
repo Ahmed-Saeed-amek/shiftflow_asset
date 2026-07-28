@@ -4,8 +4,8 @@
 @{
     ViewData["Title"] = Loc.T("New Inspection Order");
     var teams = (List<Team>)ViewBag.Teams;
-    var zones = (List<Zone>)ViewBag.Zones;
     var categories = (List<AssetCategory>)ViewBag.Categories;
+    var governorates = (List<Governorate>)ViewBag.Governorates;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Inspection Order"),Subtitle=Loc.T("Assign one or more assets to an employee or a team")})" />
 
@@ -40,17 +40,17 @@
                 <div class="col-12">
                     <label class="form-label d-block">@Loc.T("Assign To")</label>
                     <div class="btn-group btn-group-sm mb-2" role="group">
-                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked />
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" />
                         <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
-                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" />
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked />
                         <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
                     </div>
                 </div>
-                <div class="col-md-6" id="assigneeUserRow">
+                <div class="col-md-6 d-none" id="assigneeUserRow">
                     <label class="form-label">@Loc.T("Employee")</label>
                     <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,Placeholder=Loc.T("Search by name or email…")})" />
                 </div>
-                <div class="col-md-6 d-none" id="assigneeTeamRow">
+                <div class="col-md-6" id="assigneeTeamRow">
                     <label class="form-label">@Loc.T("Team")</label>
                     <select asp-for="AssignedToTeamId" class="form-select">
                         <option value="">@Loc.T("Select a team")</option>
@@ -63,19 +63,9 @@
 
                 <div class="col-12"><hr /></div>
 
-                <div class="col-md-4">
-                    <label class="form-label">@Loc.T("Zone")</label>
-                    <select id="zoneSelect" asp-for="ZoneId" class="form-select">
-                        <option value="">@Loc.T("Pick assets individually instead")</option>
-                        @foreach (var z in zones)
-                        {
-                            <option value="@z.Id">@z.Name</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-8" id="assetsCol">
+                <div class="col-12">
                     <label class="form-label">@Loc.T("Assets")</label>
-                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=new List<AssetChip>(),Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories})" />
+                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=new List<AssetChip>(),Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,Governorates=governorates})" />
                 </div>
             </div>
 
@@ -101,14 +91,6 @@
             }
         });
     });
-
-    const zoneSelect = document.getElementById('zoneSelect');
-    const assetsCol = document.getElementById('assetsCol');
-    function syncZone() {
-        assetsCol.classList.toggle('d-none', !!zoneSelect.value);
-    }
-    zoneSelect.addEventListener('change', syncZone);
-    syncZone();
 })();
 </script>
 }

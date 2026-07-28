@@ -291,36 +291,115 @@ public static class DbSeeder
         {
             var categories = await db.AssetCategories.Where(c => c.ParentCategoryId == null).ToDictionaryAsync(c => c.Name);
 
-            // Idempotent per-category — skips a category that already has action types, so
-            // topping up Electrical/IT Equipment doesn't require HVAC's to be empty too.
-            async Task SeedActionTypesFor(string categoryName, (string Name, string NameAr, (string Name, string NameAr)[] Causes)[] types)
+            // Deactivate the old generic "Report Failure"/"Request Maintenance" action types on the
+            // top-level categories — replaced below by a single, category/subcategory-specific failure
+            // report type each. Soft-disable (IsActive=false) rather than delete: any WorkOrder created
+            // earlier against these rows still has a valid FK, they just stop appearing as options for
+            // new reports (AssetActionTypesController.ByCategory filters on IsActive).
+            var staleActionTypeNames = new[] { "Report Failure", "Request Maintenance" };
+            var topLevelCategoryIds = categories.Values.Select(c => c.Id).ToList();
+            var staleActionTypes = await db.AssetActionTypes
+                .Where(t => topLevelCategoryIds.Contains(t.CategoryId) && staleActionTypeNames.Contains(t.Name) && t.IsActive)
+                .ToListAsync();
+            foreach (var t in staleActionTypes) t.IsActive = false;
+            if (staleActionTypes.Count > 0) await db.SaveChangesAsync();
+
+            // Idempotent add-what's-missing by (ParentId, Name) — same pattern as Areas' fill-in.
+            var subcategorySeed = new (string Parent, string Name, string NameAr)[]
             {
-                if (!categories.TryGetValue(categoryName, out var cat)) return;
-                if (await db.AssetActionTypes.AnyAsync(t => t.CategoryId == cat.Id)) return;
-                foreach (var t in types)
+                ("HVAC", "Split Units", "وحدات مقسمة"),
+                ("HVAC", "Chillers", "المبردات"),
+                ("Electrical", "Transformers", "المحولات"),
+                ("Electrical", "Generators", "المولدات"),
+                ("Electrical", "Panels", "اللوحات الكهربائية"),
+                ("IT Equipment", "Servers", "الخوادم"),
+                ("IT Equipment", "Network Equipment", "معدات الشبكة"),
+                ("IT Equipment", "Security Systems", "أنظمة الأمن"),
+            };
+            var existingSubcatKeys = (await db.AssetCategories.Where(c => c.ParentCategoryId != null)
+                .Select(c => new { c.ParentCategoryId, c.Name }).ToListAsync())
+                .Select(c => (ParentId: (int)c.ParentCategoryId!, c.Name)).ToHashSet();
+            var missingSubcats = subcategorySeed
+                .Where(s => categories.ContainsKey(s.Parent) && !existingSubcatKeys.Contains((categories[s.Parent].Id, s.Name)))
+                .Select(s => new AssetCategory { Name = s.Name, NameAr = s.NameAr, ParentCategoryId = categories[s.Parent].Id })
+                .ToList();
+            if (missingSubcats.Count > 0)
+            {
+                db.AssetCategories.AddRange(missingSubcats);
+                await db.SaveChangesAsync();
+            }
+            var subcategories = await db.AssetCategories.Where(c => c.ParentCategoryId != null)
+                .ToDictionaryAsync(c => (c.ParentCategoryId!.Value, c.Name));
+
+            // Idempotent per (CategoryId, Name) — adds the action type and any missing causes under
+            // it without touching ones that already exist, so a partial/earlier run tops up cleanly.
+            async Task<AssetActionType> UpsertActionTypeAsync(int categoryId, string name, string nameAr, (string Name, string NameAr)[] causes)
+            {
+                var actionType = await db.AssetActionTypes.FirstOrDefaultAsync(t => t.CategoryId == categoryId && t.Name == name);
+                if (actionType is null)
                 {
-                    var actionType = new AssetActionType { CategoryId = cat.Id, Name = t.Name, NameAr = t.NameAr };
+                    actionType = new AssetActionType { CategoryId = categoryId, Name = name, NameAr = nameAr };
                     db.AssetActionTypes.Add(actionType);
                     await db.SaveChangesAsync();
-                    db.AssetActionCauses.AddRange(t.Causes.Select(c => new AssetActionCause { ActionTypeId = actionType.Id, Name = c.Name, NameAr = c.NameAr }));
                 }
+                var existingCauseNames = (await db.AssetActionCauses.Where(c => c.ActionTypeId == actionType.Id).Select(c => c.Name).ToListAsync()).ToHashSet();
+                var missingCauses = causes.Where(c => !existingCauseNames.Contains(c.Name))
+                    .Select(c => new AssetActionCause { ActionTypeId = actionType.Id, Name = c.Name, NameAr = c.NameAr }).ToList();
+                if (missingCauses.Count > 0)
+                {
+                    db.AssetActionCauses.AddRange(missingCauses);
+                    await db.SaveChangesAsync();
+                }
+                return actionType;
             }
 
-            await SeedActionTypesFor("HVAC",
-            [
-                ("Report Failure", "الإبلاغ عن عطل", [("Compressor Failure", "عطل الضاغط"), ("Refrigerant Leak", "تسرب غاز التبريد"), ("No Power", "لا يوجد طاقة")]),
-                ("Request Maintenance", "طلب صيانة", [("Routine Inspection", "فحص دوري"), ("Filter Replacement", "استبدال الفلتر")]),
-            ]);
-            await SeedActionTypesFor("Electrical",
-            [
-                ("Report Failure", "الإبلاغ عن عطل", [("Short Circuit", "دائرة قصر"), ("Overload", "حمل زائد"), ("No Power", "لا يوجد طاقة")]),
-                ("Request Maintenance", "طلب صيانة", [("Routine Inspection", "فحص دوري"), ("Calibration", "معايرة")]),
-            ]);
-            await SeedActionTypesFor("IT Equipment",
-            [
-                ("Report Failure", "الإبلاغ عن عطل", [("Hardware Failure", "عطل في الجهاز"), ("Network Outage", "انقطاع الشبكة"), ("Overheating", "ارتفاع الحرارة")]),
-                ("Request Maintenance", "طلب صيانة", [("Firmware Update", "تحديث البرنامج الثابت"), ("Routine Inspection", "فحص دوري")]),
-            ]);
+            // Top-level categories — one failure-report action type each, named for that category.
+            if (categories.TryGetValue("HVAC", out var hvac))
+                await UpsertActionTypeAsync(hvac.Id, "Report HVAC Failure", "الإبلاغ عن عطل التكييف",
+                    [("Compressor Failure", "عطل الضاغط"), ("Refrigerant Leak", "تسرب غاز التبريد"), ("No Power", "لا يوجد طاقة")]);
+            if (categories.TryGetValue("Electrical", out var electrical))
+                await UpsertActionTypeAsync(electrical.Id, "Report Electrical Failure", "الإبلاغ عن عطل كهربائي",
+                    [("Short Circuit", "دائرة قصر"), ("Overload", "حمل زائد"), ("No Power", "لا يوجد طاقة")]);
+            if (categories.TryGetValue("IT Equipment", out var itEquipment))
+                await UpsertActionTypeAsync(itEquipment.Id, "Report Hardware Failure", "الإبلاغ عن عطل في الجهاز",
+                    [("Hardware Failure", "عطل في الجهاز"), ("Network Outage", "انقطاع الشبكة"), ("Overheating", "ارتفاع الحرارة")]);
+
+            // Subcategories — each gets its own, more specific failure-report action type. The asset
+            // picker's ByCategory lookup already includes the parent category's types too when a
+            // subcategory is selected, so these are additive, not exclusive, alternatives.
+            if (categories.TryGetValue("HVAC", out var hvacCat))
+            {
+                if (subcategories.TryGetValue((hvacCat.Id, "Split Units"), out var splitUnits))
+                    await UpsertActionTypeAsync(splitUnits.Id, "Report Split Unit Failure", "الإبلاغ عن عطل الوحدة المقسمة",
+                        [("Compressor Failure", "عطل الضاغط"), ("Refrigerant Leak", "تسرب غاز التبريد"), ("No Power", "لا يوجد طاقة")]);
+                if (subcategories.TryGetValue((hvacCat.Id, "Chillers"), out var chillers))
+                    await UpsertActionTypeAsync(chillers.Id, "Report Chiller Failure", "الإبلاغ عن عطل المبرد",
+                        [("Compressor Failure", "عطل الضاغط"), ("Low Water Flow", "انخفاض تدفق المياه"), ("No Power", "لا يوجد طاقة")]);
+            }
+            if (categories.TryGetValue("Electrical", out var electricalCat))
+            {
+                if (subcategories.TryGetValue((electricalCat.Id, "Transformers"), out var transformers))
+                    await UpsertActionTypeAsync(transformers.Id, "Report Transformer Failure", "الإبلاغ عن عطل المحول",
+                        [("Overload", "حمل زائد"), ("Oil Leak", "تسرب الزيت"), ("No Power", "لا يوجد طاقة")]);
+                if (subcategories.TryGetValue((electricalCat.Id, "Generators"), out var generators))
+                    await UpsertActionTypeAsync(generators.Id, "Report Generator Failure", "الإبلاغ عن عطل المولد",
+                        [("Fuel Issue", "مشكلة في الوقود"), ("Starting Failure", "فشل التشغيل"), ("No Power", "لا يوجد طاقة")]);
+                if (subcategories.TryGetValue((electricalCat.Id, "Panels"), out var panels))
+                    await UpsertActionTypeAsync(panels.Id, "Report Panel Failure", "الإبلاغ عن عطل اللوحة",
+                        [("Short Circuit", "دائرة قصر"), ("Overload", "حمل زائد"), ("No Power", "لا يوجد طاقة")]);
+            }
+            if (categories.TryGetValue("IT Equipment", out var itEquipmentCat))
+            {
+                if (subcategories.TryGetValue((itEquipmentCat.Id, "Servers"), out var servers))
+                    await UpsertActionTypeAsync(servers.Id, "Report Server Failure", "الإبلاغ عن عطل الخادم",
+                        [("Hardware Failure", "عطل في الجهاز"), ("Overheating", "ارتفاع الحرارة"), ("No Power", "لا يوجد طاقة")]);
+                if (subcategories.TryGetValue((itEquipmentCat.Id, "Network Equipment"), out var networkEquipment))
+                    await UpsertActionTypeAsync(networkEquipment.Id, "Report Network Failure", "الإبلاغ عن عطل الشبكة",
+                        [("Network Outage", "انقطاع الشبكة"), ("Hardware Failure", "عطل في الجهاز")]);
+                if (subcategories.TryGetValue((itEquipmentCat.Id, "Security Systems"), out var securitySystems))
+                    await UpsertActionTypeAsync(securitySystems.Id, "Report Security System Failure", "الإبلاغ عن عطل نظام الأمن",
+                        [("Hardware Failure", "عطل في الجهاز"), ("Network Outage", "انقطاع الشبكة"), ("No Power", "لا يوجد طاقة")]);
+            }
 
             await db.SaveChangesAsync();
         }
@@ -493,6 +572,7 @@ public static class DbSeeder
         {
             ["Admin"] =
             [
+                "System.IsAdmin",
                 "User.Manage", "User.View",
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
                 "Team.View", "Team.Manage",

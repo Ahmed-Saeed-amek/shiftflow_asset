@@ -8,11 +8,10 @@ public class InspectionOrderCreateVm : IValidatableObject
     public string? Description { get; set; }
 
     /// <summary>"User" or "Team"</summary>
-    [Required] public string AssigneeType { get; set; } = "User";
+    [Required] public string AssigneeType { get; set; } = "Team";
     public string? AssignedToUserId { get; set; }
     public int? AssignedToTeamId { get; set; }
 
-    public int? ZoneId { get; set; }
     public List<int>? AssetIds { get; set; }
 
     public DateTime? DueDate { get; set; }
@@ -32,8 +31,8 @@ public class InspectionOrderCreateVm : IValidatableObject
                 yield return new ValidationResult(string.Format(t("Please select a {0}."), t("Employee")), new[] { nameof(AssignedToUserId) });
         }
 
-        if (!ZoneId.HasValue && (AssetIds == null || AssetIds.Count == 0))
-            yield return new ValidationResult(t("Select a zone or at least one asset to inspect."), new[] { nameof(AssetIds) });
+        if (AssetIds == null || AssetIds.Count == 0)
+            yield return new ValidationResult(t("Select at least one asset."), new[] { nameof(AssetIds) });
     }
 }
 

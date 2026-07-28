@@ -126,6 +126,9 @@ public class AssetMultiPickerModel
     public string? Placeholder { get; set; }
     /// <summary>Top-level categories. When set, renders a "add all assets in category" control above the search box.</summary>
     public List<AssetCategory>? Categories { get; set; }
+    /// <summary>Top-level governorates. When set, renders a Governorate→Area→Block→Zone cascading
+    /// "add all assets at this location" control above the search box.</summary>
+    public List<Governorate>? Governorates { get; set; }
 }
 
 public class UserAssetScopeViewModel : IValidatableObject
@@ -259,12 +262,6 @@ public class EmployeePickerModel
 {
     public string Name { get; set; } = string.Empty;   // hidden input name (carries user id)
     public string? Role { get; set; }                   // optional role filter for the search
-    public int? WorkAreaId { get; set; }                 // optional work-area filter for the search
-    // Restricts results to employees with a shift assignment on ShiftDate (within ShiftScheduleId)
-    // whose DailyGroupShift is still Draft; ExcludeGroupId additionally excludes that group's members.
-    public int? ShiftScheduleId { get; set; }
-    public DateTime? ShiftDate { get; set; }
-    public int? ExcludeGroupId { get; set; }
     public string? SelectedId { get; set; }
     public string? SelectedLabel { get; set; }
     public string? Placeholder { get; set; }

@@ -59,7 +59,7 @@
                             <td>@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>
                             <td>@o.CreatedAt.ToString("dd/MM/yyyy")</td>
                             <td class="text-end">
-                                <a asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Open")</a>
+                                <a asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
                             </td>
                         </tr>
                     }
