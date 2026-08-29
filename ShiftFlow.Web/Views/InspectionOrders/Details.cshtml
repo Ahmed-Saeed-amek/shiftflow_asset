@@ -150,6 +150,11 @@
     const jsActionTypeRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Action Type and Cause are required to report a defect.")));
     const jsSelectActions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Select actions")));
     const jsSelected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("selected")));
+    // The Save button's label doubles as the "nothing is saved yet" cue — a bare "Save" reads as
+    // optional when it's actually what commits the OK/Defective decision you just clicked.
+    const jsConfirmOk = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Confirm OK")));
+    const jsConfirmDefective = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Confirm Defective")));
+    const jsSaveMaintenance = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Save Maintenance Actions")));
     const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
     const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
@@ -198,6 +203,8 @@
         delete formRow.dataset.outcome;
         formRow.querySelectorAll('.defect-only').forEach(el => el.classList.add('d-none'));
         updateMaintenanceCount(formRow);
+        const saveBtn = formRow.querySelector('.save-outcome-btn');
+        if (saveBtn) saveBtn.textContent = jsSaveMaintenance;
     }
 
     document.querySelectorAll('.maintenance-only-btn, .edit-maintenance-btn').forEach(btn => {
@@ -222,6 +229,8 @@
 
             const isDefect = outcome === 'Defective';
             formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
+            const saveBtn = formRow.querySelector('.save-outcome-btn');
+            if (saveBtn) saveBtn.textContent = isDefect ? jsConfirmDefective : jsConfirmOk;
             const actionTypeSel = formRow.querySelector('.action-type-select');
             const causeSel = formRow.querySelector('.cause-select');
             if (isDefect && actionTypeSel) {
