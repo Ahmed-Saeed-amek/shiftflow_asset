@@ -113,7 +113,10 @@ public class UsersController : Controller
     public async Task<IActionResult> MyTasks(bool showAll = false, string? range = null)
     {
         var id = _um.GetUserId(User)!;
-        var (from, to) = ResolveRange(range ?? "month");
+        // The date range only makes sense when browsing history (showAll) — a still-open task
+        // stays relevant no matter how long ago it was created, so the default "open work" view
+        // must never let a "this month" bound silently hide it.
+        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
         ViewBag.SelectedRange = range ?? "month";
         var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
         ViewBag.ShowAll = showAll;
@@ -126,7 +129,7 @@ public class UsersController : Controller
     {
         var id = _um.GetUserId(User)!;
         var user = await _um.FindByIdAsync(id);
-        var (from, to) = ResolveRange(range ?? "month");
+        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
         var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
 
         var bytes = BuildTasksPdf(rows, user?.FullName ?? user?.Email ?? id, showAll);

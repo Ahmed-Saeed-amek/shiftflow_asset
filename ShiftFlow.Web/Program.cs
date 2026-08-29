@@ -336,8 +336,12 @@ app.Use(async (context, next) =>
     headers["Content-Security-Policy"] =
         "default-src 'self'; " +
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-        "font-src 'self' data: https://cdn.jsdelivr.net; " +
+        // fonts.googleapis.com/gstatic.com: site.css @imports Inter Tight / IBM Plex Sans Arabic
+        // from Google Fonts — the stylesheet comes from googleapis.com, the actual font files it
+        // references come from gstatic.com, so both need to be allowed or the browser silently
+        // blocks the @import and every page falls back to whatever default font it has.
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+        "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
         "img-src 'self' data: https://cdn.jsdelivr.net https://*.tile.openstreetmap.org; " +
         "connect-src 'self' https://cdn.jsdelivr.net https://*.cognitiveservices.azure.com https://*.speech.microsoft.com wss://*.speech.microsoft.com https://graph.microsoft.com; " +
         "media-src 'self' blob:; " +

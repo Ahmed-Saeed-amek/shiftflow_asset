@@ -162,7 +162,10 @@ public class MaintenanceOrdersController : Controller
     [Authorize]
     public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null)
     {
-        var (from, to) = ResolveRange(range ?? "month");
+        // The date range only makes sense when browsing history (showAll) — a still-open order
+        // stays relevant no matter how long ago it was created, so the default "open work" view
+        // must never let a "this month" bound silently hide it.
+        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
         var orders = await _orders.GetMyOrdersAsync(CurrentUserId, includeDone: showAll, from: from, to: to);
         ViewBag.ShowAll = showAll;
         ViewBag.SelectedRange = range ?? "month";
