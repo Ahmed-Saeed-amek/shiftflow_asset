@@ -15,7 +15,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Suppress the "Server: Kestrel" response header — reveals server technology to any
 // unauthenticated caller for no functional benefit (OWASP A02 Security Misconfiguration).
-builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
+// Also pin TLS to 1.2/1.3 only: TLS 1.0/1.1 are deprecated, still negotiable by default on
+// this host, and offered alongside legacy CBC cipher suites vulnerable to BEAST/LUCKY13.
+builder.WebHost.ConfigureKestrel(o =>
+{
+    o.AddServerHeader = false;
+    o.ConfigureHttpsDefaults(https =>
+        https.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13);
+});
 
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
 
@@ -43,8 +50,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(o =>
 
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(o =>
 {
-    o.Password.RequiredLength = 8;
-    o.Password.RequireNonAlphanumeric = false;
+    // RequireDigit/RequireLowercase/RequireUppercase already default to true. The 8-char
+    // minimum and lack of a required special character fell short of a reasonable modern
+    // policy; bumped to 12 (every seeded demo password already satisfies this) plus a
+    // required special character.
+    o.Password.RequiredLength = 12;
+    o.Password.RequireNonAlphanumeric = true;
     o.SignIn.RequireConfirmedEmail = false;
     o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     o.Lockout.MaxFailedAccessAttempts = 5;
@@ -152,7 +163,9 @@ builder.Services.AddScoped<ILanguageService, LanguageService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IWorkOrderService, WorkOrderService>();
+builder.Services.AddScoped<IMaintenanceOrderService, MaintenanceOrderService>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IAssetScopeService, AssetScopeService>();
 builder.Services.AddHostedService<PreventiveMaintenanceSchedulerService>();
 
 // AI Assistant (Rased pattern: OpenAI direct key preferred, Azure OpenAI fallback)
@@ -162,6 +175,17 @@ builder.Services.Configure<AzureSpeechOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<AiAssistantOptions>(builder.Configuration.GetSection("AiAssistant"));
 builder.Services.AddScoped<IAiInspectionToolFunctions, AiInspectionToolFunctions>();
 builder.Services.AddScoped<AiAssistantOrchestrator>();
+
+// Asset repair-video lookup (getAssetRepairGuidance tool) — scoped to one asset ID at a time,
+// see AssetRepairGuidanceService's doc comment for why this can't become a general video search.
+builder.Services.Configure<YouTubeOptions>(builder.Configuration.GetSection("YouTube"));
+builder.Services.AddSingleton<IYouTubeQuotaTracker, YouTubeQuotaTracker>();
+builder.Services.AddScoped<IAssetRepairGuidanceService, AssetRepairGuidanceService>();
+builder.Services.AddHttpClient("YouTube", client =>
+{
+    client.BaseAddress = new Uri("https://www.googleapis.com/youtube/v3/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // Per-user throttle on the AI Assistant endpoints — each Query call can chain up to
 // AiAssistantOrchestrator.MaxIterations LLM completions, so without a limit an authenticated
@@ -174,6 +198,19 @@ builder.Services.AddRateLimiter(options =>
         factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         {
             PermitLimit = 15,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+
+    // Identity's built-in lockout (5 failed attempts -> 5 min) only kicks in per-account, so a
+    // distributed credential-stuffing run spread across many emails from one IP is otherwise
+    // unthrottled. Partition by IP (not by the submitted email, which an attacker controls and
+    // can rotate freely) so this catches that case independently of the per-account lockout.
+    options.AddPolicy("login", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
@@ -209,7 +246,14 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton<Microsoft.Extensions.Localization.IStringLocalizerFactory,
     ShiftFlow.Web.Localization.TranslationsStringLocalizerFactory>();
 
-var mvcBuilder = builder.Services.AddControllersWithViews()
+var mvcBuilder = builder.Services.AddControllersWithViews(options =>
+{
+    // Read-only actions rely on default convention-based routing with no explicit [HttpGet],
+    // so by default they'd accept ANY HTTP verb (PUT/DELETE/TRACE/invented) identically to GET.
+    // This restricts any action with no HTTP-verb-selector attribute of its own to GET/HEAD —
+    // actions already carrying [HttpPost] etc. (every write action in this app) are untouched.
+    options.Conventions.Add(new ShiftFlow.Web.Infrastructure.Mvc.DefaultGetOnlyConvention());
+})
 .AddDataAnnotationsLocalization(options =>
 {
     options.DataAnnotationLocalizerProvider = (type, factory) => factory.Create(type);
@@ -217,6 +261,22 @@ var mvcBuilder = builder.Services.AddControllersWithViews()
 
 if (builder.Environment.IsDevelopment())
     mvcBuilder.AddRazorRuntimeCompilation();
+
+// The antiforgery cookie carries the CSRF-token-binding value validated against
+// __RequestVerificationToken on every state-changing POST. Force Secure explicitly in
+// Production instead of relying on the framework default (SameAsRequest, which only adds
+// Secure when the current request happens to be HTTPS).
+// Forcing Always unconditionally was tried and reverted: this app's own dev preview serves
+// plain HTTP (no working HTTPS redirect target in that environment — "Failed to determine
+// the https port for redirect" — so UseHttpsRedirection() below doesn't save it), and
+// DefaultAntiforgery throws InvalidOperationException on every <form>-rendering GET, not just
+// POSTs, the moment Cookie.SecurePolicy=Always meets a non-SSL request — this 500'd the entire
+// app, confirmed live. Production behind real TLS is unaffected either way.
+builder.Services.AddAntiforgery(options =>
+{
+    if (!builder.Environment.IsDevelopment())
+        options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
+});
 
 // Model-binding failures (e.g. a required dropdown/picker posted as "" — can't convert "" to int)
 // are raised by the binder itself, before DataAnnotations/IValidatableObject ever run, so
@@ -244,6 +304,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Friendly branded page for 404/403/etc. that reach the end of the pipeline with no body of
+// their own (e.g. a bad URL, or an [Authorize] policy failure) — separate from UseExceptionHandler
+// above, which only covers unhandled exceptions. Active in all environments so a 404 always looks
+// the same regardless of Development vs Production.
+app.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}");
+
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 
@@ -262,6 +328,11 @@ app.Use(async (context, next) =>
     headers["X-Frame-Options"] = "DENY";
     headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     headers["Permissions-Policy"] = "microphone=(self), camera=(), geolocation=()";
+    // Flagged missing by a WSTG-methodology pentest pass (nuclei/nikto) on a sibling app sharing
+    // this codebase's lineage — cheap, no-compat-risk additions, no reason not to carry them here too.
+    headers["Cross-Origin-Opener-Policy"] = "same-origin";
+    headers["Cross-Origin-Resource-Policy"] = "same-origin";
+    headers["X-Permitted-Cross-Domain-Policies"] = "none";
     headers["Content-Security-Policy"] =
         "default-src 'self'; " +
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
@@ -271,6 +342,9 @@ app.Use(async (context, next) =>
         "connect-src 'self' https://cdn.jsdelivr.net https://*.cognitiveservices.azure.com https://*.speech.microsoft.com wss://*.speech.microsoft.com https://graph.microsoft.com; " +
         "media-src 'self' blob:; " +
         "worker-src 'self' blob:; " +
+        // youtube-nocookie.com only, matching the exact embed URL getAssetRepairGuidance's
+        // video suggestions render as — no default-src fallback would otherwise permit it.
+        "frame-src https://www.youtube-nocookie.com; " +
         "object-src 'none'; " +
         "frame-ancestors 'none'; " +
         "base-uri 'self';";

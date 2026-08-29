@@ -23,14 +23,12 @@ public class WorkOrdersController : Controller
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
-    public async Task<IActionResult> Index(string? stage, string? priority, string? type)
+    public async Task<IActionResult> Index(string? stage, string? priority)
     {
-        var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).AsQueryable();
+        var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
         if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
         if (!string.IsNullOrWhiteSpace(priority)) query = query.Where(w => w.Priority == priority);
-        if (type == "PM") query = query.Where(w => w.SourceContractId != null);
-        else if (type == "Manual") query = query.Where(w => w.SourceContractId == null);
-        ViewBag.Stage = stage; ViewBag.Priority = priority; ViewBag.Type = type;
+        ViewBag.Stage = stage; ViewBag.Priority = priority;
         return View(await query.OrderByDescending(w => w.CreatedDate).ToListAsync());
     }
 
@@ -38,8 +36,8 @@ public class WorkOrdersController : Controller
     public async Task<IActionResult> Details(int id)
     {
         var wo = await _db.WorkOrders
-            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.Block).ThenInclude(bl => bl!.Area).ThenInclude(a => a!.Governorate)
-            .Include(w => w.Vendor).Include(w => w.CreatedByUser)
+            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
+            .Include(w => w.Vendor).Include(w => w.CreatedByUser).Include(w => w.AssignedToUser)
             .Include(w => w.ActionType).Include(w => w.Cause)
             .Include(w => w.BlockReason)
             .Include(w => w.SourceContract)
@@ -47,8 +45,8 @@ public class WorkOrdersController : Controller
             .Include(w => w.StageEvents).ThenInclude(s => s.ChangedByUser)
             .FirstOrDefaultAsync(w => w.Id == id);
         if (wo == null) return NotFound();
-        if (wo.Stage is "Draft" or "New")
-            ViewBag.ServiceVendors = await _contractService.GetActiveServiceVendorsAsync(wo.AssetId);
+        ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+        ViewBag.CurrentUserId = _userManager.GetUserId(User);
         return View(wo);
     }
 
@@ -82,6 +80,8 @@ public class WorkOrdersController : Controller
         var wo = await _workOrderService.CreateAsync(new WorkOrder
         {
             AssetId = vm.AssetId, Priority = vm.Priority, Description = vm.Description, Notes = vm.Notes,
+            AssignedToUserId = string.IsNullOrWhiteSpace(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
+            RequiresVendorResponse = vm.RequiresVendorResponse,
         }, userId);
         TempData["Success"] = $"Work order {wo.WorkOrderNumber} created.";
         return RedirectToAction(nameof(Details), new { id = wo.Id });
@@ -114,14 +114,103 @@ public class WorkOrdersController : Controller
         return RedirectToAction(nameof(Details), "Assets", new { id = vm.AssetId });
     }
 
-    /// <summary>Admin accepts a Draft report: edits priority/description/notes and resolves the Service-contract vendor in one step.</summary>
+    /// <summary>Admin accepts a Draft report: sets priority and either sends it to a vendor or, if only an employee is assigned, moves it to New for that employee to fix directly.</summary>
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
-    public async Task<IActionResult> Accept(int id, int vendorId, string priority, string? description, string? notes)
+    public async Task<IActionResult> Accept(int id, int? vendorId, string priority)
     {
         var userId = _userManager.GetUserId(User)!;
-        try { await _workOrderService.AcceptAsync(id, vendorId, priority, description, notes, userId); TempData["Success"] = "Accepted and sent to vendor."; }
+        try { await _workOrderService.AcceptAsync(id, vendorId, priority, userId); TempData["Success"] = "Accepted."; }
         catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> AssignEmployee(int id, string? employeeUserId)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        try { await _workOrderService.AssignEmployeeAsync(id, employeeUserId, userId); TempData["Success"] = "Employee assignment updated."; }
+        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost, Authorize, ValidateAntiForgeryToken]
+    public async Task<IActionResult> EmployeeFix(int id, VendorFixViewModel vm)
+    {
+        if (vm.Files is { Count: > 0 })
+        {
+            var (_, rejected) = await ShiftFlow.Web.Services.FileUploadValidator.ValidateAllAsync(vm.Files);
+            if (rejected.Count > 0)
+            {
+                TempData["Error"] = "Fix not submitted — invalid attachment(s): " + string.Join("; ", rejected.Select(r => $"{r.FileName} — {r.Reason}"));
+                return RedirectToAction(nameof(Details), new { id });
+            }
+        }
+
+        var userId = _userManager.GetUserId(User)!;
+        try
+        {
+            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            await _workOrderService.EmployeeFixAsync(id, vm.Description ?? "", vm.Cost, vm.CompletionDate, parts, userId);
+            await ShiftFlow.Web.Services.WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
+            TempData["Success"] = "Fix report submitted.";
+        }
+        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Bypasses waiting on the vendor for a work order sitting at "Sent to Vendor" whose
+    /// RequiresVendorResponse flag is off — usable by a manager or the assigned employee.</summary>
+    [HttpPost, Authorize, ValidateAntiForgeryToken]
+    public async Task<IActionResult> AdvanceWithoutVendor(int id, VendorFixViewModel vm)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
+            .AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+        try
+        {
+            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            await _workOrderService.AdvanceWithoutVendorAsync(id, vm.Description ?? "", vm.Cost, vm.CompletionDate, parts, userId, isManager);
+            TempData["Success"] = "Work order advanced without waiting on the vendor.";
+        }
+        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> ForceClose(int id, string? reason)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        try { await _workOrderService.ForceCloseAsync(id, reason, userId); TempData["Success"] = "Work order force-closed."; }
+        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Employee self-service: work orders assigned directly to me (no vendor portal involved).
+    /// Only this month's by default; range=all lifts the date bound.</summary>
+    [Authorize]
+    public async Task<IActionResult> MyMaintenanceOrders(bool showAll = false, string? range = null)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        var (from, to) = ResolveRange(range ?? "month");
+        var query = _db.WorkOrders.Include(w => w.Asset).Where(w => w.AssignedToUserId == userId);
+        if (!showAll) query = query.Where(w => w.Stage != "Closed");
+        if (from.HasValue) query = query.Where(w => w.CreatedDate >= from.Value);
+        if (to.HasValue) query = query.Where(w => w.CreatedDate <= to.Value);
+        ViewBag.ShowAll = showAll;
+        ViewBag.SelectedRange = range ?? "month";
+        return View(await query.OrderByDescending(w => w.CreatedDate).ToListAsync());
+    }
+
+    private static (DateTime? from, DateTime? to) ResolveRange(string? range)
+    {
+        var today = DateTime.Today;
+        return range switch
+        {
+            // "to" is the current moment, not midnight-today, so anything created later today
+            // (the common case right after this feature ships) still falls inside the range.
+            "month" => (new DateTime(today.Year, today.Month, 1), DateTime.Now),
+            _ => (null, null),
+        };
     }
 
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]

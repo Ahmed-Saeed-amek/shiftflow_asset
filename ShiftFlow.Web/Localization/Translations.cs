@@ -228,7 +228,6 @@ public static class Translations
         ["Code"] = "الرمز",
         ["City"] = "المدينة",
         ["Address"] = "العنوان",
-        ["Block"] = "القطعة",
         ["Department"] = "القسم",
         ["Specialization"] = "التخصص",
         ["Phone"] = "الهاتف",
@@ -322,16 +321,15 @@ public static class Translations
         ["critical"] = "حرج",
         ["Search"] = "بحث",
         ["records"] = "سجلات",
-        ["Governorate"] = "المحافظة",
-        ["Area"] = "المنطقة",
-        // "Zone" is a distinct concept from "Block" (an administrative subdivision, numbered) —
-        // both used to translate to القطعة, making them indistinguishable in the Locations/Zones
-        // list. Zone now uses الموضع ("the specific site"), matching its role as the granular,
-        // named facility (e.g. "Block 3 Substation") that Assets/Contracts actually attach to.
+        // "Zone" is the granular, named facility (e.g. "Block 3 Substation") that Assets/Contracts
+        // actually attach to; الموضع ("the specific site") keeps it distinct from Location Category.
         ["Zone"] = "الموضع",
         ["Asset Locations"] = "مواقع الأصول",
         ["New Zone"] = "موضع جديد",
-        ["New Area"] = "منطقة جديدة",
+        ["Location Category"] = "فئة الموقع",
+        ["Main Locations"] = "المواقع الرئيسية",
+        ["Side Locations"] = "المواقع الفرعية",
+        ["Governmental Locations"] = "المواقع الحكومية",
         ["Coordinates"] = "الإحداثيات",
         ["No coordinates set"] = "لم يتم تحديد الإحداثيات",
         ["Add coordinates"] = "إضافة إحداثيات",
@@ -373,8 +371,71 @@ public static class Translations
         ["Fix Report"] = "تقرير الإصلاح",
         ["Submit Fix"] = "إرسال الإصلاح",
         ["Submit Block"] = "إرسال التعطيل",
-        ["No active Service contract covers this asset — link one before sending a work order to a vendor."] = "لا يوجد عقد خدمة نشط يغطي هذا الأصل — اربط عقدًا أولاً قبل إرسال أمر عمل إلى مورد.",
         ["Choose Vendor"] = "اختر المورد",
+        ["Assigned Employee"] = "الموظف المكلف",
+        ["Assign Employee"] = "تعيين موظف",
+        ["Report Fix"] = "تسجيل الإصلاح",
+        ["Force Close"] = "إغلاق إجباري",
+        ["Force-close reason (optional)"] = "سبب الإغلاق الإجباري (اختياري)",
+        ["Defect Report"] = "تقرير العطل",
+        ["Back to Work Orders"] = "العودة إلى أوامر العمل",
+        ["Review this report"] = "مراجعة هذا البلاغ",
+        ["Reassign Employee"] = "إعادة تعيين الموظف",
+        ["Closes this work order immediately without waiting for a vendor or employee reply."] = "يُغلق أمر العمل هذا فورًا دون انتظار رد المورد أو الموظف.",
+        ["Review the fix report below, then confirm to close this work order."] = "راجع تقرير الإصلاح أدناه، ثم أكّد لإغلاق أمر العمل هذا.",
+        ["Close this work order immediately without waiting for a vendor or employee reply?"] = "هل تريد إغلاق أمر العمل هذا فورًا دون انتظار رد المورد أو الموظف؟",
+        ["My Maintenance Orders"] = "أوامر الصيانة الخاصة بي",
+        ["Maintenance Order"] = "أمر صيانة",
+        ["— No vendor (employee only) —"] = "— بدون مورد (موظف فقط) —",
+        ["Assign an employee above if you plan to accept without a vendor."] = "قم بتعيين موظف أعلاه إذا كنت تخطط للقبول دون مورد.",
+        ["This work order isn't assigned to you."] = "أمر العمل هذا غير مسند إليك.",
+        ["A vendor is already handling this work order."] = "يوجد مورد يتولى هذا الأمر بالفعل.",
+        ["Selected vendor not found or inactive."] = "المورد المحدد غير موجود أو غير نشط.",
+        ["Assign a vendor or an employee before accepting this report."] = "قم بتعيين مورد أو موظف قبل قبول هذا التقرير.",
+        ["Quick Check"] = "فحص سريع",
+        ["QuickCheck"] = "فحص سريع",
+        ["Inspection"] = "معاينة",
+        ["Maintenance Orders"] = "أوامر الصيانة",
+        ["New Maintenance Order"] = "أمر صيانة جديد",
+        ["In-house fixes assigned directly to employees — no vendor involved"] = "إصلاحات داخلية تُسند مباشرة للموظفين — دون تدخل مورد",
+        ["Assign an employee to fix an asset in-house — no vendor, no formal review step"] = "عيّن موظفًا لإصلاح أصل داخليًا — دون مورد ودون خطوة مراجعة رسمية",
+        ["What needs fixing?"] = "ما الذي يحتاج إلى إصلاح؟",
+        ["Search by order # or asset tag..."] = "ابحث برقم الطلب أو رمز الأصل...",
+        ["My Assigned Work Orders"] = "أوامر العمل المسندة إليّ",
+        ["Work orders you're directly assigned to fix"] = "أوامر العمل المسندة إليك مباشرة للإصلاح",
+        ["Assigned to Employee"] = "مسند إلى موظف",
+        ["Waiting on the assigned employee to report the fix."] = "بانتظار أن يُبلغ الموظف المكلف عن الإصلاح.",
+        ["This maintenance order was cancelled."] = "تم إلغاء أمر الصيانة هذا.",
+        ["Cancel Maintenance Order"] = "إلغاء أمر الصيانة",
+        ["Cancel this maintenance order?"] = "هل تريد إلغاء أمر الصيانة هذا؟",
+        ["Reason (optional)"] = "السبب (اختياري)",
+        ["No maintenance orders assigned to you."] = "لا توجد أوامر صيانة مسندة إليك.",
+        ["No open maintenance orders — you're all caught up."] = "لا توجد أوامر صيانة مفتوحة — أنت منجز بكل شيء.",
+        ["This maintenance order isn't assigned to you."] = "أمر الصيانة هذا غير مسند إليك.",
+        ["This maintenance order isn't awaiting a fix."] = "أمر الصيانة هذا ليس بانتظار إصلاح.",
+        ["Only an open maintenance order can be cancelled."] = "يمكن إلغاء أمر الصيانة المفتوح فقط.",
+        ["Select an employee to assign this maintenance order to."] = "اختر موظفًا لإسناد أمر الصيانة هذا إليه.",
+        ["Maintenance order not found."] = "أمر الصيانة غير موجود.",
+        ["Month"] = "الشهر",
+        ["Your past orders, grouped by month"] = "طلباتك السابقة، مجمّعة حسب الشهر",
+        ["Zone Overview"] = "نظرة عامة على المواقع",
+        ["Latest orders by zone"] = "أحدث الطلبات حسب الموقع",
+        ["Dispatched Orders"] = "الطلبات الموجّهة",
+        ["Asset Map"] = "خريطة الأصول",
+        ["No zones match these filters."] = "لا توجد مواقع مطابقة لهذه الفلاتر.",
+        ["No defective or under-maintenance assets in this zone."] = "لا توجد أصول معطلة أو قيد الصيانة في هذا الموقع.",
+        ["Order Kind"] = "نوع الأمر",
+        ["Maintenance Actions"] = "إجراءات الصيانة",
+        ["Select actions"] = "اختر الإجراءات",
+        ["selected"] = "محدد",
+        ["Maintenance Action Types"] = "أنواع إجراءات الصيانة",
+        ["New Maintenance Action"] = "إجراء صيانة جديد",
+        ["Cleaned Outer Unit"] = "تنظيف الوحدة الخارجية",
+        ["Replaced Filter"] = "استبدال الفلتر",
+        ["Basic Maintenance"] = "صيانة أساسية",
+        ["Lubricated Moving Parts"] = "تشحيم الأجزاء المتحركة",
+        ["Tightened Connections"] = "إحكام التوصيلات",
+        ["Calibration Check"] = "فحص المعايرة",
         ["Portal Login"] = "حساب البوابة",
         ["Reset Password"] = "إعادة تعيين كلمة المرور",
         ["Temporary password"] = "كلمة المرور المؤقتة",
@@ -419,6 +480,7 @@ public static class Translations
         ["Create a reusable group of employees"] = "أنشئ مجموعة موظفين قابلة لإعادة الاستخدام",
         ["Edit Team"] = "تعديل الفريق",
         ["No teams yet."] = "لا توجد فرق حتى الآن.",
+        ["Could not add that member — the team or user may no longer exist."] = "تعذّرت إضافة هذا العضو — قد يكون الفريق أو المستخدم غير موجود.",
 
         // Inspection Orders
         ["Inspection Order"] = "أمر معاينة",
@@ -1602,8 +1664,8 @@ public static class Translations
     {
         // AI Assistant chat page
         Ar["Clear"] = "مسح";
-        Ar["Hi! I'm your ShiftFlow AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?"]
-            = "أهلاً! أنا مساعدك الذكي في ShiftFlow. أقدر أساعدك تتابع أوامر المعاينة، تدير الفرق، تبلّغ عن حالة الأصول، وأكثر. وش أقدر أساعدك فيه اليوم؟";
+        Ar["Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?"]
+            = "أهلاً! أنا مساعدك الذكي في STEP. أقدر أساعدك تتابع أوامر المعاينة، تدير الفرق، تبلّغ عن حالة الأصول، وأكثر. وش أقدر أساعدك فيه اليوم؟";
         Ar["My Teams"] = "فرقي";
         Ar["Show me my inspection orders"] = "أظهر لي أوامر المعاينة الخاصة بي";
         Ar["Which of my inspection orders are overdue?"] = "وش الأوامر المتأخرة عندي؟";
@@ -1612,6 +1674,7 @@ public static class Translations
         Ar["Dashboard KPIs"] = "مؤشرات الأداء";
         Ar["What are the dashboard KPIs?"] = "ما هي مؤشرات الأداء في لوحة التحكم؟";
         Ar["Voice input"] = "إدخال صوتي";
+        Ar["Stop speaking"] = "إيقاف الكلام";
         Ar["Ask me anything about inspection orders..."] = "اسألني أي شيء عن أوامر المعاينة...";
         Ar["Send"] = "إرسال";
         Ar["No response received."] = "لم يتم استلام أي رد.";
@@ -1926,6 +1989,7 @@ public static class Translations
         Ar["Please select a {0}."] = "يرجى اختيار {0}.";
         Ar["value"] = "قيمة";
         Ar["Please select a value."] = "يرجى اختيار قيمة.";
+        Ar["Search zones…"] = "بحث عن المواضع…";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>

@@ -3,7 +3,7 @@
     var containerId = $"picker-{Model.Name}";
 }
 <div id="@containerId" class="position-relative">
-    @if (Model.Categories != null && Model.Governorates != null)
+    @if (Model.Categories != null && Model.LocationCategories != null)
     {
         <div class="d-flex align-items-center gap-2 mb-2">
             <span class="small text-muted">@Loc.T("Combine filters")</span>
@@ -15,36 +15,26 @@
             </div>
         </div>
     }
-    @if (Model.Governorates != null)
+    @if (Model.LocationCategories != null)
     {
         <div class="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 bg-light rounded">
             <div>
-                <label class="form-label small mb-1">@Loc.T("Governorate")</label>
-                <select class="form-select form-select-sm" data-gov-select style="min-width:140px">
-                    <option value="">@Loc.T("Governorate")</option>
-                    @foreach (var g in Model.Governorates)
+                <label class="form-label small mb-1">@Loc.T("Location Category")</label>
+                <select class="form-select form-select-sm" data-location-category-select style="min-width:160px">
+                    <option value="">@Loc.T("Location Category")</option>
+                    @foreach (var c in Model.LocationCategories)
                     {
-                        <option value="@g.Id">@Loc.LocalizedName(g.Name, g.NameAr)</option>
+                        <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
                     }
-                </select>
-            </div>
-            <div data-area-wrap class="d-none">
-                <label class="form-label small mb-1">@Loc.T("Area")</label>
-                <select class="form-select form-select-sm" data-area-select style="min-width:140px">
-                    <option value="">@Loc.T("All")</option>
-                </select>
-            </div>
-            <div data-block-wrap class="d-none">
-                <label class="form-label small mb-1">@Loc.T("Block")</label>
-                <select class="form-select form-select-sm" data-block-select style="min-width:120px">
-                    <option value="">@Loc.T("All")</option>
                 </select>
             </div>
             <div data-zone-wrap class="d-none">
                 <label class="form-label small mb-1">@Loc.T("Zone")</label>
-                <select class="form-select form-select-sm" data-zone-select style="min-width:140px">
-                    <option value="">@Loc.T("All")</option>
-                </select>
+                <div class="position-relative">
+                    <input type="text" class="form-control form-control-sm" autocomplete="off" placeholder="@Loc.T("Search zones…")" data-zone-search style="min-width:180px">
+                    <input type="hidden" data-zone-select>
+                    <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1056;max-height:220px;overflow:auto" data-zone-results></div>
+                </div>
             </div>
             <button type="button" class="btn btn-sm btn-outline-primary" data-add-by-location disabled>@Loc.T("Add All")</button>
         </div>
@@ -170,11 +160,9 @@
             const params = new URLSearchParams({ categoryId });
             let url = `/Assets/ByCategory?${params}`;
             if (filterMode === 'intersection') {
-                const locationSel = root.querySelector('[data-zone-select]')?.value ? { zoneId: root.querySelector('[data-zone-select]').value }
-                    : root.querySelector('[data-block-select]')?.value ? { blockId: root.querySelector('[data-block-select]').value }
-                    : root.querySelector('[data-area-select]')?.value ? { areaId: root.querySelector('[data-area-select]').value }
-                    : root.querySelector('[data-gov-select]')?.value ? { governorateId: root.querySelector('[data-gov-select]').value }
-                    : null;
+                const zoneVal = root.querySelector('[data-zone-select]')?.value;
+                const locCatVal = root.querySelector('[data-location-category-select]')?.value;
+                const locationSel = zoneVal ? { zoneId: zoneVal } : locCatVal ? { locationCategoryId: locCatVal } : null;
                 if (locationSel) {
                     const p = new URLSearchParams({ categoryId, ...locationSel });
                     url = `/Assets/ByLocation?${p}`;
@@ -185,51 +173,56 @@
         });
     }
 
-    // "Add all assets at a location scope" — same dedup-safe bulk add as category, most-specific-wins
-    // (Zone > Block > Area > Governorate); addChip's dedup skips ones already added by other pickers.
-    const govSel = root.querySelector('[data-gov-select]');
-    const areaSel = root.querySelector('[data-area-select]');
-    const blockSel = root.querySelector('[data-block-select]');
-    const zoneSel = root.querySelector('[data-zone-select]');
-    const areaWrap = root.querySelector('[data-area-wrap]');
-    const blockWrap = root.querySelector('[data-block-wrap]');
+    // "Add all assets at a location scope" — pick a Location Category, then immediately search/scroll
+    // a flat list of its zones (no further cascading levels); addByLocationBtn uses whichever is most
+    // specific (Zone > Category). addChip's dedup skips ones already added by other pickers.
+    const locCatSel = root.querySelector('[data-location-category-select]');
+    const zoneSearchEl = root.querySelector('[data-zone-search]');
+    const zoneSelectHidden = root.querySelector('[data-zone-select]');
+    const zoneResultsEl = root.querySelector('[data-zone-results]');
     const zoneWrap = root.querySelector('[data-zone-wrap]');
     const addByLocationBtn = root.querySelector('[data-add-by-location]');
+    let zonesInCategory = [];
 
-    function resetLocationLevel(sel, wrap) {
-        sel.innerHTML = `<option value="">${@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("All")))}</option>`;
-        wrap.classList.add('d-none');
+    function renderZoneResults(term) {
+        const filtered = zonesInCategory.filter(z => localName(z).toLowerCase().includes(term.toLowerCase()));
+        zoneResultsEl.innerHTML = '';
+        filtered.forEach(z => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action small';
+            item.textContent = localName(z);
+            item.addEventListener('click', () => {
+                zoneSelectHidden.value = z.id;
+                zoneSearchEl.value = localName(z);
+                zoneResultsEl.classList.add('d-none');
+                addByLocationBtn.disabled = false;
+            });
+            zoneResultsEl.appendChild(item);
+        });
+        zoneResultsEl.classList.toggle('d-none', filtered.length === 0);
     }
 
-    if (govSel) {
-        govSel.addEventListener('change', async () => {
-            resetLocationLevel(areaSel, areaWrap); resetLocationLevel(blockSel, blockWrap); resetLocationLevel(zoneSel, zoneWrap);
-            addByLocationBtn.disabled = !govSel.value;
-            if (!govSel.value) return;
-            const areas = await (await fetch(`/Areas/ByGovernorate?governorateId=${govSel.value}`)).json();
-            areas.forEach(a => { const opt = document.createElement('option'); opt.value = a.id; opt.textContent = localName(a); areaSel.appendChild(opt); });
-            areaWrap.classList.toggle('d-none', areas.length === 0);
+    if (locCatSel) {
+        locCatSel.addEventListener('change', async () => {
+            zoneSelectHidden.value = ''; zoneSearchEl.value = ''; zonesInCategory = [];
+            zoneWrap.classList.add('d-none'); addByLocationBtn.disabled = true;
+            if (!locCatSel.value) return;
+            zonesInCategory = await (await fetch(`/Zones/ByCategory?locationCategoryId=${locCatSel.value}`)).json();
+            zoneWrap.classList.remove('d-none');
+            addByLocationBtn.disabled = false;
         });
-        areaSel.addEventListener('change', async () => {
-            resetLocationLevel(blockSel, blockWrap); resetLocationLevel(zoneSel, zoneWrap);
-            if (!areaSel.value) return;
-            const blocks = await (await fetch(`/Blocks/ByArea?areaId=${areaSel.value}`)).json();
-            blocks.forEach(b => { const opt = document.createElement('option'); opt.value = b.id; opt.textContent = b.name; blockSel.appendChild(opt); });
-            blockWrap.classList.toggle('d-none', blocks.length === 0);
+        zoneSearchEl.addEventListener('input', () => {
+            zoneSelectHidden.value = '';
+            renderZoneResults(zoneSearchEl.value.trim());
         });
-        blockSel.addEventListener('change', async () => {
-            resetLocationLevel(zoneSel, zoneWrap);
-            if (!blockSel.value) return;
-            const zones = await (await fetch(`/Zones/ByBlock?blockId=${blockSel.value}`)).json();
-            zones.forEach(z => { const opt = document.createElement('option'); opt.value = z.id; opt.textContent = localName(z); zoneSel.appendChild(opt); });
-            zoneWrap.classList.toggle('d-none', zones.length === 0);
-        });
+        zoneSearchEl.addEventListener('focus', () => renderZoneResults(zoneSearchEl.value.trim()));
+        document.addEventListener('click', e => { if (!zoneWrap.contains(e.target)) zoneResultsEl.classList.add('d-none'); });
+
         addByLocationBtn.addEventListener('click', async () => {
             const params = new URLSearchParams();
-            if (zoneSel.value) params.set('zoneId', zoneSel.value);
-            else if (blockSel.value) params.set('blockId', blockSel.value);
-            else if (areaSel.value) params.set('areaId', areaSel.value);
-            else if (govSel.value) params.set('governorateId', govSel.value);
+            if (zoneSelectHidden.value) params.set('zoneId', zoneSelectHidden.value);
+            else if (locCatSel.value) params.set('locationCategoryId', locCatSel.value);
             else return;
             if (filterMode === 'intersection') {
                 const categoryId = subSel && subSel.value ? subSel.value : (catSel && catSel.value ? catSel.value : null);

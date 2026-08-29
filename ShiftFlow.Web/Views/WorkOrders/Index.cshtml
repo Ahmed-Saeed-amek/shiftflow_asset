@@ -33,24 +33,17 @@
             }
         </select>
     </div>
-    <div class="col-auto">
-        <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Type")</option>
-            <option value="PM" selected="@((string?)ViewBag.Type=="PM")">@Loc.T("Preventive Maintenance")</option>
-            <option value="Manual" selected="@((string?)ViewBag.Type=="Manual")">@Loc.T("Manual")</option>
-        </select>
-    </div>
     <div class="col-auto ms-auto text-muted small">@Model.Count @Loc.T("records")</div>
 </form>
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Type")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th>@Loc.T("Vendor")</th></tr></thead>
+            <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Type")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th>@Loc.T("Vendor")</th><th>@Loc.T("Assigned Employee")</th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
-                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                 }
                 @foreach (var w in Model)
                 {
@@ -72,6 +65,7 @@
                         <td><partial name="_StatusBadge" model="@w.Priority" /></td>
                         <td><partial name="_StatusBadge" model="@w.Stage" /></td>
                         <td class="small">@w.Vendor?.Name</td>
+                        <td class="small">@w.AssignedToUser?.FullName</td>
                     </tr>
                 }
             </tbody>

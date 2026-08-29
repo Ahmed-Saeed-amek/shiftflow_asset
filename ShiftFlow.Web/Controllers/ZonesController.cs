@@ -18,9 +18,9 @@ public class ZonesController : Controller
     public async Task<IActionResult> Index()
     {
         var zones = await _db.Zones
-            .Include(z => z.Block!).ThenInclude(bl => bl.Area!).ThenInclude(a => a.Governorate)
+            .Include(z => z.LocationCategory)
             .Include(z => z.Assets)
-            .OrderBy(z => z.Block!.Area!.Governorate!.Name).ThenBy(z => z.Block!.Area!.Name).ThenBy(z => z.Block!.Number).ThenBy(z => z.Name)
+            .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name)
             .ToListAsync();
         return View(zones);
     }
@@ -29,7 +29,7 @@ public class ZonesController : Controller
     public async Task<IActionResult> Details(int id)
     {
         var zone = await _db.Zones
-            .Include(z => z.Block!).ThenInclude(bl => bl.Area!).ThenInclude(a => a.Governorate)
+            .Include(z => z.LocationCategory)
             .Include(z => z.Assets).ThenInclude(a => a.Category)
             .FirstOrDefaultAsync(z => z.Id == id);
         if (zone == null) return NotFound();
@@ -50,7 +50,7 @@ public class ZonesController : Controller
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         _db.Zones.Add(new Zone
         {
-            Name = vm.Name, NameAr = vm.NameAr, BlockId = vm.BlockId, Address = vm.Address,
+            Name = vm.Name, NameAr = vm.NameAr, LocationCategoryId = vm.LocationCategoryId, Address = vm.Address,
             Latitude = vm.Latitude, Longitude = vm.Longitude, CreatedDate = DateTime.UtcNow,
         });
         await _db.SaveChangesAsync();
@@ -61,14 +61,14 @@ public class ZonesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var zone = await _db.Zones.Include(z => z.Block!).ThenInclude(bl => bl.Area).FirstOrDefaultAsync(z => z.Id == id);
+        var zone = await _db.Zones.FirstOrDefaultAsync(z => z.Id == id);
         if (zone == null) return NotFound();
         await PopulateLookupsAsync();
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
         return View(new ZoneViewModel
         {
             Id = zone.Id, Name = zone.Name, NameAr = zone.NameAr,
-            GovernorateId = zone.Block!.Area!.GovernorateId, AreaId = zone.Block.AreaId, BlockId = zone.BlockId,
+            LocationCategoryId = zone.LocationCategoryId,
             Address = zone.Address, Latitude = zone.Latitude, Longitude = zone.Longitude,
         });
     }
@@ -79,18 +79,18 @@ public class ZonesController : Controller
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         var zone = await _db.Zones.FindAsync(vm.Id);
         if (zone == null) return NotFound();
-        zone.Name = vm.Name; zone.NameAr = vm.NameAr; zone.BlockId = vm.BlockId; zone.Address = vm.Address;
+        zone.Name = vm.Name; zone.NameAr = vm.NameAr; zone.LocationCategoryId = vm.LocationCategoryId; zone.Address = vm.Address;
         zone.Latitude = vm.Latitude; zone.Longitude = vm.Longitude;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Asset location updated.";
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>Cascading dropdown data source for the Asset form.</summary>
+    /// <summary>Zone list for a given category — the picker's second (and final) step.</summary>
     [Authorize(Policy = PermissionCatalog.AssetView)]
-    public async Task<IActionResult> ByBlock(int blockId)
+    public async Task<IActionResult> ByCategory(int locationCategoryId)
     {
-        var zones = await _db.Zones.Where(z => z.BlockId == blockId)
+        var zones = await _db.Zones.Where(z => z.LocationCategoryId == locationCategoryId)
             .OrderBy(z => z.Name).Select(z => new { z.Id, z.Name, z.NameAr }).ToListAsync();
         return Json(zones);
     }
@@ -100,12 +100,12 @@ public class ZonesController : Controller
     public async Task<IActionResult> MapData()
     {
         var zones = await _db.Zones
-            .Include(z => z.Block!).ThenInclude(bl => bl.Area!).ThenInclude(a => a.Governorate)
+            .Include(z => z.LocationCategory)
             .Where(z => z.Latitude != null && z.Longitude != null)
             .Select(z => new
             {
                 z.Id, z.Name, z.Latitude, z.Longitude,
-                AreaName = z.Block!.Area!.Name, GovernorateName = z.Block.Area.Governorate!.Name,
+                CategoryName = z.LocationCategory!.Name,
                 AssetCount = z.Assets.Count,
             })
             .ToListAsync();
@@ -114,6 +114,6 @@ public class ZonesController : Controller
 
     private async Task PopulateLookupsAsync()
     {
-        ViewBag.Governorates = await _db.Governorates.OrderBy(g => g.Name).ToListAsync();
+        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
     }
 }

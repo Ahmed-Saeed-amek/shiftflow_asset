@@ -13,37 +13,39 @@
                         Placeholder = Loc.T("Search by name or email…") }' />
                     <span asp-validation-for="UserId" class="text-danger small"></span>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Scope Type")</label>
-                    <select id="scopeTypeSelect" class="form-select">
-                        @foreach (var t in UserAssetScope.ScopeTypes)
+                <div class="col-12">
+                    <div class="form-text mb-1">@Loc.T("Pick any combination — whichever are set narrow the visible assets together.")</div>
+                    <span asp-validation-for="ZoneId" class="text-danger small d-block mb-2"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Zone")</label>
+                    <select asp-for="ZoneId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
+                        @foreach (var z in (List<Zone>)ViewBag.Zones)
                         {
-                            <option value="@t" selected="@(Model.ScopeType==t)">@Loc.T(t)</option>
+                            <option value="@z.Id">@Loc.LocalizedName(z.Name, z.NameAr)</option>
                         }
                     </select>
                 </div>
-                <div class="col-12">
-                    <label class="form-label small">@Loc.T("Value")</label>
-                    <select id="zoneValueSelect" class="form-select scope-value-select" data-type="Zone">
-                        @foreach (var z in (List<Zone>)ViewBag.Zones)
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Location Type")</label>
+                    <select asp-for="LocationCategoryId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
+                        @foreach (var c in (List<LocationCategory>)ViewBag.LocationCategories)
                         {
-                            <option value="@z.Id" selected="@(Model.ScopeType=="Zone" && Model.ScopeValueId==z.Id)">@Loc.LocalizedName(z.Name, z.NameAr)</option>
+                            <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
                         }
                     </select>
-                    <select id="areaValueSelect" class="form-select scope-value-select d-none" data-type="Area">
-                        @foreach (var a in (List<Area>)ViewBag.Areas)
-                        {
-                            <option value="@a.Id" selected="@(Model.ScopeType=="Area" && Model.ScopeValueId==a.Id)">@Loc.LocalizedName(a.Name, a.NameAr)</option>
-                        }
-                    </select>
-                    <select id="categoryValueSelect" class="form-select scope-value-select d-none" data-type="Category">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Category")</label>
+                    <select asp-for="CategoryId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
                         @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
                         {
-                            <option value="@c.Id" selected="@(Model.ScopeType=="Category" && Model.ScopeValueId==c.Id)">@c.Name</option>
+                            <option value="@c.Id">@c.Name</option>
                         }
                     </select>
-                    <input type="hidden" asp-for="ScopeValueId" id="scopeValueIdHidden" />
-                    <input type="hidden" asp-for="ScopeType" id="scopeTypeHidden" />
                 </div>
             </div>
             <div class="mt-4 d-flex gap-2">
@@ -53,26 +55,3 @@
         </form>
     </div>
 </div>
-
-<script>
-(function () {
-    const typeSel = document.getElementById('scopeTypeSelect');
-    const typeHidden = document.getElementById('scopeTypeHidden');
-    const valueHidden = document.getElementById('scopeValueIdHidden');
-    const valueSelects = document.querySelectorAll('.scope-value-select');
-
-    function showForType(type) {
-        valueSelects.forEach(sel => {
-            const match = sel.dataset.type === type;
-            sel.classList.toggle('d-none', !match);
-            if (match) valueHidden.value = sel.value;
-        });
-        typeHidden.value = type;
-    }
-
-    valueSelects.forEach(sel => sel.addEventListener('change', () => { if (sel.dataset.type === typeSel.value) valueHidden.value = sel.value; }));
-    typeSel.addEventListener('change', () => showForType(typeSel.value));
-
-    showForType(typeSel.value);
-})();
-</script>

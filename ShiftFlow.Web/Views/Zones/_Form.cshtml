@@ -13,27 +13,15 @@
                     <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Governorate")</label>
-                            <select id="governorateSelect" class="form-select">
+                            <label class="form-label small">@Loc.T("Location Category")</label>
+                            <select asp-for="LocationCategoryId" class="form-select">
                                 <option value="">—</option>
-                                @foreach (var g in (List<Governorate>)ViewBag.Governorates)
+                                @foreach (var c in (List<LocationCategory>)ViewBag.LocationCategories)
                                 {
-                                    <option value="@g.Id" data-lat="@g.CenterLat" data-lng="@g.CenterLng" selected="@(Model.GovernorateId==g.Id)">@Loc.LocalizedName(g.Name, g.NameAr)</option>
+                                    <option value="@c.Id" selected="@(Model.LocationCategoryId==c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
                                 }
                             </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Area")</label>
-                            <select id="areaSelect" class="form-select" disabled>
-                                <option value="">—</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Block")</label>
-                            <select asp-for="BlockId" id="blockSelect" class="form-select" disabled>
-                                <option value="">—</option>
-                            </select>
-                            <span asp-validation-for="BlockId" class="text-danger small"></span>
+                            <span asp-validation-for="LocationCategoryId" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">@Loc.T("Name")</label>
@@ -77,51 +65,11 @@
 
 <script>
 (function () {
-    const govSel = document.getElementById('governorateSelect');
-    const areaSel = document.getElementById('areaSelect');
-    const blockSel = document.getElementById('blockSelect');
     const latInput = document.getElementById('latInput');
     const lngInput = document.getElementById('lngInput');
-    const isArabic = @(Loc.IsRTL ? "true" : "false");
-    const selectedAreaId = @Html.Raw(Model.AreaId > 0 ? Model.AreaId.ToString() : "null");
-    const selectedBlockId = @Html.Raw(Model.BlockId > 0 ? Model.BlockId.ToString() : "null");
     const initialLat = @Html.Raw(Model.Latitude.HasValue ? Model.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
     const initialLng = @Html.Raw(Model.Longitude.HasValue ? Model.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
 
-    const mapCtl = initZonePickerMap('zoneMap', 'latInput', 'lngInput', initialLat, initialLng);
-
-    function fillSelect(sel, items, selectedId) {
-        sel.innerHTML = '<option value="">—</option>';
-        items.forEach(i => {
-            const opt = document.createElement('option');
-            opt.value = i.id; opt.textContent = (isArabic && i.nameAr) ? i.nameAr : i.name;
-            if (selectedId && i.id === selectedId) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        sel.disabled = false;
-    }
-
-    async function loadAreas(governorateId, preselectAreaId) {
-        if (!governorateId) { areaSel.innerHTML = '<option value="">—</option>'; areaSel.disabled = true; fillSelect(blockSel, [], null); blockSel.disabled = true; return; }
-        const areas = await (await fetch(`/Areas/ByGovernorate?governorateId=${governorateId}`)).json();
-        fillSelect(areaSel, areas, preselectAreaId);
-        if (preselectAreaId) await loadBlocks(preselectAreaId, selectedBlockId);
-        else { fillSelect(blockSel, [], null); blockSel.disabled = true; }
-    }
-
-    async function loadBlocks(areaId, preselectBlockId) {
-        if (!areaId) { blockSel.innerHTML = '<option value="">—</option>'; blockSel.disabled = true; return; }
-        const blocks = await (await fetch(`/Blocks/ByArea?areaId=${areaId}`)).json();
-        fillSelect(blockSel, blocks, preselectBlockId);
-    }
-
-    govSel.addEventListener('change', () => {
-        loadAreas(govSel.value ? Number(govSel.value) : null, null);
-        const opt = govSel.selectedOptions[0];
-        if (opt && opt.dataset.lat && !latInput.value) mapCtl.recenter(Number(opt.dataset.lat), Number(opt.dataset.lng));
-    });
-    areaSel.addEventListener('change', () => loadBlocks(areaSel.value ? Number(areaSel.value) : null, null));
-
-    if (govSel.value) loadAreas(Number(govSel.value), selectedAreaId);
+    initZonePickerMap('zoneMap', 'latInput', 'lngInput', initialLat, initialLng);
 })();
 </script>

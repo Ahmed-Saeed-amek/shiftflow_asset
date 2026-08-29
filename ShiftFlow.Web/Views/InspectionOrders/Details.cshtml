@@ -4,8 +4,10 @@
     var run = Model.InspectionRun!;
     var assignedTo = Model.AssignedToUser?.FullName
         ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
+    var tracksDefectOutcome = Model.OrderType!.TracksDefectOutcome;
+    var maintenanceActionTypes = (List<MaintenanceActionType>)ViewBag.MaintenanceActionTypes;
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber + " — " + Model.Title,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
 
 <div class="d-flex align-items-center gap-2 mb-3">
     <partial name="_StatusBadge" model="@Model.Status" />
@@ -30,7 +32,7 @@
                     <th>@Loc.T("Asset Tag")</th>
                     <th>@Loc.T("Location")</th>
                     <th>@Loc.T("Outcome")</th>
-                    <th>@Loc.T("Notes")</th>
+                    <th>@Loc.T("Maintenance Actions")</th>
                     <th></th>
                 </tr>
             </thead>
@@ -47,8 +49,7 @@
                             {
                                 <a asp-controller="Zones" asp-action="Details" asp-route-id="@item.Asset.ZoneId">@Loc.LocalizedName(item.Asset.Zone.Name, item.Asset.Zone.NameAr)</a>
                                 <div class="text-muted" style="font-size:.72rem">
-                                    @(item.Asset.Zone.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null), @(item.Asset.Zone.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null)
-                                    (@Loc.T("Block") @item.Asset.Zone.Block?.Number)
+                                    @(item.Asset.Zone.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(item.Asset.Zone.Address))
                                 {
@@ -57,11 +58,29 @@
                             }
                         </td>
                         <td class="outcome-cell" data-label="@Loc.T("Outcome")"><partial name="_StatusBadge" model="@item.Outcome" /></td>
-                        <td class="small notes-cell" data-label="@Loc.T("Notes")">
-                            @item.Notes
+                        <td class="small maintenance-actions-cell" data-label="@Loc.T("Maintenance Actions")">
+                            @if (item.MaintenanceActions.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var m in item.MaintenanceActions)
+                                    {
+                                        <span class="badge bg-light text-dark border fw-normal">@Loc.LocalizedName(m.MaintenanceActionType.Name, m.MaintenanceActionType.NameAr)</span>
+                                    }
+                                </div>
+                            }
+                            else if (item.Outcome != "Pending")
+                            {
+                                <span class="text-muted">—</span>
+                            }
                             @if (item.WorkOrderId.HasValue)
                             {
-                                <a asp-controller="WorkOrders" asp-action="Details" asp-route-id="@item.WorkOrderId" class="d-block"><i class="bi bi-tools me-1"></i>@Loc.T("Work Order")</a>
+                                <a asp-controller="WorkOrders" asp-action="Details" asp-route-id="@item.WorkOrderId" class="d-block mt-1"><i class="bi bi-tools me-1"></i>@Loc.T("Work Order")</a>
+                            }
+                            @if (item.Outcome != "Pending")
+                            {
+                                <button type="button" class="btn btn-sm btn-link p-0 mt-1 edit-maintenance-btn" data-item-id="@item.Id">
+                                    <i class="bi bi-pencil-square me-1"></i>@Loc.T("Edit")
+                                </button>
                             }
                         </td>
                         <td>
@@ -70,24 +89,43 @@
                                 <div class="d-flex gap-2 outcome-actions">
                                     <button type="button" class="btn btn-sm btn-outline-success outcome-btn" data-outcome="OK">@Loc.T("OK")</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger outcome-btn" data-outcome="Defective">@Loc.T("Defective")</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary maintenance-only-btn" data-item-id="@item.Id">@Loc.T("Maintenance")</button>
                                 </div>
                             }
                         </td>
                     </tr>
-                    <tr class="d-none inline-form-row" data-form-for="@item.Id">
+                    <tr class="d-none inline-form-row" data-form-for="@item.Id" data-tracks-defect="@tracksDefectOutcome.ToString().ToLowerInvariant()">
                         <td colspan="5">
                             <div class="row g-2 align-items-end p-2 bg-light rounded">
-                                <div class="col-md-3 defect-only d-none">
-                                    <label class="form-label small mb-1">@Loc.T("Action Type")</label>
-                                    <select class="form-select form-select-sm action-type-select"><option value="">—</option></select>
-                                </div>
-                                <div class="col-md-3 defect-only d-none">
-                                    <label class="form-label small mb-1">@Loc.T("Cause")</label>
-                                    <select class="form-select form-select-sm cause-select" disabled><option value="">—</option></select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-1">@Loc.T("Notes")</label>
-                                    <input type="text" class="form-control form-control-sm notes-input" />
+                                @if (tracksDefectOutcome)
+                                {
+                                    <div class="col-md-3 defect-only d-none">
+                                        <label class="form-label small mb-1">@Loc.T("Action Type")</label>
+                                        <select class="form-select form-select-sm action-type-select"><option value="">—</option></select>
+                                    </div>
+                                    <div class="col-md-3 defect-only d-none">
+                                        <label class="form-label small mb-1">@Loc.T("Cause")</label>
+                                        <select class="form-select form-select-sm cause-select" disabled><option value="">—</option></select>
+                                    </div>
+                                }
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">@Loc.T("Maintenance Actions")</label>
+                                    <div class="dropdown maintenance-action-dropdown">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle w-100 text-start text-truncate"
+                                                data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                            <span class="maintenance-action-summary">@Loc.T("Select actions")</span>
+                                        </button>
+                                        <div class="dropdown-menu p-2" style="max-height:240px;overflow-y:auto;min-width:220px">
+                                            @foreach (var m in maintenanceActionTypes)
+                                            {
+                                                <div class="form-check">
+                                                    <input class="form-check-input maintenance-action-check" type="checkbox" value="@m.Id" id="ma-@item.Id-@m.Id"
+                                                           checked="@(item.MaintenanceActions.Any(x => x.MaintenanceActionTypeId == m.Id))">
+                                                    <label class="form-check-label small" for="ma-@item.Id-@m.Id">@Loc.LocalizedName(m.Name, m.NameAr)</label>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-2">
                                     <button type="button" class="btn btn-sm btn-primary w-100 save-outcome-btn">@Loc.T("Save")</button>
@@ -110,6 +148,8 @@
     const alertBox = document.getElementById('inspectAlert');
     const jsFailed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Failed to save.")));
     const jsActionTypeRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Action Type and Cause are required to report a defect.")));
+    const jsSelectActions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Select actions")));
+    const jsSelected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("selected")));
     const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
     const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
@@ -123,6 +163,47 @@
         sel.disabled = items.length === 0;
     }
 
+    // Updates the dropdown toggle button's label to reflect the current selection — this is
+    // the only thing that needs to change as checkboxes are toggled, since the dropdown itself
+    // (fixed-size button + internally-scrolling menu) never changes shape or width regardless
+    // of how many maintenance action types exist or whether it's shown next to the extra
+    // Action Type/Cause columns (Defective) or not (OK) — that inconsistency was the whole
+    // point of moving off the old inline chip row.
+    function updateMaintenanceCount(formRow) {
+        const checked = formRow.querySelectorAll('.maintenance-action-check:checked');
+        const summary = formRow.querySelector('.maintenance-action-summary');
+        if (!summary) return;
+        if (checked.length === 0) summary.textContent = jsSelectActions;
+        else if (checked.length === 1) summary.textContent = document.querySelector(`label[for="${checked[0].id}"]`).textContent;
+        else summary.textContent = `${checked.length} ${jsSelected}`;
+    }
+
+    // Delegated so it covers every row's checklist with one listener instead of one per row.
+    document.addEventListener('change', e => {
+        if (e.target.matches('.maintenance-action-check')) {
+            updateMaintenanceCount(e.target.closest('tr.inline-form-row'));
+        }
+    });
+
+    // Maintenance actions can be logged independent of the OK/Defective decision — either via
+    // the standalone "Maintenance" button (Pending items) or "Edit" (already-decided items).
+    // Both open the same inline form, but in mode="maintenance": Action Type/Cause stay hidden
+    // regardless of order kind, and Save posts to UpdateMaintenanceActions instead of UpdateItem,
+    // touching only the maintenance-action join rows — never the outcome, Work Order, or the
+    // order's completion status.
+    function openMaintenanceOnly(itemId) {
+        const formRow = document.querySelector(`tr.inline-form-row[data-form-for="${itemId}"]`);
+        formRow.classList.remove('d-none');
+        formRow.dataset.mode = 'maintenance';
+        delete formRow.dataset.outcome;
+        formRow.querySelectorAll('.defect-only').forEach(el => el.classList.add('d-none'));
+        updateMaintenanceCount(formRow);
+    }
+
+    document.querySelectorAll('.maintenance-only-btn, .edit-maintenance-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMaintenanceOnly(btn.dataset.itemId));
+    });
+
     document.querySelectorAll('.outcome-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const row = btn.closest('tr');
@@ -135,13 +216,15 @@
 
             const formRow = document.querySelector(`tr.inline-form-row[data-form-for="${itemId}"]`);
             formRow.classList.remove('d-none');
+            formRow.dataset.mode = 'outcome';
             formRow.dataset.outcome = outcome;
+            updateMaintenanceCount(formRow);
 
             const isDefect = outcome === 'Defective';
             formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
-            if (isDefect) {
-                const actionTypeSel = formRow.querySelector('.action-type-select');
-                const causeSel = formRow.querySelector('.cause-select');
+            const actionTypeSel = formRow.querySelector('.action-type-select');
+            const causeSel = formRow.querySelector('.cause-select');
+            if (isDefect && actionTypeSel) {
                 try {
                     const resp = await fetch(`/AssetActionTypes/ByCategory?categoryId=${categoryId}`);
                     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -172,23 +255,38 @@
         btn.addEventListener('click', async () => {
             const formRow = btn.closest('tr.inline-form-row');
             const itemId = formRow.dataset.formFor;
-            const outcome = formRow.dataset.outcome;
-            const notes = formRow.querySelector('.notes-input').value;
-            const actionTypeId = formRow.querySelector('.action-type-select')?.value || '';
-            const causeId = formRow.querySelector('.cause-select')?.value || '';
+            const maintenanceActionTypeIds = Array.from(formRow.querySelectorAll('.maintenance-action-check:checked')).map(c => c.value);
 
-            if (outcome === 'Defective' && (!actionTypeId || !causeId)) {
-                alertBox.innerHTML = `<div class="alert alert-danger small">${jsActionTypeRequired}</div>`;
-                return;
-            }
-
+            let r;
             btn.disabled = true;
-            const body = new URLSearchParams({ itemId, outcome, notes, actionTypeId, causeId });
-            const r = await fetch('/InspectionOrders/UpdateItem', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
-                body,
-            });
+            if (formRow.dataset.mode === 'maintenance') {
+                const body = new URLSearchParams({ itemId });
+                maintenanceActionTypeIds.forEach(id => body.append('maintenanceActionTypeIds', id));
+                r = await fetch('/InspectionOrders/UpdateMaintenanceActions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                    body,
+                });
+            } else {
+                const outcome = formRow.dataset.outcome;
+                const tracksDefect = formRow.dataset.tracksDefect === 'true';
+                const actionTypeId = formRow.querySelector('.action-type-select')?.value || '';
+                const causeId = formRow.querySelector('.cause-select')?.value || '';
+
+                if (tracksDefect && outcome === 'Defective' && (!actionTypeId || !causeId)) {
+                    alertBox.innerHTML = `<div class="alert alert-danger small">${jsActionTypeRequired}</div>`;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const body = new URLSearchParams({ itemId, outcome, actionTypeId, causeId });
+                maintenanceActionTypeIds.forEach(id => body.append('maintenanceActionTypeIds', id));
+                r = await fetch('/InspectionOrders/UpdateItem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                    body,
+                });
+            }
             btn.disabled = false;
 
             if (!r.ok) {

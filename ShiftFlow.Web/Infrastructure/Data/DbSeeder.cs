@@ -67,149 +67,54 @@ public static class DbSeeder
         await CreateUser("admin@shiftflow.com",    "Admin@123456",   "System Administrator", "Admin",            "EMP-0001");
         await CreateUser("manager@shiftflow.com",  "Manager@123456", "Ahmed Al-Rashidi",     "OperationsManager", "EMP-0002");
         await CreateUser("engineer@shiftflow.com", "Engineer@123456","Khalid Al-Mutairi",    "Engineer",         "EMP-0003");
-        await CreateUser("hr@shiftflow.com",       "Hr@123456",      "Sara Al-Kandari",      "HR",               "EMP-0004");
+        // "Hr@123456" (9 chars) no longer meets the 12-char password policy below.
+        await CreateUser("hr@shiftflow.com",       "HrDept@123456",  "Sara Al-Kandari",      "HR",               "EMP-0004");
 
         await SeedPermissionsAsync(db, rm);
         await SeedAssetManagementAsync(db, um);
     }
 
-    /// <summary>Fixed, not user-editable — see Governorate.cs.</summary>
-    private static readonly (string Name, string NameAr, double Lat, double Lng)[] KuwaitGovernorates =
+    /// <summary>Fixed, not user-editable — see LocationCategory.cs. Every Zone belongs to exactly one of these 3.</summary>
+    private static readonly (string Name, string NameAr)[] LocationCategoryNames =
     [
-        ("Al Asimah", "العاصمة", 29.3759, 47.9774),
-        ("Hawalli", "حولي", 29.3328, 48.0263),
-        ("Farwaniya", "الفروانية", 29.2977, 47.9391),
-        ("Mubarak Al-Kabeer", "مبارك الكبير", 29.1961, 48.0704),
-        ("Ahmadi", "الأحمدي", 29.0769, 48.0838),
-        ("Jahra", "الجهراء", 29.3375, 47.6581),
-    ];
-
-    /// <summary>Fixed, not user-editable — same as Governorates. Every real area under each governorate is listed here up front, not created ad hoc.</summary>
-    private static readonly (string Governorate, string Name, string NameAr)[] KuwaitAreas =
-    [
-        ("Al Asimah", "Kuwait City", "مدينة الكويت"), ("Al Asimah", "Sharq", "شرق"), ("Al Asimah", "Mirqab", "المرقاب"),
-        ("Al Asimah", "Qibla", "القبلة"), ("Al Asimah", "Dasman", "دسمان"), ("Al Asimah", "Daiya", "الدعية"),
-        ("Al Asimah", "Qadsiya", "القادسية"), ("Al Asimah", "Shamiya", "الشامية"), ("Al Asimah", "Faiha", "الفيحاء"),
-        ("Al Asimah", "Nuzha", "النزهة"), ("Al Asimah", "Khaldiya", "الخالدية"), ("Al Asimah", "Adailiya", "العديلية"),
-        ("Al Asimah", "Rawda", "الروضة"), ("Al Asimah", "Surra", "السرة"), ("Al Asimah", "Yarmouk", "اليرموك"),
-        ("Al Asimah", "Qurtuba", "قرطبة"), ("Al Asimah", "Shuwaikh", "الشويخ"), ("Al Asimah", "Kaifan", "كيفان"),
-        ("Al Asimah", "Doha", "الدوحة"), ("Al Asimah", "Bnaid Al-Qar", "بنيد القار"),
-
-        ("Hawalli", "Hawalli", "حولي"), ("Hawalli", "Salmiya", "السالمية"), ("Hawalli", "Jabriya", "الجابرية"),
-        ("Hawalli", "Bayan", "بيان"), ("Hawalli", "Mishref", "مشرف"), ("Hawalli", "Salwa", "سلوى"),
-        ("Hawalli", "Rumaithiya", "الرميثية"), ("Hawalli", "Shaab", "الشعب"), ("Hawalli", "Shuhada", "الشهداء"),
-        ("Hawalli", "Zahra", "الزهراء"), ("Hawalli", "Bidaa", "بيدع"), ("Hawalli", "Maidan Hawalli", "ميدان حولي"),
-
-        ("Farwaniya", "Farwaniya", "الفروانية"), ("Farwaniya", "Khaitan", "خيطان"), ("Farwaniya", "Jleeb Al-Shuyoukh", "جليب الشيوخ"),
-        ("Farwaniya", "Andalous", "الأندلس"), ("Farwaniya", "Ardiya", "العارضية"), ("Farwaniya", "Rabiya", "الرابية"),
-        ("Farwaniya", "Rai", "الري"), ("Farwaniya", "Omariya", "العمرية"), ("Farwaniya", "Ferdous", "الفردوس"),
-        ("Farwaniya", "Abdullah Al-Mubarak", "عبدالله المبارك"), ("Farwaniya", "Sabah Al-Nasser", "صباح الناصر"), ("Farwaniya", "Reggai", "الرقعي"),
-
-        ("Mubarak Al-Kabeer", "Mubarak Al-Kabeer", "مبارك الكبير"), ("Mubarak Al-Kabeer", "Adan", "العدان"),
-        ("Mubarak Al-Kabeer", "Qusour", "القصور"), ("Mubarak Al-Kabeer", "Qurain", "القرين"),
-        ("Mubarak Al-Kabeer", "Sabah Al-Salem", "صباح السالم"), ("Mubarak Al-Kabeer", "Messila", "المسيلة"),
-        ("Mubarak Al-Kabeer", "Abu Ftaira", "أبو فطيرة"), ("Mubarak Al-Kabeer", "Fnaitees", "الفنيطيس"),
-
-        ("Ahmadi", "Ahmadi", "الأحمدي"), ("Ahmadi", "Fahaheel", "الفحيحيل"), ("Ahmadi", "Mangaf", "المنقف"),
-        ("Ahmadi", "Abu Halifa", "أبو حليفة"), ("Ahmadi", "Fintas", "الفنطاس"), ("Ahmadi", "Mahboula", "المهبولة"),
-        ("Ahmadi", "Riqqa", "الرقة"), ("Ahmadi", "Sabahiya", "الصباحية"), ("Ahmadi", "Wafra", "الوفرة"),
-        ("Ahmadi", "Jaber Al-Ali", "جابر العلي"), ("Ahmadi", "Hadiya", "هدية"), ("Ahmadi", "Zour", "الزور"),
-
-        ("Jahra", "Jahra", "الجهراء"), ("Jahra", "Naeem", "النعيم"), ("Jahra", "Qasr", "القصر"),
-        ("Jahra", "Waha", "الواحة"), ("Jahra", "Sulaibiya", "الصليبية"), ("Jahra", "Taima", "تيماء"),
-        ("Jahra", "Oyoun", "العيون"), ("Jahra", "Abdali", "العبدلي"), ("Jahra", "Nasseem", "النسيم"),
-        ("Jahra", "Saad Al-Abdullah", "سعد العبدالله"),
+        ("Main Locations", "المواقع الرئيسية"),
+        ("Side Locations", "المواقع الفرعية"),
+        ("Governmental Locations", "المواقع الحكومية"),
     ];
 
     private static async Task SeedAssetManagementAsync(ApplicationDbContext db, UserManager<ApplicationUser> um)
     {
-        if (!await db.Governorates.AnyAsync())
+        if (!await db.LocationCategories.AnyAsync())
         {
-            db.Governorates.AddRange(KuwaitGovernorates.Select(g =>
-                new Governorate { Name = g.Name, NameAr = g.NameAr, CenterLat = g.Lat, CenterLng = g.Lng }));
+            db.LocationCategories.AddRange(LocationCategoryNames.Select(c => new LocationCategory { Name = c.Name, NameAr = c.NameAr }));
             await db.SaveChangesAsync();
         }
 
-        // Fixed reference data — same idempotent "add what's missing" pattern as SeedPermissionsAsync,
-        // so re-running this on an existing DB fills in any areas that weren't there yet without
-        // touching ones that already exist (e.g. ones with Zones already attached to them).
-        var governoratesByName = await db.Governorates.ToDictionaryAsync(g => g.Name);
-        var existingAreas = await db.Areas.Select(a => new { a.GovernorateId, a.Name }).ToListAsync();
-        var existingAreaKeys = existingAreas.Select(a => (a.GovernorateId, a.Name)).ToHashSet();
-        var missingAreas = KuwaitAreas
-            .Where(a => governoratesByName.ContainsKey(a.Governorate) && !existingAreaKeys.Contains((governoratesByName[a.Governorate].Id, a.Name)))
-            .Select(a => new Area { Name = a.Name, NameAr = a.NameAr, GovernorateId = governoratesByName[a.Governorate].Id })
-            .ToList();
-        if (missingAreas.Count > 0)
+        // Idempotent "add what's missing by Name" — re-running on a partially-seeded DB tops up
+        // the rest without touching existing zones. Spread across all 3 LocationCategories (not
+        // just "Main Locations") so the Zone Overview category filter has real variety to show.
+        var locationCategoriesByName = await db.LocationCategories.ToDictionaryAsync(c => c.Name);
+        var seedZones = new (string Category, string Name, string NameAr, string Address, double? Lat, double? Lng)[]
         {
-            db.Areas.AddRange(missingAreas);
-            await db.SaveChangesAsync();
-        }
-
-        // Blocks are fixed reference data too — like Area, not admin-editable. Real block counts,
-        // each individually confirmed against that area's own Wikipedia article (a quoted sentence
-        // stating its block count) — NOT the "Areas of Kuwait" aggregated table, which turned out to
-        // misreport several values (e.g. it claimed Jabriya=14/Bayan=14/Doha=5/Hawalli=11 — the real,
-        // per-article figures are 12/13/7/12) and is not used as a source here. "Kuwait City" itself
-        // is the historic old-town core and genuinely has 0 numbered blocks per Wikipedia — it gets a
-        // single nominal Block 1 purely as an anchor since every Zone needs a Block to attach to.
-        // Areas with no individually-confirmed block count fall back to 1 (an honest "unconfirmed"
-        // placeholder, not a fabricated number) via GetValueOrDefault below.
-        var blockCountByArea = new Dictionary<string, int>
-        {
-            // Al Asimah (Capital)
-            ["Kuwait City"] = 1, ["Shamiya"] = 10, ["Faiha"] = 9, ["Khaldiya"] = 4, ["Adailiya"] = 4,
-            ["Rawda"] = 5, ["Surra"] = 6, ["Yarmouk"] = 4, ["Shuwaikh"] = 8, ["Doha"] = 7,
-            // Hawalli
-            ["Hawalli"] = 12, ["Salmiya"] = 12, ["Jabriya"] = 12, ["Bayan"] = 13, ["Rumaithiya"] = 12, ["Zahra"] = 8,
-            // Farwaniya
-            ["Khaitan"] = 10, ["Jleeb Al-Shuyoukh"] = 5,
-            // Mubarak Al-Kabeer
-            ["Sabah Al-Salem"] = 13,
-            // Ahmadi
-            ["Fahaheel"] = 14, ["Mangaf"] = 10,
-            // Jahra
-            ["Jahra"] = 12, ["Sulaibiya"] = 10, ["Saad Al-Abdullah"] = 10,
+            ("Main Locations", "Block 3 Substation",          "محطة القطعة 3",              "Building 7, Street 1, Block 3, Jabriya",           29.3210, 48.0175),
+            ("Governmental Locations", "Central Admin Building", "مبنى الإدارة المركزية",    "Admin Tower, Street 20, Block 1, Kuwait City",     29.3759, 47.9774),
+            ("Main Locations", "North Control Center",        "مركز التحكم الشمالي",          "Control Building, Street 5, Kuwait City",  null,    null), // no coordinates — demonstrates the optional case
+            ("Main Locations", "Salmiya Substation",          "محطة السالمية",              "Building 12, Street 4, Block 1, Salmiya",          29.3394, 48.0758),
+            ("Side Locations", "Fahaheel Pumping Station",    "محطة ضخ الفحيحيل",            "Pump House, Street 9, Block 1, Fahaheel",          29.0847, 48.1319),
+            ("Governmental Locations", "Jahra Water Treatment Plant", "محطة معالجة مياه الجهراء", "Treatment Plant, Street 3, Block 1, Jahra",   29.3375, 47.6581),
+            ("Side Locations", "Khaitan Distribution Center", "مركز توزيع خيطان",             "Distribution Bldg, Street 15, Block 1, Khaitan",   29.2775, 47.9569),
+            ("Governmental Locations", "Sabah Al-Salem Substation", "محطة صباح السالم",       "Substation, Street 6, Block 1, Sabah Al-Salem",    29.1500, 48.1167),
+            ("Side Locations", "Shuwaikh Warehouse",          "مستودع الشويخ",                "Warehouse 2, Street 11, Block 1, Shuwaikh",        29.3400, 47.9350),
+            ("Side Locations", "Mangaf Control Room",         "غرفة تحكم المنقف",             "Control Room, Street 8, Block 1, Mangaf",          29.0833, 48.1333),
+            ("Main Locations", "Rumaithiya Substation",       "محطة الرميثية",                "Building 4, Street 2, Block 1, Rumaithiya",        29.3167, 48.0500),
+            ("Governmental Locations", "Sulaibiya Pumping Station", "محطة ضخ الصليبية",       "Pump House, Street 7, Block 1, Sulaibiya",         29.3833, 47.6167),
         };
-        var allAreas = await db.Areas.ToListAsync();
-        var existingBlockKeys = (await db.Blocks.Select(b => new { b.AreaId, b.Number }).ToListAsync())
-            .Select(b => (b.AreaId, b.Number)).ToHashSet();
-        var missingBlocks = allAreas
-            .SelectMany(a => Enumerable.Range(1, blockCountByArea.GetValueOrDefault(a.Name, 1))
-                .Where(n => !existingBlockKeys.Contains((a.Id, n)))
-                .Select(n => new Block { AreaId = a.Id, Number = n }))
-            .ToList();
-        if (missingBlocks.Count > 0)
-        {
-            db.Blocks.AddRange(missingBlocks);
-            await db.SaveChangesAsync();
-        }
-
-        // Idempotent "add what's missing by Name" — same fill-in pattern as Areas/Blocks above,
-        // so re-running on a partially-seeded DB tops up the rest without touching existing zones.
-        var areasByName = await db.Areas.ToDictionaryAsync(a => a.Name);
-        var blocksByAreaAndNumber = (await db.Blocks.ToListAsync()).ToDictionary(b => (b.AreaId, b.Number));
-        var seedZones = new (string Area, int Block, string Name, string NameAr, string Address, double? Lat, double? Lng)[]
-        {
-            ("Jabriya",         1, "Block 3 Substation",          "محطة القطعة 3",              "Building 7, Street 1, Block 3, Jabriya",           29.3210, 48.0175),
-            ("Kuwait City",     1, "Central Admin Building",      "مبنى الإدارة المركزية",       "Admin Tower, Street 20, Block 1, Kuwait City",     29.3759, 47.9774),
-            ("Kuwait City",     1, "North Control Center",        "مركز التحكم الشمالي",          "Control Building, Street 5, Kuwait City",  null,    null), // no coordinates — demonstrates the optional case; Kuwait City has no real numbered blocks, so both its zones share the nominal Block 1
-            ("Salmiya",         1, "Salmiya Substation",          "محطة السالمية",              "Building 12, Street 4, Block 1, Salmiya",          29.3394, 48.0758),
-            ("Fahaheel",        1, "Fahaheel Pumping Station",    "محطة ضخ الفحيحيل",            "Pump House, Street 9, Block 1, Fahaheel",          29.0847, 48.1319),
-            ("Jahra",           1, "Jahra Water Treatment Plant", "محطة معالجة مياه الجهراء",     "Treatment Plant, Street 3, Block 1, Jahra",        29.3375, 47.6581),
-            ("Khaitan",         1, "Khaitan Distribution Center", "مركز توزيع خيطان",             "Distribution Bldg, Street 15, Block 1, Khaitan",   29.2775, 47.9569),
-            ("Sabah Al-Salem",  1, "Sabah Al-Salem Substation",   "محطة صباح السالم",             "Substation, Street 6, Block 1, Sabah Al-Salem",    29.1500, 48.1167),
-            ("Shuwaikh",        1, "Shuwaikh Warehouse",          "مستودع الشويخ",                "Warehouse 2, Street 11, Block 1, Shuwaikh",        29.3400, 47.9350),
-            ("Mangaf",          1, "Mangaf Control Room",         "غرفة تحكم المنقف",             "Control Room, Street 8, Block 1, Mangaf",          29.0833, 48.1333),
-            ("Rumaithiya",      1, "Rumaithiya Substation",       "محطة الرميثية",                "Building 4, Street 2, Block 1, Rumaithiya",        29.3167, 48.0500),
-            ("Sulaibiya",       1, "Sulaibiya Pumping Station",   "محطة ضخ الصليبية",             "Pump House, Street 7, Block 1, Sulaibiya",         29.3833, 47.6167),
-        };
-        var existingZoneNames = (await db.Zones.Select(z => z.Name).ToListAsync()).ToHashSet();
+        var existingZonesByName = await db.Zones.ToDictionaryAsync(z => z.Name);
         var missingZones = seedZones
-            .Where(z => areasByName.ContainsKey(z.Area) && blocksByAreaAndNumber.ContainsKey((areasByName[z.Area].Id, z.Block)) && !existingZoneNames.Contains(z.Name))
+            .Where(z => locationCategoriesByName.ContainsKey(z.Category) && !existingZonesByName.ContainsKey(z.Name))
             .Select(z => new Zone
             {
-                Name = z.Name, NameAr = z.NameAr, BlockId = blocksByAreaAndNumber[(areasByName[z.Area].Id, z.Block)].Id,
+                Name = z.Name, NameAr = z.NameAr, LocationCategoryId = locationCategoriesByName[z.Category].Id,
                 Address = z.Address, Latitude = z.Lat, Longitude = z.Lng,
             })
             .ToList();
@@ -218,6 +123,22 @@ public static class DbSeeder
             db.Zones.AddRange(missingZones);
             await db.SaveChangesAsync();
         }
+
+        // Reconcile category on zones seeded by an earlier version of this list (when every zone
+        // defaulted to "Main Locations") so existing dev/demo databases pick up the new spread
+        // without needing a full reseed.
+        var categoryFixes = false;
+        foreach (var sz in seedZones)
+        {
+            if (existingZonesByName.TryGetValue(sz.Name, out var zone) &&
+                locationCategoriesByName.TryGetValue(sz.Category, out var cat) &&
+                zone.LocationCategoryId != cat.Id)
+            {
+                zone.LocationCategoryId = cat.Id;
+                categoryFixes = true;
+            }
+        }
+        if (categoryFixes) await db.SaveChangesAsync();
 
         if (!await db.AssetCategories.AnyAsync())
         {
@@ -504,6 +425,18 @@ public static class DbSeeder
                 new WorkOrderBlockReason { Name = "Needs Site Visit", NameAr = "يحتاج زيارة ميدانية" });
             await db.SaveChangesAsync();
         }
+
+        if (!await db.MaintenanceActionTypes.AnyAsync())
+        {
+            db.MaintenanceActionTypes.AddRange(
+                new MaintenanceActionType { Name = "Cleaned Outer Unit", NameAr = "تنظيف الوحدة الخارجية" },
+                new MaintenanceActionType { Name = "Replaced Filter", NameAr = "استبدال الفلتر" },
+                new MaintenanceActionType { Name = "Basic Maintenance", NameAr = "صيانة أساسية" },
+                new MaintenanceActionType { Name = "Lubricated Moving Parts", NameAr = "تشحيم الأجزاء المتحركة" },
+                new MaintenanceActionType { Name = "Tightened Connections", NameAr = "إحكام التوصيلات" },
+                new MaintenanceActionType { Name = "Calibration Check", NameAr = "فحص المعايرة" });
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task SeedPermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> rm)
@@ -544,6 +477,11 @@ public static class DbSeeder
             new Permission { Name = "Contract.Manage",               Category = "Asset Management", Description = "Create and edit vendor contracts and link them to assets" },
             new Permission { Name = "Asset.ReportAction",            Category = "Asset Management", Description = "Report a failure or other action on an asset, creating a draft work order for admin review" },
             new Permission { Name = "Asset.ScopeManage",             Category = "Asset Management", Description = "Restrict which zone, area, or category of assets a specific employee can see" },
+            // Maintenance Orders
+            new Permission { Name = "MaintenanceOrder.View",         Category = "Asset Management", Description = "See all standalone maintenance orders across the organization" },
+            new Permission { Name = "MaintenanceOrder.Manage",       Category = "Asset Management", Description = "Assign an employee to fix an asset in-house, and cancel maintenance orders" },
+            new Permission { Name = "MaintenanceOrder.Report",       Category = "Asset Management", Description = "Complete a fix on a maintenance order assigned to you" },
+            new Permission { Name = "MaintenanceOrder.Export",       Category = "Asset Management", Description = "Export the maintenance order list to Excel" },
         };
 
         var existing = await db.Permissions.ToListAsync();
@@ -582,6 +520,7 @@ public static class DbSeeder
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
+                "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
             ],
             ["OperationsManager"] =
             [
@@ -593,6 +532,7 @@ public static class DbSeeder
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
+                "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
             ],
             ["Supervisor"] =
             [
@@ -602,31 +542,37 @@ public static class DbSeeder
                 "Vendor.View",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View",
+                "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report",
             ],
             ["Section Head"] =
             [
                 "InspectionOrder.View", "Team.View",
                 "Asset.View", "Vendor.View", "WorkOrder.View",
+                "MaintenanceOrder.View",
             ],
             ["Senior Engineer"] =
             [
                 "InspectionOrder.View", "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
+                "MaintenanceOrder.Report",
             ],
             ["Engineer"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
+                "MaintenanceOrder.Report",
             ],
             ["Operation Engineer"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
+                "MaintenanceOrder.Report",
             ],
             ["Technician"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
+                "MaintenanceOrder.Report",
             ],
             ["HR"] =
             [

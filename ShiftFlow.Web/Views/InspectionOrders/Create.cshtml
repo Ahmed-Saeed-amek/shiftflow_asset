@@ -5,7 +5,8 @@
     ViewData["Title"] = Loc.T("New Inspection Order");
     var teams = (List<Team>)ViewBag.Teams;
     var categories = (List<AssetCategory>)ViewBag.Categories;
-    var governorates = (List<Governorate>)ViewBag.Governorates;
+    var locationCategories = (List<LocationCategory>)ViewBag.LocationCategories;
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Inspection Order"),Subtitle=Loc.T("Assign one or more assets to an employee or a team")})" />
 
@@ -24,9 +25,15 @@
             }
 
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">@Loc.T("Title") <span class="text-danger">*</span></label>
-                    <input asp-for="Title" class="form-control" placeholder="@Loc.T("What needs to be inspected?")" />
+                <div class="col-12">
+                    <label class="form-label d-block">@Loc.T("Order Type")</label>
+                    <div class="btn-group btn-group-sm mb-2" role="group">
+                        @foreach (var t in orderTypes)
+                        {
+                            <input type="radio" class="btn-check" name="OrderTypeId" id="orderType@(t.Id)" value="@t.Id" checked="@(Model.OrderTypeId == t.Id || (Model.OrderTypeId == 0 && t == orderTypes.First()))" />
+                            <label class="btn btn-outline-secondary" for="orderType@(t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</label>
+                        }
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">@Loc.T("Due Date")</label>
@@ -40,17 +47,17 @@
                 <div class="col-12">
                     <label class="form-label d-block">@Loc.T("Assign To")</label>
                     <div class="btn-group btn-group-sm mb-2" role="group">
-                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" />
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
                         <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
-                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked />
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked="@(Model.AssigneeType != "User")" />
                         <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
                     </div>
                 </div>
-                <div class="col-md-6 d-none" id="assigneeUserRow">
+                <div class="col-md-6 @(Model.AssigneeType == "User" ? "" : "d-none")" id="assigneeUserRow">
                     <label class="form-label">@Loc.T("Employee")</label>
-                    <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,Placeholder=Loc.T("Search by name or email…")})" />
+                    <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=ViewBag.SelectedEmployeeLabel as string,Placeholder=Loc.T("Search by name or email…")})" />
                 </div>
-                <div class="col-md-6" id="assigneeTeamRow">
+                <div class="col-md-6 @(Model.AssigneeType == "User" ? "d-none" : "")" id="assigneeTeamRow">
                     <label class="form-label">@Loc.T("Team")</label>
                     <select asp-for="AssignedToTeamId" class="form-select">
                         <option value="">@Loc.T("Select a team")</option>
@@ -65,7 +72,7 @@
 
                 <div class="col-12">
                     <label class="form-label">@Loc.T("Assets")</label>
-                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=new List<AssetChip>(),Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,Governorates=governorates})" />
+                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
                 </div>
             </div>
 

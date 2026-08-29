@@ -19,11 +19,11 @@ public class InspectionOrderService : IInspectionOrderService
         _teams = teams;
     }
 
-    public async Task<InspectionOrder> CreateAsync(string title, string? description, string? assignedToUserId, int? assignedToTeamId,
+    public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
         List<int>? assetIds, DateTime? dueDate, string createdByUserId)
     {
-        if (string.IsNullOrWhiteSpace(title))
-            throw new InvalidOperationException("Title is required.");
+        var orderType = await _db.OrderTypes.FirstOrDefaultAsync(t => t.Id == orderTypeId && t.IsActive)
+            ?? throw new InvalidOperationException("Invalid order type.");
 
         var hasUser = !string.IsNullOrEmpty(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
@@ -45,9 +45,9 @@ public class InspectionOrderService : IInspectionOrderService
 
         var order = new InspectionOrder
         {
-            OrderNumber = $"INS-{year}-{seq:D4}",
-            Title = title,
+            OrderNumber = $"{orderType.Prefix}-{year}-{seq:D4}",
             Description = description,
+            OrderTypeId = orderType.Id,
             AssignedToUserId = hasUser ? assignedToUserId : null,
             AssignedToTeamId = hasTeam ? assignedToTeamId : null,
             CreatedByUserId = createdByUserId,
@@ -68,21 +68,24 @@ public class InspectionOrderService : IInspectionOrderService
 
     public async Task<InspectionOrder?> GetByIdAsync(int id) =>
         await _db.InspectionOrders
+            .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToTeam).ThenInclude(t => t!.Members).ThenInclude(m => m.User)
             .Include(o => o.CreatedByUser)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Zone)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items).ThenInclude(i => i.Asset).ThenInclude(a => a.Zone)
-                .ThenInclude(z => z!.Block!).ThenInclude(bl => bl.Area!).ThenInclude(a => a.Governorate)
+                .ThenInclude(z => z!.LocationCategory)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items).ThenInclude(i => i.WorkOrder)
+            .Include(o => o.InspectionRun!).ThenInclude(r => r.Items).ThenInclude(i => i.MaintenanceActions).ThenInclude(m => m.MaintenanceActionType)
             .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == id);
 
-    public async Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false)
+    public async Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null)
     {
         var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == userId).Select(m => m.TeamId).ToListAsync();
 
         var query = _db.InspectionOrders
+            .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToTeam)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
@@ -90,6 +93,8 @@ public class InspectionOrderService : IInspectionOrderService
 
         if (!includeDone)
             query = query.Where(o => o.Status != "Done");
+        if (from.HasValue) query = query.Where(o => o.CreatedAt >= from.Value);
+        if (to.HasValue) query = query.Where(o => o.CreatedAt <= to.Value);
 
         return await query.OrderByDescending(o => o.CreatedAt).Take(300).ToListAsync();
     }
@@ -97,6 +102,7 @@ public class InspectionOrderService : IInspectionOrderService
     public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search)
     {
         var query = _db.InspectionOrders
+            .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToTeam)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
@@ -108,13 +114,13 @@ public class InspectionOrderService : IInspectionOrderService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(o => o.OrderNumber.Contains(term) || o.Title.Contains(term));
+            query = query.Where(o => o.OrderNumber.Contains(term));
         }
 
         return await query.OrderByDescending(o => o.CreatedAt).Take(500).ToListAsync();
     }
 
-    public async Task UpdateInspectionItemAsync(int itemId, string outcome, string? notes, int? workOrderId, string updatedByUserId)
+    public async Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, List<int>? maintenanceActionTypeIds, string updatedByUserId)
     {
         var item = await _db.InspectionRunAssets.FindAsync(itemId)
             ?? throw new InvalidOperationException("Inspection item not found.");
@@ -129,10 +135,14 @@ public class InspectionOrderService : IInspectionOrderService
             throw new InvalidOperationException("This inspection order is already closed.");
 
         item.Outcome = outcome;
-        item.Notes = notes;
         item.InspectedByUserId = updatedByUserId;
         item.InspectedAt = DateTime.UtcNow;
         item.WorkOrderId = workOrderId;
+
+        _db.InspectionItemMaintenanceActions.RemoveRange(
+            await _db.InspectionItemMaintenanceActions.Where(m => m.InspectionRunAssetId == itemId).ToListAsync());
+        foreach (var maintenanceActionTypeId in maintenanceActionTypeIds ?? [])
+            _db.InspectionItemMaintenanceActions.Add(new InspectionItemMaintenanceAction { InspectionRunAssetId = itemId, MaintenanceActionTypeId = maintenanceActionTypeId });
 
         if (order.Status == "Open")
             order.Status = "InProgress";
@@ -149,6 +159,32 @@ public class InspectionOrderService : IInspectionOrderService
         }
 
         await _audit.LogAsync("UpdateInspectionItem", "InspectionRunAsset", itemId.ToString(), updatedByUserId, newValue: outcome);
+    }
+
+    public async Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId)
+    {
+        var item = await _db.InspectionRunAssets.FindAsync(itemId)
+            ?? throw new InvalidOperationException("Inspection item not found.");
+
+        var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
+            .Select(r => r.InspectionOrderId).FirstAsync();
+        var order = await _db.InspectionOrders.FindAsync(orderId)
+            ?? throw new InvalidOperationException("Inspection order not found.");
+        if (order.Status == "Done")
+            throw new InvalidOperationException("This inspection order is already closed.");
+
+        // Deliberately does not touch Outcome/InspectedByUserId/InspectedAt/WorkOrderId, or the
+        // order's Open->InProgress/Done status transitions — those all belong to the OK/Defective
+        // decision (UpdateInspectionItemAsync above). This lets maintenance actually performed be
+        // logged independent of that decision, and safely re-editable afterward, since there's no
+        // Work Order (re-)creation here to risk duplicating.
+        _db.InspectionItemMaintenanceActions.RemoveRange(
+            await _db.InspectionItemMaintenanceActions.Where(m => m.InspectionRunAssetId == itemId).ToListAsync());
+        foreach (var maintenanceActionTypeId in maintenanceActionTypeIds ?? [])
+            _db.InspectionItemMaintenanceActions.Add(new InspectionItemMaintenanceAction { InspectionRunAssetId = itemId, MaintenanceActionTypeId = maintenanceActionTypeId });
+
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("UpdateMaintenanceActions", "InspectionRunAsset", itemId.ToString(), updatedByUserId);
     }
 
     public async Task CancelAsync(int orderId, string userId)
@@ -175,7 +211,7 @@ public class InspectionOrderService : IInspectionOrderService
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();
         var ws = pkg.Workbook.Worksheets.Add("Inspection Orders");
-        string[] headers = ["Order #", "Title", "Status", "Assigned To", "Assets", "Checked", "Due Date", "Created"];
+        string[] headers = ["Order #", "Status", "Assigned To", "Assets", "Checked", "Due Date", "Created"];
         for (var i = 0; i < headers.Length; i++) ws.Cells[1, i + 1].Value = headers[i];
         using (var range = ws.Cells[1, 1, 1, headers.Length]) { range.Style.Font.Bold = true; }
 
@@ -184,13 +220,12 @@ public class InspectionOrderService : IInspectionOrderService
         {
             var items = o.InspectionRun?.Items ?? [];
             ws.Cells[row, 1].Value = o.OrderNumber;
-            ws.Cells[row, 2].Value = o.Title;
-            ws.Cells[row, 3].Value = o.Status;
-            ws.Cells[row, 4].Value = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : "");
-            ws.Cells[row, 5].Value = items.Count;
-            ws.Cells[row, 6].Value = items.Count(i => i.Outcome != "Pending");
-            ws.Cells[row, 7].Value = o.DueDate?.ToString("yyyy-MM-dd");
-            ws.Cells[row, 8].Value = o.CreatedAt.ToString("yyyy-MM-dd");
+            ws.Cells[row, 2].Value = o.Status;
+            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : "");
+            ws.Cells[row, 4].Value = items.Count;
+            ws.Cells[row, 5].Value = items.Count(i => i.Outcome != "Pending");
+            ws.Cells[row, 6].Value = o.DueDate?.ToString("yyyy-MM-dd");
+            ws.Cells[row, 7].Value = o.CreatedAt.ToString("yyyy-MM-dd");
             row++;
         }
         ws.Cells.AutoFitColumns();

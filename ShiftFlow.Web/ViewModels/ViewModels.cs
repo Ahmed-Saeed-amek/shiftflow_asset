@@ -63,9 +63,7 @@ public class ZoneViewModel : IValidatableObject
     public int Id { get; set; }
     [Required, MaxLength(150)] public string Name { get; set; } = string.Empty;
     public string? NameAr { get; set; }
-    public int GovernorateId { get; set; }
-    public int AreaId { get; set; }
-    public int BlockId { get; set; }
+    public int LocationCategoryId { get; set; }
     public string? Address { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
@@ -73,9 +71,7 @@ public class ZoneViewModel : IValidatableObject
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var t = ValidationHelper.Localizer(validationContext);
-        foreach (var r in ValidationHelper.CheckSelected(GovernorateId, nameof(GovernorateId), "Governorate", t)) yield return r;
-        foreach (var r in ValidationHelper.CheckSelected(AreaId, nameof(AreaId), "Area", t)) yield return r;
-        foreach (var r in ValidationHelper.CheckSelected(BlockId, nameof(BlockId), "Block", t)) yield return r;
+        foreach (var r in ValidationHelper.CheckSelected(LocationCategoryId, nameof(LocationCategoryId), "Location Category", t)) yield return r;
     }
 }
 
@@ -126,20 +122,25 @@ public class AssetMultiPickerModel
     public string? Placeholder { get; set; }
     /// <summary>Top-level categories. When set, renders a "add all assets in category" control above the search box.</summary>
     public List<AssetCategory>? Categories { get; set; }
-    /// <summary>Top-level governorates. When set, renders a Governorate→Area→Block→Zone cascading
+    /// <summary>The 3 fixed location categories. When set, renders a Category→Zone
     /// "add all assets at this location" control above the search box.</summary>
-    public List<Governorate>? Governorates { get; set; }
+    public List<LocationCategory>? LocationCategories { get; set; }
 }
 
 public class UserAssetScopeViewModel : IValidatableObject
 {
     public int Id { get; set; }
     [Required] public string UserId { get; set; } = string.Empty;
-    [Required] public string ScopeType { get; set; } = "Zone";
-    public int ScopeValueId { get; set; }
+    public int? ZoneId { get; set; }
+    public int? LocationCategoryId { get; set; }
+    public int? CategoryId { get; set; }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
-        ValidationHelper.CheckSelected(ScopeValueId, nameof(ScopeValueId), "value", ValidationHelper.Localizer(validationContext));
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var t = ValidationHelper.Localizer(validationContext);
+        if (ZoneId == null && LocationCategoryId == null && CategoryId == null)
+            yield return new ValidationResult(t("Pick at least one of Zone, Location Type, or Category."), new[] { nameof(ZoneId) });
+    }
 }
 
 public class ReportActionViewModel : IValidatableObject
@@ -235,9 +236,37 @@ public class WorkOrderViewModel : IValidatableObject
     [Required] public string Priority { get; set; } = "Medium";
     public string? Description { get; set; }
     public string? Notes { get; set; }
+    public string? AssignedToUserId { get; set; }
+    public bool RequiresVendorResponse { get; set; } = false;
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         ValidationHelper.CheckSelected(AssetId, nameof(AssetId), "Asset", ValidationHelper.Localizer(validationContext));
+}
+
+public class MaintenanceOrderCreateVm : IValidatableObject
+{
+    public int AssetId { get; set; }
+    public int OrderTypeId { get; set; }
+    public string? AssignedToUserId { get; set; }
+    public string? Description { get; set; }
+    public DateTime? DueDate { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var t = ValidationHelper.Localizer(validationContext);
+        foreach (var r in ValidationHelper.CheckSelected(AssetId, nameof(AssetId), "Asset", t)) yield return r;
+        if (string.IsNullOrWhiteSpace(AssignedToUserId))
+            yield return new ValidationResult(string.Format(t("Please select a {0}."), t("Employee")), new[] { nameof(AssignedToUserId) });
+    }
+}
+
+public class MaintenanceOrderCompleteVm
+{
+    public string? FixDescription { get; set; }
+    public decimal? Cost { get; set; }
+    public DateTime? CompletedDate { get; set; }
+    public List<string>? PartNames { get; set; }
+    public List<int>? PartQuantities { get; set; }
 }
 
 public class WorkOrderBlockReasonViewModel
@@ -246,6 +275,26 @@ public class WorkOrderBlockReasonViewModel
     [Required, MaxLength(100)] public string Name { get; set; } = string.Empty;
     public string? NameAr { get; set; }
     public bool IsActive { get; set; } = true;
+}
+
+public class MaintenanceActionTypeViewModel
+{
+    public int Id { get; set; }
+    [Required, MaxLength(150)] public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class OrderTypeViewModel
+{
+    public int Id { get; set; }
+    [Required, MaxLength(150)] public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    [Required, MaxLength(10)] public string Prefix { get; set; } = "INS";
+    public bool TracksDefectOutcome { get; set; }
+    public bool RequiresVendor { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
 }
 
 public class VendorFixViewModel
@@ -279,6 +328,20 @@ public class AssetSinglePickerModel
     public string? CssClass { get; set; }
 }
 
+/// <summary>Reusable Location Category → searchable Zone picker: pick one of the 3 fixed categories,
+/// then immediately search/scroll that category's zones — no further cascading levels. The hidden
+/// input carries the selected zone id under Name, mirroring EmployeePickerModel's shape.</summary>
+public class ZoneComboboxModel
+{
+    public string Name { get; set; } = string.Empty;
+    public List<LocationCategory> LocationCategories { get; set; } = new();
+    public int? SelectedLocationCategoryId { get; set; }
+    public int? SelectedZoneId { get; set; }
+    public string? SelectedZoneLabel { get; set; }
+    public string? Placeholder { get; set; }
+    public string? CssClass { get; set; }
+}
+
 public class UserCreateViewModel
 {
     [Required, EmailAddress] public string Email { get; set; } = string.Empty;
@@ -292,6 +355,6 @@ public class UserCreateViewModel
 public class ChangePasswordViewModel
 {
     [Required, DataType(DataType.Password)] public string CurrentPassword { get; set; } = string.Empty;
-    [Required, DataType(DataType.Password), MinLength(8)] public string NewPassword { get; set; } = string.Empty;
+    [Required, DataType(DataType.Password), MinLength(12)] public string NewPassword { get; set; } = string.Empty;
     [Required, DataType(DataType.Password), Compare(nameof(NewPassword))] public string ConfirmPassword { get; set; } = string.Empty;
 }

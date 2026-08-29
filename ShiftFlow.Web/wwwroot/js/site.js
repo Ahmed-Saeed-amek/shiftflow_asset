@@ -1,4 +1,11 @@
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.alert-dismissible').forEach(a=>setTimeout(()=>{a.style.opacity='0';setTimeout(()=>a.remove(),300)},5000));document.querySelectorAll('[data-confirm]').forEach(btn=>btn.addEventListener('click',e=>{if(!confirm(btn.dataset.confirm||'Are you sure?'))e.preventDefault();}));document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t=>new bootstrap.Tooltip(t));initEmployeePickers();initAssetPickers();initSidebar();initSidebarScrollMemory();});
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.alert-dismissible').forEach(a=>setTimeout(()=>{a.style.opacity='0';setTimeout(()=>a.remove(),300)},5000));document.querySelectorAll('[data-confirm]').forEach(btn=>btn.addEventListener('click',e=>{if(!confirm(btn.dataset.confirm||'Are you sure?'))e.preventDefault();}));document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t=>new bootstrap.Tooltip(t));initEmployeePickers();initAssetPickers();initZonePickers();initSidebar();initSidebarScrollMemory();});
+
+// Shared HTML-escaping helper for the typeahead pickers below — every field they render
+// (employee FullName/Email/EmployeeNumber, asset Name, zone Name/NameAr) comes from other
+// users' server data, not the current viewer, so every interpolated value must be escaped
+// before it reaches innerHTML. A prior version escaped only the data-label attribute,
+// leaving the visible text nodes open to stored DOM-XSS.
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // Every sidebar link is a full-page navigation, which normally resets the
 // scrollable nav list back to its top on the next page. Persist the scroll
@@ -65,9 +72,9 @@ function initEmployeePickers(){
     function render(list){
       if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(u){
-        var sub=[u.email,u.employeeNumber].filter(Boolean).join(' · ');
-        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+u.id+'" data-label="'+(u.fullName||'').replace(/"/g,'&quot;')+'">'+
-               '<div class="fw-semibold small">'+(u.fullName||'')+'</div><div class="text-muted" style="font-size:.72rem">'+sub+'</div></button>';
+        var sub=[u.email,u.employeeNumber].filter(Boolean).map(esc).join(' · ');
+        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(u.id)+'" data-label="'+esc(u.fullName||'')+'">'+
+               '<div class="fw-semibold small">'+esc(u.fullName||'')+'</div><div class="text-muted" style="font-size:.72rem">'+sub+'</div></button>';
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
@@ -101,8 +108,8 @@ function initAssetPickers(){
       if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(a){
         var label=a.assetTag+' — '+(a.name||'');
-        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+a.id+'" data-label="'+label.replace(/"/g,'&quot;')+'">'+
-               '<div class="fw-semibold small">'+a.assetTag+'</div><div class="text-muted" style="font-size:.72rem">'+(a.name||'')+'</div></button>';
+        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(a.id)+'" data-label="'+esc(label)+'">'+
+               '<div class="fw-semibold small">'+esc(a.assetTag)+'</div><div class="text-muted" style="font-size:.72rem">'+esc(a.name||'')+'</div></button>';
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
@@ -117,5 +124,49 @@ function initAssetPickers(){
     search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(query,220);});
     search.addEventListener('focus',function(){query();});
     document.addEventListener('click',function(e){if(!pk.contains(e.target))hide();});
+  });
+}
+
+// Reusable Location Category -> searchable Zone picker: category select fetches that category's
+// zones once (small fixed list), then typed input filters the already-fetched list client-side —
+// mirrors initEmployeePickers()/initAssetPickers()'s shape but with a local filter instead of a
+// server round-trip per keystroke, since /Zones/ByCategory returns the whole category upfront.
+function initZonePickers(){
+  document.querySelectorAll('[data-zone-combobox]').forEach(function(pk){
+    if(pk.dataset.zcInit) return; pk.dataset.zcInit='1';
+    var categorySel=pk.querySelector('[data-zc-category]');
+    var hidden=pk.querySelector('[data-zc-value]');
+    var search=pk.querySelector('[data-zc-search]');
+    var results=pk.querySelector('[data-zc-results]');
+    var zones=[];
+    function hide(){results.classList.add('d-none');results.innerHTML='';}
+    function render(list){
+      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
+      results.innerHTML=list.map(function(z){
+        var label=z.nameAr&&document.documentElement.dir==='rtl'?z.nameAr:z.name;
+        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(z.id)+'" data-label="'+esc(label||'')+'">'+esc(label||'')+'</button>';
+      }).join('');
+      results.classList.remove('d-none');
+      results.querySelectorAll('[data-id]').forEach(function(b){
+        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();});
+      });
+    }
+    function filterAndRender(){
+      var q=search.value.trim().toLowerCase();
+      var matches=q?zones.filter(function(z){return (z.name||'').toLowerCase().includes(q)||(z.nameAr||'').toLowerCase().includes(q);}):zones;
+      render(matches);
+    }
+    function loadZones(resetSelection){
+      if(resetSelection){hidden.value='';search.value='';}
+      zones=[];
+      if(!categorySel.value) return;
+      fetch('/Zones/ByCategory?locationCategoryId='+categorySel.value,{headers:{'Accept':'application/json'}})
+        .then(function(r){return r.ok?r.json():[];}).then(function(list){zones=list;});
+    }
+    categorySel.addEventListener('change',function(){loadZones(true);});
+    search.addEventListener('input',function(){hidden.value='';filterAndRender();});
+    search.addEventListener('focus',function(){if(zones.length)filterAndRender();});
+    document.addEventListener('click',function(e){if(!pk.contains(e.target))hide();});
+    if(categorySel.value) loadZones(false);
   });
 }

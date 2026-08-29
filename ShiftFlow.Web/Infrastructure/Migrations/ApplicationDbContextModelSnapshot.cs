@@ -262,36 +262,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Area", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("GovernorateId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("NameAr")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GovernorateId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("Areas");
-                });
-
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Asset", b =>
                 {
                     b.Property<int>("Id")
@@ -521,28 +491,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.ToTable("AuditLogs");
                 });
 
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Block", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AreaId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AreaId", "Number")
-                        .IsUnique();
-
-                    b.ToTable("Blocks");
-                });
-
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Contract", b =>
                 {
                     b.Property<int>("Id")
@@ -612,7 +560,7 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.ToTable("ContractAssets");
                 });
 
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Governorate", b =>
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionItemMaintenanceAction", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -620,26 +568,20 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double>("CenterLat")
-                        .HasColumnType("float");
+                    b.Property<int>("InspectionRunAssetId")
+                        .HasColumnType("int");
 
-                    b.Property<double>("CenterLng")
-                        .HasColumnType("float");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("NameAr")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("MaintenanceActionTypeId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("MaintenanceActionTypeId");
+
+                    b.HasIndex("InspectionRunAssetId", "MaintenanceActionTypeId")
                         .IsUnique();
 
-                    b.ToTable("Governorates");
+                    b.ToTable("InspectionItemMaintenanceActions");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionOrder", b =>
@@ -677,15 +619,13 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int>("OrderTypeId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.HasKey("Id");
 
@@ -697,6 +637,8 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
+
+                    b.HasIndex("OrderTypeId");
 
                     b.HasIndex("Status");
 
@@ -749,9 +691,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
                     b.Property<int>("InspectionRunId")
                         .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Outcome")
                         .IsRequired()
@@ -818,6 +757,196 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Locations");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.LocationCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NameAr")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("LocationCategories");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceActionType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("NameAr")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("MaintenanceActionTypes");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceOrder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssetId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AssignedToUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ClosedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CompletedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("Cost")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FixDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("OrderTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.HasIndex("OrderTypeId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("MaintenanceOrders");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceOrderPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MaintenanceOrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenanceOrderId");
+
+                    b.ToTable("MaintenanceOrderParts");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.OrderType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("NameAr")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("RequiresVendor")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("TracksDefectOutcome")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("OrderTypes");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Permission", b =>
@@ -941,22 +1070,29 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ScopeType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
 
-                    b.Property<int>("ScopeValueId")
+                    b.Property<int?>("LocationCategoryId")
                         .HasColumnType("int");
 
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int?>("ZoneId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("LocationCategoryId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
+
+                    b.HasIndex("ZoneId");
 
                     b.ToTable("UserAssetScopes");
                 });
@@ -1040,6 +1176,9 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Property<int>("AssetId")
                         .HasColumnType("int");
 
+                    b.Property<string>("AssignedToUserId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("BlockDetail")
                         .HasColumnType("nvarchar(max)");
 
@@ -1079,6 +1218,11 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<bool>("RequiresVendorResponse")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTime?>("ScheduledDate")
                         .HasColumnType("datetime2");
 
@@ -1103,6 +1247,8 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.HasIndex("ActionTypeId");
 
                     b.HasIndex("AssetId");
+
+                    b.HasIndex("AssignedToUserId");
 
                     b.HasIndex("BlockReasonId");
 
@@ -1264,14 +1410,14 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Property<string>("Address")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("BlockId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
+
+                    b.Property<int>("LocationCategoryId")
+                        .HasColumnType("int");
 
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
@@ -1286,7 +1432,7 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BlockId", "Name")
+                    b.HasIndex("LocationCategoryId", "Name")
                         .IsUnique();
 
                     b.ToTable("Zones");
@@ -1351,17 +1497,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Location");
-                });
-
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Area", b =>
-                {
-                    b.HasOne("ShiftFlow.Domain.Entities.Governorate", "Governorate")
-                        .WithMany("Areas")
-                        .HasForeignKey("GovernorateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Governorate");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Asset", b =>
@@ -1448,17 +1583,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Block", b =>
-                {
-                    b.HasOne("ShiftFlow.Domain.Entities.Area", "Area")
-                        .WithMany("Blocks")
-                        .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Area");
-                });
-
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Contract", b =>
                 {
                     b.HasOne("ShiftFlow.Domain.Entities.Vendor", "Vendor")
@@ -1489,6 +1613,25 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("Contract");
                 });
 
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionItemMaintenanceAction", b =>
+                {
+                    b.HasOne("ShiftFlow.Domain.Entities.InspectionRunAsset", "InspectionRunAsset")
+                        .WithMany("MaintenanceActions")
+                        .HasForeignKey("InspectionRunAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ShiftFlow.Domain.Entities.MaintenanceActionType", "MaintenanceActionType")
+                        .WithMany()
+                        .HasForeignKey("MaintenanceActionTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InspectionRunAsset");
+
+                    b.Navigation("MaintenanceActionType");
+                });
+
             modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionOrder", b =>
                 {
                     b.HasOne("ShiftFlow.Domain.Entities.Team", "AssignedToTeam")
@@ -1507,11 +1650,19 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ShiftFlow.Domain.Entities.OrderType", "OrderType")
+                        .WithMany()
+                        .HasForeignKey("OrderTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("AssignedToTeam");
 
                     b.Navigation("AssignedToUser");
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("OrderType");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionRun", b =>
@@ -1565,6 +1716,51 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceOrder", b =>
+                {
+                    b.HasOne("ShiftFlow.Domain.Entities.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ShiftFlow.Domain.Entities.ApplicationUser", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ShiftFlow.Domain.Entities.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ShiftFlow.Domain.Entities.OrderType", "OrderType")
+                        .WithMany()
+                        .HasForeignKey("OrderTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Asset");
+
+                    b.Navigation("AssignedToUser");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("OrderType");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceOrderPart", b =>
+                {
+                    b.HasOne("ShiftFlow.Domain.Entities.MaintenanceOrder", "MaintenanceOrder")
+                        .WithMany("Parts")
+                        .HasForeignKey("MaintenanceOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MaintenanceOrder");
+                });
+
             modelBuilder.Entity("ShiftFlow.Domain.Entities.RolePermission", b =>
                 {
                     b.HasOne("ShiftFlow.Domain.Entities.ApplicationRole", null)
@@ -1606,13 +1802,34 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.UserAssetScope", b =>
                 {
+                    b.HasOne("ShiftFlow.Domain.Entities.AssetCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ShiftFlow.Domain.Entities.LocationCategory", "LocationCategory")
+                        .WithMany()
+                        .HasForeignKey("LocationCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ShiftFlow.Domain.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ShiftFlow.Domain.Entities.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("LocationCategory");
+
                     b.Navigation("User");
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.UserPermission", b =>
@@ -1647,6 +1864,11 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ShiftFlow.Domain.Entities.ApplicationUser", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ShiftFlow.Domain.Entities.WorkOrderBlockReason", "BlockReason")
                         .WithMany()
                         .HasForeignKey("BlockReasonId")
@@ -1676,6 +1898,8 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("ActionType");
 
                     b.Navigation("Asset");
+
+                    b.Navigation("AssignedToUser");
 
                     b.Navigation("BlockReason");
 
@@ -1739,13 +1963,13 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Zone", b =>
                 {
-                    b.HasOne("ShiftFlow.Domain.Entities.Block", "Block")
+                    b.HasOne("ShiftFlow.Domain.Entities.LocationCategory", "LocationCategory")
                         .WithMany("Zones")
-                        .HasForeignKey("BlockId")
+                        .HasForeignKey("LocationCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Block");
+                    b.Navigation("LocationCategory");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.ApplicationUser", b =>
@@ -1755,11 +1979,6 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("AuditLogs");
 
                     b.Navigation("TeamMemberships");
-                });
-
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Area", b =>
-                {
-                    b.Navigation("Blocks");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Asset", b =>
@@ -1783,19 +2002,9 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
                     b.Navigation("Subcategories");
                 });
 
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Block", b =>
-                {
-                    b.Navigation("Zones");
-                });
-
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Contract", b =>
                 {
                     b.Navigation("AssetLinks");
-                });
-
-            modelBuilder.Entity("ShiftFlow.Domain.Entities.Governorate", b =>
-                {
-                    b.Navigation("Areas");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionOrder", b =>
@@ -1806,6 +2015,21 @@ namespace ShiftFlow.Web.Infrastructure.Migrations
             modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionRun", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.InspectionRunAsset", b =>
+                {
+                    b.Navigation("MaintenanceActions");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.LocationCategory", b =>
+                {
+                    b.Navigation("Zones");
+                });
+
+            modelBuilder.Entity("ShiftFlow.Domain.Entities.MaintenanceOrder", b =>
+                {
+                    b.Navigation("Parts");
                 });
 
             modelBuilder.Entity("ShiftFlow.Domain.Entities.Team", b =>

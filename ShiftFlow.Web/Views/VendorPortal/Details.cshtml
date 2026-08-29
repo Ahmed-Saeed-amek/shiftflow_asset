@@ -35,7 +35,7 @@
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Stage")</span><partial name="_StatusBadge" model="@Model.Stage" /></div>
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Asset")</span><span class="small">@Model.Asset?.Name (@Model.Asset?.AssetTag)</span></div>
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Category")</span><span class="small">@Model.Asset?.Category?.Name</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Zone")</span><span class="small">@(Model.Asset?.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(Model.Asset?.Zone?.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null) / @(Model.Asset?.Zone?.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null))</span></span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Zone")</span><span class="small">@(Model.Asset?.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(Model.Asset?.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></span></div>
                 @if (Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku)))
                 {
                     <div class="mt-2 pt-2 border-top">

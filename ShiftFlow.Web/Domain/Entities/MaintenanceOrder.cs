@@ -1,0 +1,40 @@
+namespace ShiftFlow.Domain.Entities;
+
+/// <summary>A standalone, lightweight in-house fix — an employee is assigned to change out a part
+/// or otherwise service an asset directly, with no vendor and no Work Order pipeline (Draft/Accept/
+/// Sent to Vendor/Confirm) involved. Deliberately its own entity/table rather than a Work Order
+/// variant: just Open -> Done (or Cancelled), no stages, no admin confirmation step.</summary>
+public class MaintenanceOrder
+{
+    public int Id{get;set;}
+    public string OrderNumber{get;set;}=string.Empty;      // "MO-{year}-{seq:D4}"
+    public int AssetId{get;set;} public virtual Asset? Asset{get;set;}
+    public string AssignedToUserId{get;set;}=string.Empty; public virtual ApplicationUser? AssignedToUser{get;set;}
+    public string? Description{get;set;}
+    public string CreatedByUserId{get;set;}=string.Empty; public virtual ApplicationUser? CreatedByUser{get;set;}
+    public DateTime CreatedDate{get;set;}=DateTime.UtcNow;
+    public DateTime? DueDate{get;set;}
+    /// <summary>The order type this was created as (from the shared OrderType catalog, AppliesTo=="Maintenance"). Requests whose type has RequiresVendor==true don't become a MaintenanceOrder at all — they route to a WorkOrder instead — so every MaintenanceOrder that does exist has OrderType.RequiresVendor==false (or no type recorded, for legacy rows).</summary>
+    public int? OrderTypeId{get;set;} public virtual OrderType? OrderType{get;set;}
+
+    public string Status{get;set;}="Open";
+    public static readonly string[] Statuses = ["Open", "Done", "Cancelled"];
+
+    /// <summary>Set by the assigned employee when they complete the fix (Status -> "Done").</summary>
+    public string? FixDescription{get;set;}
+    public decimal? Cost{get;set;}
+    public DateTime? CompletedDate{get;set;}
+    /// <summary>Set when Status leaves "Open" (Done or Cancelled).</summary>
+    public DateTime? ClosedDate{get;set;}
+
+    public virtual ICollection<MaintenanceOrderPart> Parts{get;set;}=new List<MaintenanceOrderPart>();
+}
+
+/// <summary>A part used to fix a MaintenanceOrder — same shape as WorkOrderPart.</summary>
+public class MaintenanceOrderPart
+{
+    public int Id{get;set;}
+    public int MaintenanceOrderId{get;set;} public virtual MaintenanceOrder? MaintenanceOrder{get;set;}
+    public string Name{get;set;}=string.Empty;
+    public int Quantity{get;set;}=1;
+}

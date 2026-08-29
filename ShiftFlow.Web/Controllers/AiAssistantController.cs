@@ -110,9 +110,12 @@ public class AiAssistantController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> Query([FromBody] AiQueryRequest req, CancellationToken ct)
+    public async Task<IActionResult> Query([FromBody] AiQueryRequest? req, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(req.Text))
+        // This controller extends Controller (not [ApiController]/ControllerBase), so ASP.NET
+        // Core does not auto-400 a missing/malformed JSON body — req can reach here as null,
+        // which would otherwise crash with a raw NullReferenceException on the line below.
+        if (req is null || string.IsNullOrWhiteSpace(req.Text))
             return BadRequest(new { error = _loc.T("Text is required") });
 
         if (req.Text.Length > 500)

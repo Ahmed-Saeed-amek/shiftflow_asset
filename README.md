@@ -57,7 +57,7 @@ ShiftFlow.sln
 | Admin | admin@shiftflow.com | Admin@123456 |
 | Shift Manager | manager@shiftflow.com | Manager@123456 |
 | Engineer | engineer@shiftflow.com | Engineer@123456 |
-| HR | hr@shiftflow.com | HR@123456 |
+| HR | hr@shiftflow.com | HrDept@123456 |
 
 ## Notes
 

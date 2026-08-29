@@ -14,9 +14,11 @@
     var canViewVendors = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
     var canViewWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderView)).Succeeded;
     var canManageWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
+    var canViewMaintenanceOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderView)).Succeeded;
     var canViewContracts = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractView)).Succeeded;
     var canReportAssetAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
     var canManageAssetScope = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetScopeManage)).Succeeded;
+    var canManageOrderTypes = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.OrderTypeManage)).Succeeded;
     var canViewUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     var canViewAuditLogs = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AuditLogView)).Succeeded;
     var canManageRbac = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
@@ -26,7 +28,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>@ViewData["Title"] - ShiftFlow</title>
+    <title>@ViewData["Title"] - STEP</title>
     <link rel="icon" type="image/png" href="~/images/favicon.png" asp-append-version="true" />
     @if (isRTL)
     {
@@ -66,12 +68,16 @@
             <li class="nav-section-label">@Loc.T("My Work")</li>
             <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
             <li><a class="nav-link" asp-controller="Users" asp-action="MyTasks"><i class="bi bi-check2-square me-2"></i>@Loc.T("My Tasks")</a></li>
+            <li><a class="nav-link" asp-controller="MaintenanceOrders" asp-action="MyOrders"><i class="bi bi-wrench-adjustable me-2"></i>@Loc.T("My Maintenance Orders")</a></li>
+            <li><a class="nav-link" asp-controller="WorkOrders" asp-action="MyMaintenanceOrders"><i class="bi bi-tools me-2"></i>@Loc.T("My Assigned Work Orders")</a></li>
             <li><a class="nav-link" asp-controller="Users" asp-action="MyMetrics"><i class="bi bi-graph-up-arrow me-2"></i>@Loc.T("My Metrics")</a></li>
+            <li><a class="nav-link" asp-controller="Users" asp-action="MyHistory"><i class="bi bi-clock-history me-2"></i>@Loc.T("History")</a></li>
 
             @if (canManageInspectionOrders)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Overview")</li>
                 <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>@Loc.T("Executive Dashboard")</a></li>
+                <li><a class="nav-link" asp-controller="ZoneOverview" asp-action="Index"><i class="bi bi-geo me-2"></i>@Loc.T("Zone Overview")</a></li>
             }
 
             @if (canViewInspectionOrders || canManageInspectionOrders || canReportInspectionOrders)
@@ -91,7 +97,7 @@
                 <li><a class="nav-link" asp-controller="Teams" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Teams")</a></li>
             }
 
-            @if (canViewAssets || canViewWorkOrders || canViewVendors || canViewContracts)
+            @if (canViewAssets || canViewWorkOrders || canViewMaintenanceOrders || canViewVendors || canViewContracts)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Asset Management")</li>
                 if (canViewAssets)
@@ -104,9 +110,18 @@
                 {
                     <li><a class="nav-link" asp-controller="WorkOrders" asp-action="Index"><i class="bi bi-tools me-2"></i>@Loc.T("Work Orders")</a></li>
                 }
+                if (canViewMaintenanceOrders)
+                {
+                    <li><a class="nav-link" asp-controller="MaintenanceOrders" asp-action="Index"><i class="bi bi-wrench-adjustable me-2"></i>@Loc.T("Maintenance Orders")</a></li>
+                }
                 if (canManageWorkOrders)
                 {
                     <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
+                    <li><a class="nav-link" asp-controller="MaintenanceActionTypes" asp-action="Index"><i class="bi bi-wrench me-2"></i>@Loc.T("Maintenance Action Types")</a></li>
+                }
+                if (canManageOrderTypes)
+                {
+                    <li><a class="nav-link" asp-controller="OrderTypes" asp-action="Index"><i class="bi bi-tags me-2"></i>@Loc.T("Order Types")</a></li>
                 }
                 if (canViewVendors)
                 {
@@ -187,11 +202,15 @@
         <main class="flex-grow-1 p-3 p-md-4" style="background:hsl(var(--background))">
             @RenderBody()
         </main>
-        <footer class="bg-white border-top text-center text-muted small py-2">ShiftFlow &copy; @DateTime.Now.Year</footer>
+        <footer class="bg-white border-top text-center text-muted small py-2">STEP &copy; @DateTime.Now.Year</footer>
     </div>
 </div>
 
-@if (canUseAi)
+@{
+    // Redundant on the AI Assistant page itself — you're already looking at the chat there.
+    var onAiAssistantPage = string.Equals(ViewContext.RouteData.Values["controller"] as string, "AiAssistant", StringComparison.OrdinalIgnoreCase);
+}
+@if (canUseAi && !onAiAssistantPage)
 {
     <partial name="_FloatingAvatar" />
 }

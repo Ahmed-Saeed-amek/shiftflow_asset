@@ -6,8 +6,7 @@
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
     string actionsHtml = "<div class=\"btn-group me-2\"><button type=\"button\" class=\"btn btn-outline-secondary btn-sm active\" id=\"listViewBtn\">" + Loc.T("List View") + "</button><button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" id=\"mapViewBtn\">" + Loc.T("Map View") + "</button></div>";
     if (canManage)
-        actionsHtml += "<a href='" + Url.Action("Index", "Areas") + "' class='btn btn-outline-secondary btn-sm me-2'>" + Loc.T("Area") + "</a>"
-                     + "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Zone") + "</a>";
+        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Zone") + "</a>";
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -19,18 +18,16 @@
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead><tr><th>@Loc.T("Governorate")</th><th>@Loc.T("Area")</th><th>@Loc.T("Block")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th><th></th></tr></thead>
+                <thead><tr><th>@Loc.T("Location Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th><th></th></tr></thead>
                 <tbody>
                     @if (Model.Count == 0)
                     {
-                        <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                     }
                     @foreach (var z in Model)
                     {
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
-                            <td class="small text-muted">@(z.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null)</td>
-                            <td class="small">@(z.Block?.Area is { } area ? Loc.LocalizedName(area.Name, area.NameAr) : null)</td>
-                            <td class="small">@z.Block?.Number</td>
+                            <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
                             <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
                             <td>
                                 @if (z.Latitude.HasValue)

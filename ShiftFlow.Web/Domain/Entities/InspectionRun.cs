@@ -18,11 +18,32 @@ public class InspectionRunAsset
     public int InspectionRunId { get; set; } public virtual InspectionRun InspectionRun { get; set; } = null!;
     public int AssetId { get; set; } public virtual Asset Asset { get; set; } = null!;
     public string Outcome { get; set; } = "Pending";
-    public string? Notes { get; set; }
     public string? InspectedByUserId { get; set; } public virtual ApplicationUser? InspectedByUser { get; set; }
     public DateTime? InspectedAt { get; set; }
     /// <summary>Set when Outcome=Defective auto-created a work order for this asset.</summary>
     public int? WorkOrderId { get; set; } public virtual WorkOrder? WorkOrder { get; set; }
 
+    public virtual ICollection<InspectionItemMaintenanceAction> MaintenanceActions { get; set; } = new List<InspectionItemMaintenanceAction>();
+
     public static readonly string[] Outcomes = ["Pending", "OK", "Defective"];
+}
+
+/// <summary>Fixed, admin-manageable catalog of maintenance actions an employee can log against an
+/// inspected asset (e.g. "Cleaned Outer Unit", "Replaced Filter") — a log entry only, never gates
+/// the OK/Defective outcome. Flat, not category-scoped (unlike AssetActionType).</summary>
+public class MaintenanceActionType
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>One maintenance action logged against one inspection checklist item — an employee may
+/// log several per asset (e.g. cleaned + replaced filter).</summary>
+public class InspectionItemMaintenanceAction
+{
+    public int Id { get; set; }
+    public int InspectionRunAssetId { get; set; } public virtual InspectionRunAsset InspectionRunAsset { get; set; } = null!;
+    public int MaintenanceActionTypeId { get; set; } public virtual MaintenanceActionType MaintenanceActionType { get; set; } = null!;
 }

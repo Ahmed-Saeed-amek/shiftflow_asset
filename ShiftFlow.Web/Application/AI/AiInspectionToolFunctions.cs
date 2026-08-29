@@ -27,7 +27,6 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     {
         id = o.Id,
         orderNumber = o.OrderNumber,
-        title = o.Title,
         status = o.Status,
         assignedTo = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
         dueDate = o.DueDate?.ToString("yyyy-MM-dd"),
@@ -57,7 +56,6 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         {
             id = order.Id,
             orderNumber = order.OrderNumber,
-            title = order.Title,
             description = order.Description,
             status = order.Status,
             dueDate = order.DueDate?.ToString("yyyy-MM-dd"),
@@ -68,7 +66,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
                 assetTag = i.Asset.AssetTag,
                 assetName = i.Asset.Name,
                 outcome = i.Outcome,
-                notes = i.Notes,
+                maintenanceActions = i.MaintenanceActions.Select(m => m.MaintenanceActionType.Name),
             }),
         };
     }
@@ -120,7 +118,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         };
     }
 
-    public async Task<object> CreateInspectionOrderAsync(string title, string? description, string? assignedToUserId,
+    public async Task<object> CreateInspectionOrderAsync(string? description, string? assignedToUserId,
         int? assignedToTeamId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct)
     {
         // zoneId is an AI-facing convenience ("inspect zone X") — resolve it to concrete asset ids
@@ -132,7 +130,14 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
             foreach (var id in zoneAssetIds)
                 if (!resolvedAssetIds.Contains(id)) resolvedAssetIds.Add(id);
         }
-        var order = await _orders.CreateAsync(title, description, assignedToUserId, assignedToTeamId, resolvedAssetIds, dueDate, userId);
+        // The AI tool always creates the full "tracks defect outcome" order type (was the hardcoded
+        // "Inspection" kind) rather than a lighter type like Quick Check — falls back to any active
+        // type if that one was renamed/deactivated.
+        var orderTypeId = await _db.OrderTypes
+            .Where(t => t.IsActive)
+            .OrderByDescending(t => t.TracksDefectOutcome).ThenBy(t => t.SortOrder)
+            .Select(t => t.Id).FirstOrDefaultAsync(ct);
+        var order = await _orders.CreateAsync(orderTypeId, description, assignedToUserId, assignedToTeamId, resolvedAssetIds, dueDate, userId);
         return new { success = true, id = order.Id, orderNumber = order.OrderNumber };
     }
 
@@ -152,7 +157,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
             workOrderId = wo.Id;
         }
 
-        await _orders.UpdateInspectionItemAsync(itemId, outcome, notes, workOrderId, userId);
+        await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, null, userId);
         return new { success = true, outcome, workOrderId };
     }
 

@@ -11,7 +11,7 @@ public interface IAiInspectionToolFunctions
     Task<object> GetTeamDetailAsync(int teamId, string userId, CancellationToken ct);
 
     // ── Writes ────────────────────────────────────────────────────────────────
-    Task<object> CreateInspectionOrderAsync(string title, string? description, string? assignedToUserId,
+    Task<object> CreateInspectionOrderAsync(string? description, string? assignedToUserId,
         int? assignedToTeamId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct);
     Task<object> ReportInspectionOutcomeAsync(int itemId, string outcome, string? notes, int? actionTypeId, int? causeId, string userId, CancellationToken ct);
     Task<object> CancelInspectionOrderAsync(int orderId, string userId, CancellationToken ct);

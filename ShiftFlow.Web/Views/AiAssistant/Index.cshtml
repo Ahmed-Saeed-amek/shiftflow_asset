@@ -50,18 +50,6 @@
 
     .ai-side-card-header h6 { margin: 0; font-weight: 600; font-size: .9rem; color: #374151; }
 
-    .ai-powered-by {
-        background: rgba(14,165,233,.06);
-        border: 1px solid rgba(14,165,233,.15);
-        border-radius: 12px;
-        padding: .9rem 1rem;
-        font-size: .72rem;
-        color: #0369a1;
-    }
-
-    .ai-powered-by p { margin: 0 0 .4rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .7; }
-    .ai-powered-by ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .2rem; }
-
     .ai-chat-wrap {
         display: flex;
         flex-direction: column;
@@ -73,14 +61,6 @@
         border-radius: 12px;
         box-shadow: 0 2px 16px rgba(14,165,233,.08);
         overflow: hidden;
-    }
-
-    @@media (max-width: 900px) {
-        .ai-layout { flex-direction: column; }
-        .ai-side { width: 100%; flex-direction: row; flex-wrap: wrap; }
-        .ai-side-card { flex: 1; min-width: 260px; }
-        .ai-powered-by { flex-basis: 100%; }
-        .ai-chat-wrap { height: calc(100vh - 340px); min-height: 420px; }
     }
 
     .ai-messages {
@@ -120,6 +100,27 @@
     .ai-bubble ul, .ai-bubble ol { margin: 0 0 .5rem; padding-inline-start: 1.25rem; }
     .ai-bubble li { margin-bottom: .15rem; }
     .ai-bubble strong { font-weight: 600; }
+
+    /* Responsive 16:9 embed for getAssetRepairGuidance video suggestions. max-width keeps
+       it from overflowing the bubble's max-width on the (rare) very wide viewport. */
+    .ai-video-embed {
+        position: relative;
+        width: 100%;
+        max-width: 360px;
+        aspect-ratio: 16 / 9;
+        margin: .4rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+    }
+
+    .ai-video-embed iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
 
     .ai-typing {
         align-self: flex-start;
@@ -207,6 +208,13 @@
         transition: background .15s;
         flex-shrink: 0;
     }
+
+    .btn-mic-stop {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+
+    .btn-mic-stop:hover { background: #FECACA; }
 
     .btn-mic.listening {
         background: #F59E0B;
@@ -311,6 +319,52 @@
     }
 
     @@keyframes aiAvatarSpin { to { transform: rotate(360deg); } }
+
+    /* Below the tablet breakpoint the old layout stacked a full 9:16 avatar panel on top of
+       the chat panel — on a phone that pushed the conversation almost entirely off-screen, so
+       in practice you could see the avatar OR scroll down to the chat, never both at once.
+       Instead, shrink the avatar into a small rectangular picture-in-picture card that floats
+       over the top-right corner of the chat, which now gets the full available height. */
+    @@media (max-width: 900px) {
+        .ai-layout { position: relative; flex-direction: column; }
+
+        .ai-side {
+            position: absolute;
+            top: .5rem;
+            inset-inline-end: .5rem;
+            width: 110px;
+            z-index: 5;
+            gap: 0;
+        }
+
+        .ai-side-card {
+            padding: 0;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.2);
+        }
+
+        .ai-side-card-header { display: none; }
+
+        .ai-avatar-scene {
+            width: 100%;
+            max-width: 110px;
+            aspect-ratio: 3 / 4;
+            border-radius: 12px;
+            border-width: 2px;
+            margin: 0;
+        }
+
+        .ai-avatar-overlay {
+            font-size: .55rem;
+            padding: .3rem;
+            gap: .3rem;
+        }
+
+        .ai-avatar-overlay span { display: none; }
+        .ai-avatar-spinner { width: 16px; height: 16px; }
+
+        .ai-chat-wrap { width: 100%; height: calc(100dvh - 140px); min-height: 600px; }
+    }
 </style>
 
 <div class="ai-page-header">
@@ -337,15 +391,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="ai-powered-by">
-            <p>@Loc.T("Powered by")</p>
-            <ul>
-                <li>Azure AI TTS Avatar (Harry)</li>
-                <li>Azure AI Speech (STT)</li>
-                <li>OpenAI GPT-4o</li>
-            </ul>
-        </div>
     </div>
 
     <div class="ai-chat-wrap">
@@ -356,16 +401,21 @@
 
         <div class="ai-messages" id="aiMessages">
             <div class="ai-bubble assistant">
-                @Loc.T("Hi! I'm your ShiftFlow AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?")
+                @Loc.T("Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?")
             </div>
             <div class="ai-typing" id="aiTyping">
                 <span></span><span></span><span></span>
             </div>
         </div>
 
-        <button class="btn-mic ai-mic-standalone" id="btnMic" title="@Loc.T("Voice input")" onclick="toggleMic()">
-            <i class="bi bi-mic" id="micIcon"></i>
-        </button>
+        <div class="ai-mic-standalone d-flex gap-2 justify-content-center">
+            <button class="btn-mic" id="btnMic" title="@Loc.T("Voice input")" onclick="toggleMic()">
+                <i class="bi bi-mic" id="micIcon"></i>
+            </button>
+            <button class="btn-mic btn-mic-stop d-none" id="btnStopSpeak" title="@Loc.T("Stop speaking")" onclick="stopCurrentSpeech()">
+                <i class="bi bi-stop-fill"></i>
+            </button>
+        </div>
 
         <div class="ai-input-row">
             <input type="text" id="aiInput" placeholder="@Loc.T("Ask me anything about inspection orders...")" maxlength="500"
@@ -431,6 +481,12 @@
             speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(d.token, d.region);
             speechConfig.speechRecognitionLanguage = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(speechLocale));
             speechConfig.speechSynthesisVoiceName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(speechVoice));
+            // Azure's default end-of-speech silence detection is ~500ms-1s, which cut the
+            // mic off after any brief thinking pause — stretch it to 2s so a pause mid-sentence
+            // doesn't end the turn early. Both properties control the same behavior across
+            // SDK versions/paths, so set both.
+            speechConfig.setProperty(SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "2000");
+            speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "2000");
         } catch (e) { console.warn('AI Assistant: speech unavailable —', e); }
         document.getElementById('btnMic').style.display = speechConfig ? '' : 'none';
     }
@@ -439,6 +495,10 @@
         const scene = document.getElementById('avatarScene');
         scene.classList.remove('state-listening', 'state-thinking', 'state-speaking');
         if (state) scene.classList.add('state-' + state);
+        // The stop button only makes sense while the assistant is actually talking —
+        // both speakText (avatar/audio-only) and stopCurrentSpeech route through this
+        // function, so gating visibility here keeps it in sync automatically.
+        document.getElementById('btnStopSpeak').classList.toggle('d-none', state !== 'speaking');
     }
 
     function showAvatarOverlay(text, isError) {
@@ -512,6 +572,10 @@
     }
 
     function startListening() {
+        // Talking over the assistant interrupts it right away — don't wait for the
+        // recognized text to be sent before cutting its voice off.
+        stopCurrentSpeech();
+
         isListening = true;
         document.getElementById('btnMic').classList.add('listening');
         document.getElementById('micIcon').className = 'bi bi-mic-fill';
@@ -519,6 +583,12 @@
 
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
         recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+        // Live interim preview while still speaking, so there's feedback during the
+        // (now longer) pause before Azure decides the utterance is finished.
+        recognizer.recognizing = (s, e) => {
+            if (e.result.text) document.getElementById('aiInput').value = e.result.text;
+        };
 
         recognizer.recognizeOnceAsync(result => {
             stopListening();
@@ -536,6 +606,26 @@
         setAvatarState(null);
         recognizer?.close();
         recognizer = null;
+    }
+
+    // Tracks whichever audio-only synthesizer is currently speaking, if any, so a new
+    // message can interrupt it (the real-time Avatar interrupts via its own
+    // stopSpeakingAsync instead — see stopCurrentSpeech below).
+    let currentAudioSynth = null;
+
+    // Cuts off whatever the assistant is currently saying — called at the start of every
+    // new send/mic-open so an in-flight reply never talks over a newer one, and wired to
+    // the explicit stop button next to the mic.
+    function stopCurrentSpeech() {
+        if (avatarReady && avatarSynth) {
+            avatarSynth.stopSpeakingAsync().catch(() => {});
+        }
+        if (currentAudioSynth) {
+            const s = currentAudioSynth;
+            currentAudioSynth = null;
+            try { s.close(); } catch { /* already closing/closed */ }
+        }
+        setAvatarState(null);
     }
 
     async function speakText(text, voice) {
@@ -569,7 +659,12 @@
         if (voice) speechConfig.speechSynthesisVoiceName = voice;
         const audioConfig = SpeechSDK.AudioConfig.fromDefaultSpeakerOutput();
         const synth = new SpeechSDK.SpeechSynthesizer(speechConfig, audioConfig);
-        const stopSpeaking = () => { setAvatarState(null); synth.close(); };
+        currentAudioSynth = synth;
+        const stopSpeaking = () => {
+            setAvatarState(null);
+            if (currentAudioSynth === synth) currentAudioSynth = null;
+            synth.close();
+        };
         synth.speakTextAsync(text, stopSpeaking, stopSpeaking);
     }
 
@@ -587,6 +682,10 @@
     }
 
     async function doSend(text) {
+        // A new message always wins — cut off whatever the assistant is still saying
+        // from the previous turn instead of talking over it.
+        stopCurrentSpeech();
+
         isBusy = true;
         document.getElementById('btnSend').disabled = true;
 
@@ -609,7 +708,9 @@
                 showTyping(false);
                 addBubble(answer, 'assistant');
                 messages.push({ role: 'assistant', text: answer });
-                if (data.voice) await speakText(answer, data.voice);
+                // Fire-and-forget: speech playback must not hold the send button disabled —
+                // the user can send the next message while this one is still talking.
+                if (data.voice) speakText(stripForSpeech(answer), data.voice);
                 else setAvatarState(null);
             } else {
                 showTyping(false);
@@ -627,12 +728,59 @@
         }
     }
 
+    // Speech-only cleanup: [label](url) links (video suggestions from getAssetRepairGuidance,
+    // or any other link the model includes) render as an embed/clickable link visually — read
+    // aloud, only the label makes sense, not a URL. Also drops any bare URL not wrapped in
+    // markdown link syntax, and the literal ** markers around bold text, so none of that gets
+    // spoken verbatim by the TTS voice.
+    function stripForSpeech(t) {
+        return t
+            .replace(/\[([^\]]+)\]\(\S+?\)/g, '$1')
+            .replace(/https?:\/\/\S+/g, '')
+            .replace(/\*\*(.+?)\*\*/g, '$1');
+    }
+
     // Minimal, safe Markdown-ish formatter for assistant replies: escapes HTML first
     // (the text still ultimately comes from an LLM completion, so never trust it as raw
     // HTML), then applies a small set of well-understood patterns — bold, numbered/bulleted
-    // lists, line breaks — rather than pulling in a full markdown library for a chat bubble.
+    // lists, line breaks, links — rather than pulling in a full markdown library for a chat bubble.
     function formatAiText(text) {
         const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        // getAssetRepairGuidance always constructs video links in exactly this shape
+        // (https://www.youtube.com/watch?v=<11-char-id>) — re-validated here rather than
+        // trusted from the model's text, since a video ID is the only thing ever used to
+        // build an iframe src. Matches youtube.com only; nothing else gets embedded.
+        const YT_RE = /^https:\/\/www\.youtube\.com\/watch\?v=([A-Za-z0-9_-]{11})$/;
+
+        // Converts markdown [label](url) links found in one line into safe HTML: a YouTube
+        // video link becomes an embedded player instead of a plain link, anything else
+        // becomes a normal target=_blank link. Everything outside a recognized link syntax
+        // is HTML-escaped — this replaces the old whole-line escapeHtml() call, not a
+        // supplement to it, so no raw text ever reaches the DOM unescaped.
+        function linkify(rawLine) {
+            const re = /\[([^\]]+)\]\((\S+?)\)/g;
+            let out = '';
+            let last = 0;
+            let m;
+            while ((m = re.exec(rawLine))) {
+                out += escapeHtml(rawLine.slice(last, m.index));
+                const label = m[1], url = m[2];
+                const yt = YT_RE.exec(url);
+                if (yt) {
+                    out += `<div class="ai-video-embed"><iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" ` +
+                        `title="${escapeHtml(label)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ` +
+                        `allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+                } else if (/^https:\/\//.test(url)) {
+                    out += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+                } else {
+                    out += escapeHtml(m[0]);
+                }
+                last = re.lastIndex;
+            }
+            out += escapeHtml(rawLine.slice(last));
+            return out;
+        }
 
         const lines = text.split('\n');
         let html = '';
@@ -643,7 +791,7 @@
         }
 
         for (const rawLine of lines) {
-            const line = escapeHtml(rawLine).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            const line = linkify(rawLine).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
             const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
             const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
 

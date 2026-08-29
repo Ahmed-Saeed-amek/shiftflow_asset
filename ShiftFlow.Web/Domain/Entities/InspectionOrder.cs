@@ -7,7 +7,6 @@ public class InspectionOrder
 {
     public int Id { get; set; }
     public string OrderNumber { get; set; } = "";      // "INS-{year}-{seq:D4}", same pattern as WorkOrder.WorkOrderNumber
-    public string Title { get; set; } = "";
     public string? Description { get; set; }
 
     // Exactly one of these two is set — enforced in the service layer + a DB CHECK constraint.
@@ -22,6 +21,9 @@ public class InspectionOrder
     /// <summary>Open (nothing reported) -> InProgress (first item reported) -> Done (every item non-Pending)</summary>
     public string Status { get; set; } = "Open";
     public static readonly string[] Statuses = ["Open", "InProgress", "Done"];
+
+    /// <summary>The admin-managed order type this order was created as — decides whether items require Action Type/Cause on Defective (OrderType.TracksDefectOutcome) and whether a defect routes to a vendor-required WorkOrder (OrderType.RequiresVendor).</summary>
+    public int OrderTypeId { get; set; } public virtual OrderType? OrderType { get; set; }
 
     public virtual InspectionRun? InspectionRun { get; set; }
 }

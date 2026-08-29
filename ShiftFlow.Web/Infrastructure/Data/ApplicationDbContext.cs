@@ -18,6 +18,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<InspectionRun> InspectionRuns => Set<InspectionRun>();
     public DbSet<InspectionRunAsset> InspectionRunAssets => Set<InspectionRunAsset>();
+    public DbSet<MaintenanceActionType> MaintenanceActionTypes => Set<MaintenanceActionType>();
+    public DbSet<InspectionItemMaintenanceAction> InspectionItemMaintenanceActions => Set<InspectionItemMaintenanceAction>();
 
     // -- RBAC
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -26,9 +28,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     // ── Asset Management ─────────────────────────────────────────────────────
     public DbSet<AssetCategory> AssetCategories => Set<AssetCategory>();
-    public DbSet<Governorate> Governorates => Set<Governorate>();
-    public DbSet<Area> Areas => Set<Area>();
-    public DbSet<Block> Blocks => Set<Block>();
+    public DbSet<LocationCategory> LocationCategories => Set<LocationCategory>();
     public DbSet<Zone> Zones => Set<Zone>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
@@ -42,6 +42,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
     public DbSet<WorkOrderBlockReason> WorkOrderBlockReasons => Set<WorkOrderBlockReason>();
     public DbSet<WorkOrderAttachment> WorkOrderAttachments => Set<WorkOrderAttachment>();
+    public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
+    public DbSet<MaintenanceOrderPart> MaintenanceOrderParts => Set<MaintenanceOrderPart>();
+    public DbSet<OrderType> OrderTypes => Set<OrderType>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -94,7 +97,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasKey(o => o.Id);
             e.Property(o => o.OrderNumber).HasMaxLength(30).IsRequired();
-            e.Property(o => o.Title).HasMaxLength(300).IsRequired();
             e.Property(o => o.Status).HasMaxLength(20).IsRequired();
             e.HasIndex(o => o.OrderNumber).IsUnique();
             e.HasIndex(o => o.Status);
@@ -104,6 +106,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(o => o.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.CreatedByUser).WithMany()
                 .HasForeignKey(o => o.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(o => o.OrderType).WithMany()
+                .HasForeignKey(o => o.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_InspectionOrder_ExactlyOneAssignee",
@@ -133,6 +137,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(i => i.WorkOrder).WithMany()
                 .HasForeignKey(i => i.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(i => i.InspectionRunId);
+        });
+        b.Entity<MaintenanceActionType>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.Name).HasMaxLength(150).IsRequired();
+            e.HasIndex(m => m.Name).IsUnique();
+        });
+        b.Entity<InspectionItemMaintenanceAction>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.HasIndex(m => new { m.InspectionRunAssetId, m.MaintenanceActionTypeId }).IsUnique();
+            e.HasOne(m => m.InspectionRunAsset).WithMany(i => i.MaintenanceActions)
+                .HasForeignKey(m => m.InspectionRunAssetId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(m => m.MaintenanceActionType).WithMany()
+                .HasForeignKey(m => m.MaintenanceActionTypeId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ── RBAC ──────────────────────────────────────────────────────────────
@@ -168,35 +187,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(c => c.ParentCategory).WithMany(c => c.Subcategories)
                 .HasForeignKey(c => c.ParentCategoryId).OnDelete(DeleteBehavior.Restrict);
         });
-        // ── Asset Location hierarchy (Governorate → Area → Block → Zone) ────────
-        b.Entity<Governorate>(e =>
+        // ── Asset Location model (LocationCategory → Zone) ──────────────────────
+        b.Entity<LocationCategory>(e =>
         {
-            e.HasKey(g => g.Id);
-            e.Property(g => g.Name).HasMaxLength(100).IsRequired();
-            e.HasIndex(g => g.Name).IsUnique();
-        });
-        b.Entity<Area>(e =>
-        {
-            e.HasKey(a => a.Id);
-            e.Property(a => a.Name).HasMaxLength(150).IsRequired();
-            e.HasIndex(a => new { a.GovernorateId, a.Name }).IsUnique();
-            e.HasOne(a => a.Governorate).WithMany(g => g.Areas)
-                .HasForeignKey(a => a.GovernorateId).OnDelete(DeleteBehavior.Restrict);
-        });
-        b.Entity<Block>(e =>
-        {
-            e.HasKey(bl => bl.Id);
-            e.HasIndex(bl => new { bl.AreaId, bl.Number }).IsUnique();
-            e.HasOne(bl => bl.Area).WithMany(a => a.Blocks)
-                .HasForeignKey(bl => bl.AreaId).OnDelete(DeleteBehavior.Restrict);
+            e.HasKey(c => c.Id);
+            e.Property(c => c.Name).HasMaxLength(100).IsRequired();
+            e.HasIndex(c => c.Name).IsUnique();
         });
         b.Entity<Zone>(e =>
         {
             e.HasKey(z => z.Id);
             e.Property(z => z.Name).HasMaxLength(150).IsRequired();
-            e.HasIndex(z => new { z.BlockId, z.Name }).IsUnique();
-            e.HasOne(z => z.Block).WithMany(bl => bl.Zones)
-                .HasForeignKey(z => z.BlockId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(z => new { z.LocationCategoryId, z.Name }).IsUnique();
+            e.HasOne(z => z.LocationCategory).WithMany(c => c.Zones)
+                .HasForeignKey(z => z.LocationCategoryId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Asset>(e =>
@@ -237,6 +241,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.Property(w => w.WorkOrderNumber).HasMaxLength(30).IsRequired();
             e.Property(w => w.Priority).HasMaxLength(20).IsRequired();
             e.Property(w => w.Stage).HasMaxLength(40).IsRequired();
+            e.Property(w => w.RequiresVendorResponse).HasDefaultValue(false);
             e.Property(w => w.FixCost).HasColumnType("decimal(12,2)");
             e.HasIndex(w => w.WorkOrderNumber).IsUnique();
             e.HasIndex(w => new { w.Stage, w.Priority });
@@ -245,6 +250,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(w => w.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(w => w.Vendor).WithMany(v => v.WorkOrders)
                 .HasForeignKey(w => w.VendorId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(w => w.AssignedToUser).WithMany()
+                .HasForeignKey(w => w.AssignedToUserId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(w => w.CreatedByUser).WithMany()
                 .HasForeignKey(w => w.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(w => w.ActionType).WithMany()
@@ -286,6 +293,39 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(a => a.UploadedByUser).WithMany()
                 .HasForeignKey(a => a.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
+        b.Entity<MaintenanceOrder>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.OrderNumber).HasMaxLength(30).IsRequired();
+            e.Property(m => m.Status).HasMaxLength(20).IsRequired();
+            e.Property(m => m.Cost).HasColumnType("decimal(12,2)");
+            e.HasIndex(m => m.OrderNumber).IsUnique();
+            e.HasIndex(m => m.AssetId);
+            e.HasIndex(m => m.Status);
+            e.HasOne(m => m.Asset).WithMany()
+                .HasForeignKey(m => m.AssetId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.AssignedToUser).WithMany()
+                .HasForeignKey(m => m.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.CreatedByUser).WithMany()
+                .HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.OrderType).WithMany()
+                .HasForeignKey(m => m.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OrderType>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Name).HasMaxLength(150).IsRequired();
+            e.Property(t => t.NameAr).HasMaxLength(150);
+            e.Property(t => t.Prefix).HasMaxLength(10).IsRequired();
+            e.HasIndex(t => t.Name).IsUnique();
+        });
+        b.Entity<MaintenanceOrderPart>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            e.HasOne(p => p.MaintenanceOrder).WithMany(m => m.Parts)
+                .HasForeignKey(p => p.MaintenanceOrderId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<AssetActionType>(e =>
         {
             e.HasKey(a => a.Id);
@@ -324,10 +364,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         b.Entity<UserAssetScope>(e =>
         {
             e.HasKey(s => s.Id);
-            e.Property(s => s.ScopeType).HasMaxLength(20).IsRequired();
             e.HasIndex(s => s.UserId).IsUnique();
             e.HasOne(s => s.User).WithMany()
                 .HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.Zone).WithMany()
+                .HasForeignKey(s => s.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.LocationCategory).WithMany()
+                .HasForeignKey(s => s.LocationCategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.Category).WithMany()
+                .HasForeignKey(s => s.CategoryId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<WorkOrderStageEvent>(e =>
         {

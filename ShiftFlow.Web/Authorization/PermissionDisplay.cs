@@ -39,6 +39,7 @@ public static class PermissionDisplay
         [PermissionCatalog.AiAssistantUse]           = "Use AI Assistant",
         [PermissionCatalog.AuditLogView]             = "View Audit Log",
         [PermissionCatalog.RbacManage]                = "Manage Roles & Permissions",
+        [PermissionCatalog.OrderTypeManage]          = "Manage Order Types",
         [PermissionCatalog.IsAdmin]                  = "Full Administrator Access",
     };
 

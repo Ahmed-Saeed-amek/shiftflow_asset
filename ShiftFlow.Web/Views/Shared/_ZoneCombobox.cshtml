@@ -1,0 +1,26 @@
+@*
+    Reusable Location Category -> searchable Zone picker.
+    Usage:
+      <partial name="_ZoneCombobox" model='new ZoneComboboxModel {
+          Name = "ZoneId", LocationCategories = locationCategories,
+          SelectedLocationCategoryId = Model.LocationCategoryId, SelectedZoneId = Model.ZoneId, SelectedZoneLabel = zoneName }' />
+    The hidden input carries the selected zone id under the given Name, so existing
+    form-post contracts (asp-for / name) are unchanged.
+*@
+@model ShiftFlow.Web.ViewModels.ZoneComboboxModel
+<div class="zone-combobox" data-zone-combobox>
+    <select class="form-select mb-2" data-zc-category>
+        <option value="">@Loc.T("Location Category")</option>
+        @foreach (var c in Model.LocationCategories)
+        {
+            <option value="@c.Id" selected="@(Model.SelectedLocationCategoryId == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+        }
+    </select>
+    <div class="position-relative">
+        <input type="hidden" name="@Model.Name" value="@Model.SelectedZoneId" data-zc-value />
+        <input type="text" class="form-control @Model.CssClass" autocomplete="off"
+               placeholder="@(Model.Placeholder ?? Loc.T("Search zones…"))"
+               value="@Model.SelectedZoneLabel" data-zc-search />
+        <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-zc-results></div>
+    </div>
+</div>

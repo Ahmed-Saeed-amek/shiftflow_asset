@@ -47,47 +47,23 @@
         </select>
     </div>
     <div class="col-auto">
-        <select name="governorateId" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Governorate")</option>
-            @foreach (var gov in (List<Governorate>)ViewBag.Governorates)
+        <select name="locationCategoryId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">@Loc.T("Location Category")</option>
+            @foreach (var cat in (List<LocationCategory>)ViewBag.LocationCategories)
             {
-                <option value="@gov.Id" selected="@(ViewBag.GovernorateId==gov.Id)">@Loc.LocalizedName(gov.Name, gov.NameAr)</option>
+                <option value="@cat.Id" selected="@(ViewBag.LocationCategoryId==cat.Id)">@Loc.LocalizedName(cat.Name, cat.NameAr)</option>
             }
         </select>
     </div>
-    @if (ViewBag.GovernorateId != null)
-    {
-        <div class="col-auto">
-            <select name="areaId" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">@Loc.T("Area")</option>
-                @foreach (var ar in (List<Area>)ViewBag.Areas)
-                {
-                    <option value="@ar.Id" selected="@(ViewBag.AreaId==ar.Id)">@Loc.LocalizedName(ar.Name, ar.NameAr)</option>
-                }
-            </select>
-        </div>
-    }
-    @if (ViewBag.AreaId != null)
-    {
-        <div class="col-auto">
-            <select name="blockId" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">@Loc.T("Block")</option>
-                @foreach (var bl in (List<Block>)ViewBag.Blocks)
-                {
-                    <option value="@bl.Id" selected="@(ViewBag.BlockId==bl.Id)">@bl.Number</option>
-                }
-            </select>
-        </div>
-    }
     <div class="col-auto">
         <select name="zoneId" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">@Loc.T("Zone")</option>
-            @foreach (var g in ((List<Zone>)ViewBag.Zones).GroupBy(z => z.Block!.Area!.Governorate!.Name))
+            @foreach (var g in ((List<Zone>)ViewBag.Zones).GroupBy(z => z.LocationCategory!.Name))
             {
                 <optgroup label="@g.Key">
                     @foreach (var z in g)
                     {
-                        <option value="@z.Id" selected="@(ViewBag.ZoneId==z.Id)">@z.Block!.Area!.Name (Block @z.Block.Number) — @z.Name</option>
+                        <option value="@z.Id" selected="@(ViewBag.ZoneId==z.Id)">@z.Name</option>
                     }
                 </optgroup>
             }
@@ -96,7 +72,7 @@
     <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
     </div>
-    @if (ViewBag.GovernorateId != null || ViewBag.AreaId != null || ViewBag.BlockId != null || ViewBag.ZoneId != null || ViewBag.CategoryId != null || ViewBag.Status != null || !string.IsNullOrEmpty((string)ViewBag.Q))
+    @if (ViewBag.LocationCategoryId != null || ViewBag.ZoneId != null || ViewBag.CategoryId != null || ViewBag.Status != null || !string.IsNullOrEmpty((string)ViewBag.Q))
     {
         <div class="col-auto">
             <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")</a>
@@ -120,7 +96,7 @@
                         <td class="small text-muted font-monospace">@a.AssetTag</td>
                         <td>@a.Name</td>
                         <td>@a.Category?.Name</td>
-                        <td class="small">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null))</span></td>
+                        <td class="small">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
                         <td><partial name="_StatusBadge" model="@a.Status" /></td>
                         <td onclick="event.stopPropagation()">
                             @if (canManage)

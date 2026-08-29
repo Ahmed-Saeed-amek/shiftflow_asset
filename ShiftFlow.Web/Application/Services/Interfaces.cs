@@ -34,12 +34,18 @@ public class DashboardKpis{public int TotalEngineers{get;set;}public int OpenIns
 // ── Inspection Orders / Teams ────────────────────────────────────────────────
 public interface IInspectionOrderService
 {
-    Task<InspectionOrder> CreateAsync(string title, string? description, string? assignedToUserId, int? assignedToTeamId,
+    Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
         List<int>? assetIds, DateTime? dueDate, string createdByUserId);
     Task<InspectionOrder?> GetByIdAsync(int id);
-    Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false);
+    Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
     Task<List<InspectionOrder>> GetAllAsync(string? status, string? search);
-    Task UpdateInspectionItemAsync(int itemId, string outcome, string? notes, int? workOrderId, string updatedByUserId);
+    Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
+    /// <summary>Records maintenance actions performed on an asset independent of the OK/Defective
+    /// outcome decision — logs what maintenance was done without requiring (or changing) an
+    /// outcome, unlike UpdateInspectionItemAsync. Safe to call on an item at any point, including
+    /// after its outcome is already recorded, since it never touches Outcome/WorkOrderId or the
+    /// order's completion status.</summary>
+    Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
     Task CancelAsync(int orderId, string userId);
     Task<byte[]> ExportToExcelAsync();
 }
@@ -54,6 +60,8 @@ public interface ITeamService
     Task AddMemberAsync(int teamId, string userId, string actingUserId);
     Task RemoveMemberAsync(int teamId, string userId, string actingUserId);
     Task<bool> IsMemberAsync(int teamId, string userId);
+    /// <summary>Reconciles a team's membership to exactly the given list — used by the Edit page instead of separate AddMember/RemoveMember calls.</summary>
+    Task SetMembersAsync(int teamId, List<string> memberUserIds, string actingUserId);
 }
 
 // ── Asset Management ─────────────────────────────────────────────────────────
@@ -109,12 +117,20 @@ public interface IWorkOrderService
     Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId);
     /// <summary>Employee-facing report — creates a WorkOrder with Stage="Draft", outside the normal pipeline, awaiting admin review.</summary>
     Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId);
-    /// <summary>Admin approves a Draft: edits priority/description/notes, resolves the given Service-contract vendor, and sends it straight to that vendor (Stage="Sent to Vendor"). Throws if vendorId isn't one of the asset's active Service-contract vendors.</summary>
-    Task AcceptAsync(int workOrderId, int vendorId, string priority, string? description, string? notes, string userId);
+    /// <summary>Admin approves a Draft: sets priority, and either sends it to any active vendor (Stage="Sent to Vendor") or — when only an employee is assigned, no vendor — moves it straight to "New" so the employee's Report Fix action becomes available. Requires at least one of vendorId/the work order's own AssignedToUserId to be set.</summary>
+    Task AcceptAsync(int workOrderId, int? vendorId, string priority, string userId);
     /// <summary>Admin dismisses a Draft as not actionable — terminal state, stays out of the active pipeline.</summary>
     Task RejectAsync(int workOrderId, string? reason, string userId);
-    /// <summary>Sends an admin-created ("New") work order to a resolved Service-contract vendor — Stage="Sent to Vendor".</summary>
+    /// <summary>Sends an admin-created ("New") work order to any active vendor — Stage="Sent to Vendor".</summary>
     Task SendToVendorAsync(int workOrderId, int vendorId, string userId);
+    /// <summary>Admin assigns/reassigns/clears the internal employee on a work order — independent of and combinable with VendorId, usable at any stage.</summary>
+    Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId);
+    /// <summary>The assigned employee's own equivalent of VendorFixAsync — only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely).</summary>
+    Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string employeeUserId);
+    /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false — usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
+    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string userId, bool isManager = false);
+    /// <summary>Admin override — force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
+    Task ForceCloseAsync(int workOrderId, string? reason, string userId);
     /// <summary>Vendor submits a fix — Stage="Fixed - Pending Confirmation".</summary>
     Task VendorFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string vendorUserId);
     /// <summary>Vendor reports they can't proceed — Stage="Blocked".</summary>
@@ -131,5 +147,21 @@ public interface IWorkOrderService
     Task<WorkOrder> CreatePreventiveMaintenanceOccurrenceAsync(int assetId, int vendorId, int sourceContractId, DateTime scheduledDate, string? contractNumber, string systemUserId);
     Task<byte[]> ExportToExcelAsync();
     Task<byte[]> ExportToPdfAsync();
+}
+
+public interface IMaintenanceOrderService
+{
+    /// <summary>Admin/manager assigns an employee to fix an asset in-house — no vendor, no Work Order.
+    /// Sets Asset.Status to "Maintenance" (unless Retired).</summary>
+    Task<MaintenanceOrder> CreateAsync(int assetId, string assignedToUserId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
+    /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
+    /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
+    Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(string Name, int Quantity)> parts, string employeeUserId);
+    /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
+    Task CancelAsync(int orderId, string? reason, string userId);
+    Task<MaintenanceOrder?> GetByIdAsync(int id);
+    Task<List<MaintenanceOrder>> GetAllAsync(string? status, string? search);
+    Task<List<MaintenanceOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
+    Task<byte[]> ExportToExcelAsync();
 }
 

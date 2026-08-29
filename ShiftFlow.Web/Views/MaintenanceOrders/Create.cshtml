@@ -1,0 +1,55 @@
+@model MaintenanceOrderCreateVm
+@using ShiftFlow.Domain.Entities
+@{
+    ViewData["Title"] = Loc.T("New Maintenance Order");
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Maintenance Order"),Subtitle=Loc.T("Assign an employee to fix an asset in-house — no vendor, no formal review step")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Assets")</label>
+                    <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
+                        Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
+                        SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
+                    <span asp-validation-for="AssetId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Assigned Employee")</label>
+                    <partial name="_EmployeePicker" model='new EmployeePickerModel {
+                        Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
+                        SelectedLabel = ViewBag.SelectedEmployeeLabel as string,
+                        Placeholder = Loc.T("Search by name or email…") }' />
+                    <span asp-validation-for="AssignedToUserId" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Order Type")</label>
+                    <select asp-for="OrderTypeId" class="form-select">
+                        @foreach (var t in orderTypes)
+                        {
+                            <option value="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+                        }
+                    </select>
+                    <div class="form-text">@Loc.T("Types that require a vendor become a Work Order instead.")</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Due Date")</label>
+                    <input asp-for="DueDate" type="date" class="form-control" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Description")</label>
+                    <textarea asp-for="Description" class="form-control" rows="3" placeholder="@Loc.T("What needs fixing?")"></textarea>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>

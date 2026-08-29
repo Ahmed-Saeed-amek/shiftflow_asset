@@ -18,6 +18,84 @@
       "sourceType": "github",
       "skillPath": "skills/.curated/skill-adapter/SKILL.md",
       "computedHash": "07186734b7b994d3daef91d866b8a4c569c10d1b5276cbb0c1f9e644de05fae5"
+    },
+    "anthropic-frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "35c43b9d10c2388dbb228047ad028c989a14033750812125f351c85aa42c7a4a"
+    },
+    "vercel-web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "17e48da905f83a19c174079b50760a98c069527ba50079239b3c187236627c29"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "3286ace648b4d740317b9c1cb7fbd38600eaacc62a8b57ea5e06fd2992b5582e"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "computedHash": "fb8f849b4d46c0c4d364ae6fb398a5cb693b54f9a4c31765a1ec0689c7cb93d5"
+    },
+    "vercel-react-native-skills": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-skills/SKILL.md",
+      "computedHash": "aff91057282facb41ddc8873a482e19cfb928056fc32b350e1b084b16cb58dc2"
+    },
+    "accesslint-accessibility-audit": {
+      "source": "AccessLint/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/accesslint/skills/accessibility-audit/SKILL.md",
+      "computedHash": "73635812dbdd1dec77773130fd11d05ddab44254a095641203a62758f7011abb"
+    },
+    "accesslint-accessibility-diff": {
+      "source": "AccessLint/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/accesslint/skills/accessibility-diff/SKILL.md",
+      "computedHash": "1a2af7c86d90e2711b792109b82e9ff72b055a87d43cce71846d3aec87496834"
+    },
+    "accesslint-accessibility-fix": {
+      "source": "AccessLint/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/accesslint/skills/accessibility-fix/SKILL.md",
+      "computedHash": "30768f21f845761c7740f4575b5f64eb98168148012a976fa6b1142ded1a3297"
+    },
+    "accesslint-accessibility-inspect": {
+      "source": "AccessLint/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/accesslint/skills/accessibility-inspect/SKILL.md",
+      "computedHash": "bb9fac09102ebafd7cc27eb9acb54b66ab424b0c02515d37e7953d00a90d2458"
+    },
+    "accesslint-accessibility-scan": {
+      "source": "AccessLint/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/accesslint/skills/accessibility-scan/SKILL.md",
+      "computedHash": "de3d06b044ea52b6cf325da7a701fd06bd1ee2a7e1e1f6e19b4a30eb2d3e6f0e"
+    },
+    "bencium-innovative-ux-designer": {
+      "source": "bencium/bencium-marketplace",
+      "sourceType": "github",
+      "skillPath": "bencium-innovative-ux-designer/skills/bencium-innovative-ux-designer/SKILL.md",
+      "computedHash": "f6e19982a2e885023f099f0eaa9cd3eb914092a81acd2c8c61d243e36bab6751"
+    },
+    "bencium-controlled-ux-designer": {
+      "source": "bencium/bencium-marketplace",
+      "sourceType": "github",
+      "skillPath": "bencium-controlled-ux-designer/skills/bencium-controlled-ux-designer/SKILL.md",
+      "computedHash": "96b158a7a7d2a0a73d5601eb16e40b33a1375c92ac1f7b655a881bbc161ee565"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "88aadd21220542083a455e373bd162ffe7843266a71f06f4d837bb3b34f9c9c7"
     }
   }
 }

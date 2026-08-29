@@ -32,7 +32,7 @@
                     <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="small fw-semibold">@o.OrderNumber — @o.Title</div>
+                                <div class="small fw-semibold">@o.OrderNumber</div>
                                 <div class="small text-muted">@(o.DueDate.HasValue ? Loc.T("Due") + " " + o.DueDate.Value.ToString("dd/MM/yyyy") : "")</div>
                             </div>
                             <partial name="_StatusBadge" model="@o.Status" />

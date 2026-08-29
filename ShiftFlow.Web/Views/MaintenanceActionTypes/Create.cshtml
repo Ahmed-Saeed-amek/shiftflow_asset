@@ -1,0 +1,4 @@
+@model MaintenanceActionTypeViewModel
+@{ ViewData["Title"] = Loc.T("New Maintenance Action"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Maintenance Action")})" />
+<partial name="_Form" model="Model" />

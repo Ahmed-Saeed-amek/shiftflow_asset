@@ -23,6 +23,7 @@ public class AiAssistantOrchestrator
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
     private readonly IAiInspectionToolFunctions _tools;
+    private readonly IAssetRepairGuidanceService _repairGuidance;
     private readonly IPermissionService _permissions;
     private readonly IAuditService _audit;
     private readonly OpenAIOptions _openAiOpts;
@@ -31,6 +32,7 @@ public class AiAssistantOrchestrator
 
     public AiAssistantOrchestrator(
         IAiInspectionToolFunctions tools,
+        IAssetRepairGuidanceService repairGuidance,
         IPermissionService permissions,
         IAuditService audit,
         IOptions<OpenAIOptions> openAiOpts,
@@ -38,6 +40,7 @@ public class AiAssistantOrchestrator
         IOptions<AiAssistantOptions> aiOpts)
     {
         _tools = tools;
+        _repairGuidance = repairGuidance;
         _permissions = permissions;
         _audit = audit;
         _openAiOpts = openAiOpts.Value;
@@ -116,7 +119,7 @@ public class AiAssistantOrchestrator
             ? "\n\nAs a manager, you can also: create inspection orders (assigning them to a single employee or a Team, " +
               "targeting either a Zone snapshot or hand-picked assets), cancel inspection orders, create Teams and " +
               "manage their membership, and view any inspection order or team's detail. " +
-              "Before creating an inspection order, confirm the title, assignee (employee or team), and the zone/assets " +
+              "Before creating an inspection order, confirm the assignee (employee or team), and the zone/assets " +
               "to inspect with the user. Before cancelling an order, confirm its order number with the user."
             : "\n\nYou can view your own open inspection orders (assigned to you directly or to a Team you belong to), " +
               "see an order's detail, and report an asset's inspection outcome (OK or Defective — a defect additionally " +
@@ -153,9 +156,18 @@ public class AiAssistantOrchestrator
             "Get a specific Team's members.",
             BinaryData.FromString("""{"type":"object","properties":{"teamId":{"type":"integer","description":"The team ID"}},"required":["teamId"]}""")), null),
 
+        new(ChatTool.CreateFunctionTool("getAssetRepairGuidance",
+            "For a specific tracked asset (by its numeric ID — never invent one; resolve it from a tool result or " +
+            "the conversation first), look up a relevant instructional YouTube video for fixing/repairing/replacing " +
+            "it, plus the asset's own manufacturer/model/category metadata. This is the ONLY way to get a video " +
+            "suggestion — there is no general video/web search capability, so don't claim to search YouTube or the " +
+            "web for anything other than this specific asset.",
+            BinaryData.FromString("""{"type":"object","properties":{"assetId":{"type":"integer","description":"The asset's numeric ID"}},"required":["assetId"]}""")),
+            PermissionCatalog.AssetView),
+
         new(ChatTool.CreateFunctionTool("createInspectionOrder",
-            "Create a new inspection order, assigned to exactly one of a single employee or a Team, targeting either a Zone (every asset in it) or a hand-picked list of asset IDs. Manager-only.",
-            BinaryData.FromString("""{"type":"object","properties":{"title":{"type":"string","description":"Order title"},"description":{"type":"string","description":"Optional description"},"assignedToUserId":{"type":"string","description":"User ID to assign to (mutually exclusive with assignedToTeamId)"},"assignedToTeamId":{"type":"integer","description":"Team ID to assign to (mutually exclusive with assignedToUserId)"},"zoneId":{"type":"integer","description":"Zone ID — every asset in this zone will be inspected"},"assetIds":{"type":"array","items":{"type":"integer"},"description":"Specific asset IDs to inspect, if not using a zone"},"dueDate":{"type":"string","description":"Optional due date, YYYY-MM-DD"}},"required":["title"]}""")),
+            "Create a new inspection order, assigned to exactly one of a single employee or a Team, targeting either a Zone (every asset in it) or a hand-picked list of asset IDs. The order number is auto-generated. Manager-only.",
+            BinaryData.FromString("""{"type":"object","properties":{"description":{"type":"string","description":"Optional description"},"assignedToUserId":{"type":"string","description":"User ID to assign to (mutually exclusive with assignedToTeamId)"},"assignedToTeamId":{"type":"integer","description":"Team ID to assign to (mutually exclusive with assignedToUserId)"},"zoneId":{"type":"integer","description":"Zone ID — every asset in this zone will be inspected"},"assetIds":{"type":"array","items":{"type":"integer"},"description":"Specific asset IDs to inspect, if not using a zone"},"dueDate":{"type":"string","description":"Optional due date, YYYY-MM-DD"}},"required":[]}""")),
             PermissionCatalog.InspectionOrderManage, IsWrite: true),
 
         new(ChatTool.CreateFunctionTool("reportInspectionOutcome",
@@ -226,9 +238,10 @@ public class AiAssistantOrchestrator
             "findEmployee" => await _tools.FindEmployeeAsync(Str(args, "query"), userId, ct),
             "listTeams" => await _tools.ListTeamsAsync(userId, ct),
             "getTeamDetail" => await _tools.GetTeamDetailAsync(Int(args, "teamId", 0), userId, ct),
+            "getAssetRepairGuidance" => await _repairGuidance.GetRepairGuidanceAsync(Int(args, "assetId", 0), userId, ct),
 
             "createInspectionOrder" => await _tools.CreateInspectionOrderAsync(
-                Str(args, "title"), StrOpt(args, "description"), StrOpt(args, "assignedToUserId"),
+                StrOpt(args, "description"), StrOpt(args, "assignedToUserId"),
                 IntOpt(args, "assignedToTeamId"), IntOpt(args, "zoneId"), IntArrOpt(args, "assetIds"),
                 DateOpt(args, "dueDate"), userId, ct),
             "reportInspectionOutcome" => await _tools.ReportInspectionOutcomeAsync(

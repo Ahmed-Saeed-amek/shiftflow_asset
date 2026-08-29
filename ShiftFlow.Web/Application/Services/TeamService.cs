@@ -91,4 +91,27 @@ public class TeamService : ITeamService
 
     public Task<bool> IsMemberAsync(int teamId, string userId) =>
         _db.TeamMembers.AnyAsync(m => m.TeamId == teamId && m.UserId == userId);
+
+    /// <summary>Reconciles a team's membership to exactly the given user id list — diffs against
+    /// the current members and adds/removes only what changed, so the audit trail reads the same
+    /// as the old separate AddMember/RemoveMember actions this replaces on the Edit page.</summary>
+    public async Task SetMembersAsync(int teamId, List<string> memberUserIds, string actingUserId)
+    {
+        var current = await _db.TeamMembers.Where(m => m.TeamId == teamId).ToListAsync();
+        var currentIds = current.Select(m => m.UserId).ToHashSet();
+        var wantedIds = memberUserIds.Distinct().ToHashSet();
+
+        var toRemove = current.Where(m => !wantedIds.Contains(m.UserId)).ToList();
+        var toAddIds = wantedIds.Where(id => !currentIds.Contains(id)).ToList();
+
+        _db.TeamMembers.RemoveRange(toRemove);
+        foreach (var id in toAddIds)
+            _db.TeamMembers.Add(new TeamMember { TeamId = teamId, UserId = id, AddedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync();
+
+        foreach (var m in toRemove)
+            await _audit.LogAsync("RemoveMember", "Team", teamId.ToString(), actingUserId, oldValue: m.UserId);
+        foreach (var id in toAddIds)
+            await _audit.LogAsync("AddMember", "Team", teamId.ToString(), actingUserId, newValue: id);
+    }
 }

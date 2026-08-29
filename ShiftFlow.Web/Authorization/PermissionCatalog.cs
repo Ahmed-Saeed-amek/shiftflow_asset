@@ -47,6 +47,15 @@ public static class PermissionCatalog
     public const string AssetReportAction             = "Asset.ReportAction";
     public const string AssetScopeManage              = "Asset.ScopeManage";
 
+    // ── Maintenance Orders (standalone in-house fix, no vendor/Work Order pipeline) ────
+    public const string MaintenanceOrderView          = "MaintenanceOrder.View";
+    public const string MaintenanceOrderManage        = "MaintenanceOrder.Manage";
+    public const string MaintenanceOrderReport        = "MaintenanceOrder.Report";
+    public const string MaintenanceOrderExport        = "MaintenanceOrder.Export";
+
+    // ── Order Types (shared catalog: Inspection Orders + Maintenance Orders) ──────
+    public const string OrderTypeManage               = "OrderType.Manage";
+
     // ── Super Permission ───────────────────────────────────────────────────────
     /// <summary>Grants every permission and every hardcoded Admin role-check, everywhere (see AdminClaimsTransformation and PermissionService).</summary>
     public const string IsAdmin                     = "System.IsAdmin";
@@ -65,6 +74,8 @@ public static class PermissionCatalog
         VendorView, VendorManage,
         WorkOrderView, WorkOrderManage, WorkOrderAssign, WorkOrderExport,
         ContractView, ContractManage, AssetReportAction, AssetScopeManage,
+        MaintenanceOrderView, MaintenanceOrderManage, MaintenanceOrderReport, MaintenanceOrderExport,
+        OrderTypeManage,
         IsAdmin,
     ];
 }

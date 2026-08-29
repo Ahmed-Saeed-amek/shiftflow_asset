@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Web.Authorization;
@@ -44,7 +45,7 @@ public class AccountController : Controller
         return View();
     }
 
-    [HttpPost, AllowAnonymous, ValidateAntiForgeryToken]
+    [HttpPost, AllowAnonymous, ValidateAntiForgeryToken, EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginViewModel vm, string? returnUrl = null)
     {
         if (!ModelState.IsValid) return View(vm);
@@ -208,8 +209,15 @@ public class AccountController : Controller
     // principal from before this sign-in happened. Mirrors _Layout.cshtml's
     // sidebar's manager-tier sections exactly (both key off InspectionOrder.Manage),
     // so the landing page always matches the sidebar the user is about to see.
-    private static string BuildLandingPath(bool canViewDashboard, string? returnUrl = null, bool isVendor = false) =>
-        returnUrl ?? (isVendor ? "/VendorPortal" : canViewDashboard ? "/Dashboard" : "/MyHome");
+    // LocalRedirect() throws InvalidOperationException on a non-local URL instead of safely
+    // rejecting it, so returnUrl must be validated with Url.IsLocalUrl before it's ever handed
+    // to LocalRedirect() at every call site below — a crafted
+    // POST /Account/Login?ReturnUrl=//evil.example.com/... otherwise crashes the login action
+    // with a raw stack trace instead of just falling back to the default landing page.
+    private string BuildLandingPath(bool canViewDashboard, string? returnUrl = null, bool isVendor = false) =>
+        !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? returnUrl
+            : (isVendor ? "/VendorPortal" : canViewDashboard ? "/Dashboard" : "/MyHome");
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()

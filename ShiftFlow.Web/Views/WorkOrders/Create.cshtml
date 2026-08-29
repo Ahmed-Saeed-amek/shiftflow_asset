@@ -32,6 +32,19 @@
                     <label class="form-label small">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Assigned Employee")</label>
+                    <partial name="_EmployeePicker" model='new EmployeePickerModel {
+                        Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
+                        Placeholder = Loc.T("Search by name or email…") }' />
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="RequiresVendorResponse" class="form-check-input" type="checkbox" />
+                        <label asp-for="RequiresVendorResponse" class="form-check-label small">@Loc.T("Requires vendor response")</label>
+                        <div class="form-text">@Loc.T("When off, a manager or the assigned employee can advance this work order past \"Sent to Vendor\" without waiting on the vendor.")</div>
+                    </div>
+                </div>
             </div>
             <div class="mt-4 d-flex gap-2">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>

@@ -1,0 +1,41 @@
+@model List<MaintenanceOrder>
+@{
+    ViewData["Title"] = Loc.T("My Maintenance Orders");
+    var showAll = (bool)ViewBag.ShowAll;
+    var range = (ViewBag.SelectedRange as string) ?? "month";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("My Maintenance Orders")})" />
+
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <div class="btn-group btn-group-sm">
+        <a class="btn btn-outline-secondary @(range == "month" ? "active" : "")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="month">@Loc.T("This month")</a>
+        <a class="btn btn-outline-secondary @(range == "all" ? "active" : "")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="all">@Loc.T("All time")</a>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <a class="btn btn-outline-secondary @(!showAll ? "active" : "")" asp-action="MyOrders" asp-route-showAll="false" asp-route-range="@range">@Loc.T("Open")</a>
+        <a class="btn btn-outline-secondary @(showAll ? "active" : "")" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="@range">@Loc.T("All")</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Order #")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Status")</th><th>@Loc.T("Due Date")</th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">@(showAll ? Loc.T("No maintenance orders assigned to you.") : Loc.T("No open maintenance orders — you're all caught up."))</td></tr>
+                }
+                @foreach (var m in Model)
+                {
+                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = m.Id })'">
+                        <td class="small font-monospace">@m.OrderNumber</td>
+                        <td class="small">@m.Asset?.AssetTag</td>
+                        <td><partial name="_StatusBadge" model="@m.Status" /></td>
+                        <td class="small">@(m.DueDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

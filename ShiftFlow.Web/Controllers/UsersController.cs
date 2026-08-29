@@ -107,28 +107,33 @@ public class UsersController : Controller
 
     // Read-only list of inspection orders assigned to the current user (directly, or via a
     // Team they belong to). Open work by default; showAll=true also includes Done.
+    // Employees see only this month's tasks by default (range=null -> "month"); pass range=all
+    // for the full history (no date bound), matching MyMetrics' range convention.
     [Authorize]
-    public async Task<IActionResult> MyTasks(bool showAll = false)
+    public async Task<IActionResult> MyTasks(bool showAll = false, string? range = null)
     {
         var id = _um.GetUserId(User)!;
-        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll);
+        var (from, to) = ResolveRange(range ?? "month");
+        ViewBag.SelectedRange = range ?? "month";
+        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
         ViewBag.ShowAll = showAll;
         return View(rows);
     }
 
     // Same query/shape as MyTasks, rendered to PDF instead of HTML.
     [Authorize]
-    public async Task<IActionResult> MyTasksPdf(bool showAll = false)
+    public async Task<IActionResult> MyTasksPdf(bool showAll = false, string? range = null)
     {
         var id = _um.GetUserId(User)!;
         var user = await _um.FindByIdAsync(id);
-        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll);
+        var (from, to) = ResolveRange(range ?? "month");
+        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
 
         var bytes = BuildTasksPdf(rows, user?.FullName ?? user?.Email ?? id, showAll);
         return File(bytes, "application/pdf", $"MyTasks_{DateTime.Today:yyyyMMdd}.pdf");
     }
 
-    private async Task<List<InspectionOrderRow>> BuildMyInspectionOrderRowsAsync(string userId, bool showAll)
+    private async Task<List<InspectionOrderRow>> BuildMyInspectionOrderRowsAsync(string userId, bool showAll, DateTime? from = null, DateTime? to = null)
     {
         var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == userId).Select(m => m.TeamId).ToListAsync();
 
@@ -137,6 +142,8 @@ public class UsersController : Controller
 
         if (!showAll)
             query = query.Where(o => o.Status != "Done");
+        if (from.HasValue) query = query.Where(o => o.CreatedAt >= from.Value);
+        if (to.HasValue) query = query.Where(o => o.CreatedAt <= to.Value);
 
         return await query
             .OrderByDescending(o => o.CreatedAt)
@@ -144,7 +151,7 @@ public class UsersController : Controller
             {
                 OrderId         = o.Id,
                 OrderNumber     = o.OrderNumber,
-                Title           = o.Title,
+                OrderTypeName   = o.OrderType!.Name,
                 Status          = o.Status,
                 DueDate         = o.DueDate,
                 AssignedContext = o.AssignedToUserId == userId ? "Me" : "Team",
@@ -154,6 +161,41 @@ public class UsersController : Controller
             })
             .Take(300)
             .ToListAsync();
+    }
+
+    // Unified employee-facing history: their own Inspection/QuickCheck orders and assigned
+    // standalone Maintenance Orders, grouped by calendar month, most recent first.
+    [Authorize]
+    public async Task<IActionResult> MyHistory()
+    {
+        var id = _um.GetUserId(User)!;
+        var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == id).Select(m => m.TeamId).ToListAsync();
+
+        var inspectionGroups = await _db.InspectionOrders.AsNoTracking()
+            .Where(o => o.AssignedToUserId == id || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)))
+            .GroupBy(o => new { o.CreatedAt.Year, o.CreatedAt.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .ToListAsync();
+
+        var maintenanceGroups = await _db.MaintenanceOrders.AsNoTracking()
+            .Where(m => m.AssignedToUserId == id)
+            .GroupBy(m => new { m.CreatedDate.Year, m.CreatedDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .ToListAsync();
+
+        var months = inspectionGroups.Select(g => (g.Year, g.Month))
+            .Union(maintenanceGroups.Select(g => (g.Year, g.Month)))
+            .OrderByDescending(m => m.Year).ThenByDescending(m => m.Month)
+            .Select(m => new MyHistoryMonthRow
+            {
+                Year = m.Year,
+                Month = m.Month,
+                InspectionCount = inspectionGroups.FirstOrDefault(g => g.Year == m.Year && g.Month == m.Month)?.Count ?? 0,
+                MaintenanceCount = maintenanceGroups.FirstOrDefault(g => g.Year == m.Year && g.Month == m.Month)?.Count ?? 0,
+            })
+            .ToList();
+
+        return View(months);
     }
 
     private static byte[] BuildTasksPdf(List<InspectionOrderRow> rows, string userName, bool showAll)
@@ -192,10 +234,10 @@ public class UsersController : Controller
             .SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
             .SetMarginBottom(10));
 
-        var tbl = new iText.Layout.Element.Table(new float[] { 1.5f, 2.5f, 1.2f, 1.2f, 1.2f, 1.2f })
+        var tbl = new iText.Layout.Element.Table(new float[] { 1.5f, 1.2f, 1.2f, 1.2f, 1.2f })
             .UseAllAvailableWidth().SetMarginBottom(8).SetFontSize(8);
 
-        foreach (var h in new[] { "Order #", "Title", "Status", "Checked", "Due Date", "Context" })
+        foreach (var h in new[] { "Order #", "Status", "Checked", "Due Date", "Context" })
             tbl.AddHeaderCell(new iText.Layout.Element.Cell()
                 .Add(new iText.Layout.Element.Paragraph(h).SetBold())
                 .SetBackgroundColor(lightBg)
@@ -206,9 +248,6 @@ public class UsersController : Controller
             var (statusBg, statusFg) = StatusColors(r.Status);
             tbl.AddCell(new iText.Layout.Element.Cell()
                 .Add(new iText.Layout.Element.Paragraph(r.OrderNumber))
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(r.Title))
                 .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
             tbl.AddCell(new iText.Layout.Element.Cell()
                 .Add(new iText.Layout.Element.Paragraph(r.Status))
@@ -244,11 +283,14 @@ public class UsersController : Controller
     private static (DateTime? from, DateTime? to) ResolveRange(string? range)
     {
         var today = DateTime.Today;
+        // "to" is the current moment, not midnight-today, so anything created later today
+        // (e.g. a task assigned minutes ago) still falls inside the range.
+        var now = DateTime.Now;
         return range switch
         {
-            "month" => (new DateTime(today.Year, today.Month, 1), today),
-            "30"    => (today.AddDays(-30), today),
-            "90"    => (today.AddDays(-90), today),
+            "month" => (new DateTime(today.Year, today.Month, 1), now),
+            "30"    => (today.AddDays(-30), now),
+            "90"    => (today.AddDays(-90), now),
             _       => (null, null),   // "all" / null → no date filter
         };
     }
@@ -286,7 +328,6 @@ public class UsersController : Controller
             {
                 OrderId         = o.Id,
                 OrderNumber     = o.OrderNumber,
-                Title           = o.Title,
                 Status          = o.Status,
                 DueDate         = o.DueDate,
                 AssignedContext = o.AssignedToUserId == id ? "Me" : "Team",

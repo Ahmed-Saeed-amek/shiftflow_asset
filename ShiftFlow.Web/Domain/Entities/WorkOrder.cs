@@ -10,6 +10,10 @@ public class WorkOrder
     public string Priority{get;set;}="Medium";
     public string Stage{get;set;}="New";
     public int? VendorId{get;set;} public virtual Vendor? Vendor{get;set;}
+    /// <summary>When false (the default), this work order doesn't strictly need the vendor to respond — an admin/manager or the assigned employee can advance it past "Sent to Vendor" via AdvanceWithoutVendor instead of waiting on VendorFix. When true, only the vendor's own Fix/Block actions can move it forward.</summary>
+    public bool RequiresVendorResponse{get;set;}=false;
+    /// <summary>Internal employee assigned to fix this work order directly — independent of and combinable with VendorId (e.g. an employee coordinating an external vendor's visit). When set with VendorId null, the assigned employee gets an in-app "report fix" action mirroring the vendor portal's Fix, and the work order skips the vendor pipeline entirely.</summary>
+    public string? AssignedToUserId{get;set;} public virtual ApplicationUser? AssignedToUser{get;set;}
     public string? Description{get;set;} public string? Notes{get;set;}
     public string CreatedByUserId{get;set;}=string.Empty; public virtual ApplicationUser? CreatedByUser{get;set;}
     public DateTime CreatedDate{get;set;}=DateTime.UtcNow;

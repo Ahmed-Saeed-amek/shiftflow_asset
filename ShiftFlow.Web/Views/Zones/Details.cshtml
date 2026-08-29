@@ -6,22 +6,19 @@
     ViewData["Title"] = localizedName;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
     string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
-    var areaLocalized = Model.Block?.Area is { } area ? Loc.LocalizedName(area.Name, area.NameAr) : null;
-    var govLocalized = Model.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null;
+    var categoryLocalized = Model.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null;
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="~/js/zone-map.js" asp-append-version="true"></script>
 
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=localizedName,Subtitle=$"{areaLocalized}, {govLocalized}",ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=localizedName,Subtitle=categoryLocalized,ActionsHtml=actionsHtml})" />
 
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
-                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Governorate")</span><span class="small fw-semibold">@govLocalized</span></div>
-                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Area")</span><span class="small fw-semibold">@areaLocalized</span></div>
-                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(Model.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Block")</span><span class="small fw-semibold">@Model.Block?.Number</span></div>
+                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(Model.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Location Category")</span><span class="small fw-semibold">@categoryLocalized</span></div>
                 @if (!string.IsNullOrWhiteSpace(Model.Address))
                 {
                     <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Address")</span><span class="small fw-semibold text-end">@Model.Address</span></div>

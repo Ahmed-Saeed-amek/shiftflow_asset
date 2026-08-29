@@ -89,7 +89,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>@Loc.T("Order #")</th><th>@Loc.T("Title")</th><th>@Loc.T("Status")</th>
+                        <th>@Loc.T("Order #")</th><th>@Loc.T("Status")</th>
                         <th>@Loc.T("Checked")</th><th>@Loc.T("Due Date")</th><th>@Loc.T("Assigned Via")</th>
                     </tr>
                 </thead>
@@ -98,7 +98,6 @@
                     {
                         <tr>
                             <td class="fw-semibold"><a asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.OrderId">@o.OrderNumber</a></td>
-                            <td>@o.Title</td>
                             <td><partial name="_StatusBadge" model="@o.Status" /></td>
                             <td>@o.CheckedAssets/@o.TotalAssets</td>
                             <td>@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>

@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const f=(j.tool_input&&j.tool_input.file_path)||'';if(/appsettings.*\\.json/i.test(f)){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'ask',permissionDecisionReason:'appsettings*.json holds the SQL connection string and other config - confirm this edit is intentional.'}}));}});\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "m=$(node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const f=(j.tool_input&&j.tool_input.file_path)||(j.tool_response&&j.tool_response.filePath)||'';console.log(/\\.cs$/i.test(f)?1:0);});\"); if [ \"$m\" = \"1\" ]; then out=$(dotnet build ShiftFlow.Web/ShiftFlow.Web.csproj --nologo -v q 2>&1); if echo \"$out\" | grep -qE 'error CS[0-9]'; then echo \"$out\" | grep -E 'error CS[0-9]'; exit 2; fi; fi",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 120,
+            "statusMessage": "Building ShiftFlow.Web..."
+          }
+        ]
+      }
+    ]
+  }
+}

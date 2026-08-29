@@ -48,13 +48,13 @@ public class VendorPortalController : Controller
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
         var workOrders = await _db.WorkOrders
-            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.Block).ThenInclude(bl => bl!.Area).ThenInclude(a => a!.Governorate)
+            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Where(w => w.VendorId == vendorId && w.Asset!.Zone!.Latitude != null && w.Asset.Zone.Longitude != null)
             .Select(w => new
             {
                 w.Id, w.WorkOrderNumber, w.Stage, w.Priority,
                 AssetTag = w.Asset!.AssetTag, AssetName = w.Asset.Name,
-                ZoneName = w.Asset.Zone!.Name, AreaName = w.Asset.Zone.Block!.Area!.Name, GovernorateName = w.Asset.Zone.Block.Area.Governorate!.Name,
+                ZoneName = w.Asset.Zone!.Name, CategoryName = w.Asset.Zone.LocationCategory!.Name,
                 Latitude = w.Asset.Zone.Latitude, Longitude = w.Asset.Zone.Longitude,
             })
             .ToListAsync();
@@ -66,7 +66,7 @@ public class VendorPortalController : Controller
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
         var wo = await _db.WorkOrders
-            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.Block).ThenInclude(bl => bl!.Area).ThenInclude(a => a!.Governorate)
+            .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Include(w => w.Asset).ThenInclude(a => a!.Category)
             .Include(w => w.ActionType).Include(w => w.Cause)
             .Include(w => w.BlockReason).Include(w => w.Parts).Include(w => w.Attachments)

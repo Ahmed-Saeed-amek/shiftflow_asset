@@ -37,12 +37,27 @@ public class InspectionOrdersController : Controller
         return View(orders);
     }
 
+    // Employees see only this month's orders by default; range=all lifts the date bound.
     [Authorize]
-    public async Task<IActionResult> MyOrders(bool showAll = false)
+    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null)
     {
-        var orders = await _orders.GetMyOrdersAsync(CurrentUserId, includeDone: showAll);
+        var (from, to) = ResolveRange(range ?? "month");
+        var orders = await _orders.GetMyOrdersAsync(CurrentUserId, includeDone: showAll, from: from, to: to);
         ViewBag.ShowAll = showAll;
+        ViewBag.SelectedRange = range ?? "month";
         return View(orders);
+    }
+
+    private static (DateTime? from, DateTime? to) ResolveRange(string? range)
+    {
+        var today = DateTime.Today;
+        return range switch
+        {
+            // "to" is the current moment, not midnight-today, so anything created later today
+            // (the common case right after this feature ships) still falls inside the range.
+            "month" => (new DateTime(today.Year, today.Month, 1), DateTime.Now),
+            _ => (null, null),
+        };
     }
 
     [Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
@@ -57,14 +72,14 @@ public class InspectionOrdersController : Controller
     {
         if (!ModelState.IsValid)
         {
-            await LoadCreateViewBagAsync();
+            await LoadCreateViewBagAsync(vm);
             return View(vm);
         }
 
         try
         {
             var order = await _orders.CreateAsync(
-                vm.Title, vm.Description,
+                vm.OrderTypeId, vm.Description,
                 vm.AssigneeType == "User" ? vm.AssignedToUserId : null,
                 vm.AssigneeType == "Team" ? vm.AssignedToTeamId : null,
                 vm.AssetIds, vm.DueDate, CurrentUserId);
@@ -75,16 +90,29 @@ public class InspectionOrdersController : Controller
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError("", ex.Message);
-            await LoadCreateViewBagAsync();
+            await LoadCreateViewBagAsync(vm);
             return View(vm);
         }
     }
 
-    private async Task LoadCreateViewBagAsync()
+    // On a failed re-render (e.g. no assets selected), rehydrate the asset chips and employee label
+    // from what was actually posted so the admin doesn't lose their in-progress selection.
+    private async Task LoadCreateViewBagAsync(InspectionOrderCreateVm? vm = null)
     {
-        ViewBag.Governorates = await _db.Governorates.OrderBy(g => g.Name).ToListAsync();
+        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.Teams = await _teams.GetAllAsync();
+        ViewBag.OrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
+
+        ViewBag.SelectedAssetChips = vm?.AssetIds is { Count: > 0 }
+            ? await _db.Assets.Where(a => vm.AssetIds.Contains(a.Id))
+                .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name })
+                .ToListAsync()
+            : new List<AssetChip>();
+
+        ViewBag.SelectedEmployeeLabel = !string.IsNullOrEmpty(vm?.AssignedToUserId)
+            ? await _db.Users.Where(u => u.Id == vm.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
+            : null;
     }
 
     [Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
@@ -99,6 +127,7 @@ public class InspectionOrdersController : Controller
         if (!isManager && !isAssignee && !isTeamMember)
             return Forbid();
 
+        ViewBag.MaintenanceActionTypes = await _db.MaintenanceActionTypes.Where(m => m.IsActive).OrderBy(m => m.Name).ToListAsync();
         return View(order);
     }
 
@@ -112,12 +141,12 @@ public class InspectionOrdersController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
-    public async Task<IActionResult> UpdateItem(int itemId, string outcome, string? notes, int? actionTypeId, int? causeId)
+    public async Task<IActionResult> UpdateItem(int itemId, string outcome, int? actionTypeId, int? causeId, List<int>? maintenanceActionTypeIds)
     {
         if (!InspectionRunAsset.Outcomes.Contains(outcome) || outcome == "Pending")
             return BadRequest(new { error = "Invalid outcome." });
 
-        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
+        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder).ThenInclude(o => o.OrderType)
             .FirstOrDefaultAsync(i => i.Id == itemId);
         if (item == null) return NotFound();
         var order = item.InspectionRun.InspectionOrder;
@@ -133,17 +162,52 @@ public class InspectionOrdersController : Controller
             int? workOrderId = null;
             if (outcome == "Defective")
             {
-                if (actionTypeId == null || causeId == null)
+                // Types that TracksDefectOutcome require Action Type + Cause; other types (e.g.
+                // Quick Check) still spawn a Work Order for tracking, with both left null.
+                if (order.OrderType!.TracksDefectOutcome && (actionTypeId == null || causeId == null))
                     return BadRequest(new { error = "Action Type and Cause are required to report a defect." });
+
                 var wo = await _workOrderService.ReportAsync(new WorkOrder
                 {
-                    AssetId = item.AssetId, ActionTypeId = actionTypeId, CauseId = causeId, Notes = notes,
+                    AssetId = item.AssetId,
+                    ActionTypeId = order.OrderType.TracksDefectOutcome ? actionTypeId : null,
+                    CauseId = order.OrderType.TracksDefectOutcome ? causeId : null,
+                    RequiresVendorResponse = order.OrderType.RequiresVendor,
                 }, CurrentUserId);
                 workOrderId = wo.Id;
             }
 
-            await _orders.UpdateInspectionItemAsync(itemId, outcome, notes, workOrderId, CurrentUserId);
+            await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, maintenanceActionTypeIds, CurrentUserId);
             return Ok(new { outcome, workOrderId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Logs maintenance actions performed on an asset independent of its OK/Defective
+    /// outcome — see UpdateMaintenanceActionsAsync. Unlike UpdateItem, this is safe to call
+    /// repeatedly (including after the outcome is already recorded) since it never creates a
+    /// Work Order or touches the outcome/order-completion state.</summary>
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
+    public async Task<IActionResult> UpdateMaintenanceActions(int itemId, List<int>? maintenanceActionTypeIds)
+    {
+        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
+            .FirstOrDefaultAsync(i => i.Id == itemId);
+        if (item == null) return NotFound();
+        var order = item.InspectionRun.InspectionOrder;
+
+        var isManager = await IsManagerAsync();
+        var isAssignee = order.AssignedToUserId == CurrentUserId;
+        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isTeamMember)
+            return Forbid();
+
+        try
+        {
+            await _orders.UpdateMaintenanceActionsAsync(itemId, maintenanceActionTypeIds, CurrentUserId);
+            return Ok(new { success = true });
         }
         catch (InvalidOperationException ex)
         {

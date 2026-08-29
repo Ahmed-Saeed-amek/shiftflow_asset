@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ShiftFlow Feature Audit</title>
+<style>
+  :root{
+    --bg:#f3f5f8; --panel:#ffffff; --border:#dde2ea; --text:#1c2430; --muted:#6b7686;
+    --keep:#1f9d55; --keep-bg:#e8f8ee; --rework:#c98a05; --rework-bg:#fff6e3; --remove:#d1453b; --remove-bg:#fdeceb;
+    --accent:#2563eb; --accent-bg:#eaf0fe;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.4;}
+  header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--border);padding:16px 24px;}
+  header h1{margin:0 0 4px;font-size:20px;}
+  header p{margin:0;color:var(--muted);font-size:13px;}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .toolbar button, .toolbar input[type=text]{font-size:13px;padding:7px 12px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;}
+  .toolbar button:hover{background:#f0f2f5;}
+  .toolbar input[type=text]{cursor:text;min-width:200px;flex:1;}
+  .stats{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap;}
+  .stats b{color:var(--text);}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;font-size:11px;}
+  .pill.keep{background:var(--keep-bg);color:var(--keep);}
+  .pill.rework{background:var(--rework-bg);color:var(--rework);}
+  .pill.remove{background:var(--remove-bg);color:var(--remove);}
+  main{max-width:980px;margin:0 auto;padding:20px 24px 120px;}
+  details.category{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+  details.category>summary{list-style:none;cursor:pointer;padding:12px 16px;font-weight:600;font-size:14.5px;display:flex;justify-content:space-between;align-items:center;background:#fafbfd;}
+  details.category>summary::-webkit-details-marker{display:none;}
+  details.category>summary .catmeta{font-weight:400;color:var(--muted);font-size:12px;}
+  .item{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:10px 16px;border-top:1px solid #eef1f5;}
+  .item:hover{background:#fafcff;}
+  .item .label{font-size:13.5px;}
+  .item .desc{color:var(--muted);font-size:12px;margin-top:1px;}
+  .controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+  .seg label{padding:5px 10px;font-size:12px;cursor:pointer;background:#fff;color:var(--muted);border-right:1px solid var(--border);user-select:none;}
+  .seg label:last-child{border-right:none;}
+  .seg input{display:none;}
+  .seg input:checked + label.keep-l{background:var(--keep-bg);color:var(--keep);font-weight:600;}
+  .seg input:checked + label.rework-l{background:var(--rework-bg);color:var(--rework);font-weight:600;}
+  .seg input:checked + label.remove-l{background:var(--remove-bg);color:var(--remove);font-weight:600;}
+  .note{width:180px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;}
+  .note:focus{outline:2px solid var(--accent-bg);border-color:var(--accent);}
+  footer{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:12px 24px;display:flex;gap:10px;align-items:center;justify-content:center;box-shadow:0 -2px 8px rgba(0,0,0,.04);}
+  footer button{font-size:14px;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:600;}
+  #genBtn{background:var(--accent);color:#fff;}
+  #genBtn:hover{background:#1d4fd1;}
+  #copyBtn{background:#eef1f5;color:var(--text);border:1px solid var(--border) !important;}
+  .footer-stats{font-size:12px;color:var(--muted);}
+  #outputWrap{max-width:980px;margin:0 auto 140px;padding:0 24px;}
+  #output{width:100%;min-height:260px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;padding:14px;border-radius:8px;border:1px solid var(--border);background:#fff;white-space:pre;display:none;}
+  .hint{background:var(--accent-bg);border:1px solid #c7d7fc;color:#1e3a8a;padding:10px 14px;border-radius:8px;font-size:12.5px;margin-bottom:16px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>ShiftFlow Feature Audit</h1>
+  <p>Every page and workflow found in the codebase. Mark each Keep / Rework / Remove, add a note if needed, then generate the prompt at the bottom and paste it back to Claude.</p>
+  <div class="toolbar">
+    <button onclick="setAll('keep')">Mark all Keep</button>
+    <button onclick="expandAll(true)">Expand all</button>
+    <button onclick="expandAll(false)">Collapse all</button>
+    <input type="text" id="filterBox" placeholder="Filter items…" oninput="filterItems(this.value)">
+    <button onclick="resetAll()">Reset</button>
+  </div>
+  <div class="stats" id="statsBar"></div>
+</header>
+
+<main>
+  <div class="hint">Default status for every item is <b>Keep</b>. Only change what you actually want changed — the generated prompt lists every item's status either way, so nothing is left ambiguous.</div>
+  <div id="categories"></div>
+</main>
+
+<div id="outputWrap">
+  <textarea id="output" readonly></textarea>
+</div>
+
+<footer>
+  <span class="footer-stats" id="footerStats"></span>
+  <button id="genBtn" onclick="generate()">Generate Prompt</button>
+  <button id="copyBtn" onclick="copyOutput()">Copy to Clipboard</button>
+</footer>
+
+<script>
+const DATA = [
+["Authentication & Account", [
+  ["Login page (email + password)", "Views/Account/Login.cshtml, AccountController.Login"],
+  ["Sign in with Microsoft (external SSO)", "AccountController.ExternalLogin"],
+  ["External login callback handling", "AccountController.ExternalLoginCallback"],
+  ["Logout", "AccountController.Logout"],
+  ["Access Denied page", "AccountController.AccessDenied"],
+  ["Change Password page/workflow", "AccountController.ChangePassword"],
+]],
+["Dashboard & Personal Home", [
+  ["Executive Dashboard (KPIs + charts)", "DashboardController.Index — open inspection orders, overdue orders, active teams, total engineers, defective assets, open work orders, status chart, overdue list"],
+  ["My Home (personal landing page)", "MyHomeController.Index"],
+]],
+["Localization", [
+  ["Language switcher EN/AR incl. RTL layout", "LanguageController.SetLanguage"],
+]],
+["Users & Profiles", [
+  ["Users list (role/search filters)", "UsersController.Index"],
+  ["Create user", "UsersController.Create"],
+  ["Delete user", "UsersController.Delete"],
+  ["Toggle user active/inactive", "UsersController.ToggleActive"],
+  ["Search directory (AD/directory lookup)", "UsersController.SearchDirectory"],
+  ["Import user from directory", "UsersController.ImportFromDirectory"],
+  ["User profile page", "UsersController.Profile"],
+  ["My Metrics (personal KPIs, date range)", "UsersController.MyMetrics"],
+  ["My Tasks (list, range, show-all toggle)", "UsersController.MyTasks"],
+  ["My Tasks — PDF export", "UsersController.MyTasksPdf"],
+  ["My History", "UsersController.MyHistory"],
+  ["Seed Data action (dev/test data)", "UsersController.SeedData"],
+  ["Users API search (used by picker widgets)", "Api/UsersApiController.Search"],
+]],
+["Roles & Permissions (RBAC)", [
+  ["Roles & permissions index", "RbacController.Index"],
+  ["Create role", "RbacController.CreateRole"],
+  ["Delete role", "RbacController.DeleteRole"],
+  ["Bulk-assign roles to users", "RbacController.BulkAssignRoles"],
+  ["Edit role permissions", "RbacController.RolePermissions / SaveRolePermissions"],
+  ["Edit per-user permission overrides (allow/deny)", "RbacController.UserPermissions / SaveUserPermissions"],
+]],
+["Teams", [
+  ["Teams list", "TeamsController.Index"],
+  ["Team details", "TeamsController.Details"],
+  ["Create team", "TeamsController.Create"],
+  ["Edit team", "TeamsController.Edit"],
+  ["Add team member", "TeamsController.AddMember"],
+  ["Remove team member", "TeamsController.RemoveMember"],
+  ["Set team active/inactive", "TeamsController.SetActive"],
+]],
+["Assets", [
+  ["Assets list (status/category/zone/location filters)", "AssetsController.Index"],
+  ["Asset details", "AssetsController.Details"],
+  ["QR code generation", "AssetsController.QrCode"],
+  ["Barcode generation", "AssetsController.Barcode"],
+  ["Printable asset label", "AssetsController.Label"],
+  ["Create asset", "AssetsController.Create"],
+  ["Edit asset", "AssetsController.Edit"],
+  ["Asset search (typeahead)", "AssetsController.Search"],
+  ["Assets by category", "AssetsController.ByCategory"],
+  ["Assets by location", "AssetsController.ByLocation"],
+  ["Export assets — Excel", "AssetsController.ExportExcel"],
+  ["Export assets — PDF", "AssetsController.ExportPdf"],
+]],
+["Asset Categories", [
+  ["Asset categories list", "AssetCategoriesController.Index"],
+  ["Create category", "AssetCategoriesController.Create"],
+  ["Edit category", "AssetCategoriesController.Edit"],
+  ["Categories by parent (hierarchy nav)", "AssetCategoriesController.ByParent"],
+]],
+["Asset Action Types & Causes", [
+  ["Action types list by category", "AssetActionTypesController.Index"],
+  ["Create action type", "AssetActionTypesController.Create"],
+  ["Edit action type", "AssetActionTypesController.Edit"],
+  ["Create cause", "AssetActionTypesController.CreateCause"],
+  ["Edit cause", "AssetActionTypesController.EditCause"],
+  ["Action types by category (lookup)", "AssetActionTypesController.ByCategory"],
+  ["Causes by action type (lookup)", "AssetActionTypesController.CausesByActionType"],
+]],
+["Locations", [
+  ["Locations list", "LocationsController.Index"],
+  ["Create location", "LocationsController.Create"],
+  ["Edit location", "LocationsController.Edit"],
+]],
+["Zones", [
+  ["Zones list", "ZonesController.Index"],
+  ["Zone details", "ZonesController.Details"],
+  ["Create zone", "ZonesController.Create"],
+  ["Edit zone", "ZonesController.Edit"],
+  ["Zones by category", "ZonesController.ByCategory"],
+  ["Zone map data endpoint", "ZonesController.MapData"],
+]],
+["Zone Overview (Map Dashboard)", [
+  ["Zone overview index (map)", "ZoneOverviewController.Index"],
+  ["Zone overview details", "ZoneOverviewController.Details"],
+  ["Asset map view", "ZoneOverviewController.AssetMap"],
+]],
+["Inspection Orders", [
+  ["Inspection orders list (status/search)", "InspectionOrdersController.Index"],
+  ["My inspection orders (range/show-all)", "InspectionOrdersController.MyOrders"],
+  ["Create inspection order", "InspectionOrdersController.Create"],
+  ["Inspection order details", "InspectionOrdersController.Details"],
+  ["Update inspection item outcome (pass/fail + action + cause)", "InspectionOrdersController.UpdateItem"],
+  ["Update maintenance actions for an item", "InspectionOrdersController.UpdateMaintenanceActions"],
+  ["Cancel inspection order", "InspectionOrdersController.Cancel"],
+  ["Export inspection orders — Excel", "InspectionOrdersController.ExportExcel"],
+]],
+["Maintenance Action Types", [
+  ["Maintenance action types list", "MaintenanceActionTypesController.Index"],
+  ["Create maintenance action type", "MaintenanceActionTypesController.Create"],
+  ["Edit maintenance action type", "MaintenanceActionTypesController.Edit"],
+]],
+["Maintenance Orders", [
+  ["Maintenance orders list (status/search)", "MaintenanceOrdersController.Index"],
+  ["Create maintenance order", "MaintenanceOrdersController.Create"],
+  ["Maintenance order details", "MaintenanceOrdersController.Details"],
+  ["Complete maintenance order", "MaintenanceOrdersController.Complete"],
+  ["Cancel maintenance order", "MaintenanceOrdersController.Cancel"],
+  ["My maintenance orders (range/show-all)", "MaintenanceOrdersController.MyOrders"],
+  ["Export maintenance orders — Excel", "MaintenanceOrdersController.ExportExcel"],
+]],
+["Work Orders", [
+  ["Work orders list (stage/priority/type filters)", "WorkOrdersController.Index"],
+  ["Work order details", "WorkOrdersController.Details"],
+  ["Create work order", "WorkOrdersController.Create"],
+  ["Report an issue/fault", "WorkOrdersController.Report"],
+  ["Accept work order (assign vendor/priority)", "WorkOrdersController.Accept"],
+  ["Assign employee", "WorkOrdersController.AssignEmployee"],
+  ["Employee fix/resolve", "WorkOrdersController.EmployeeFix"],
+  ["Force close", "WorkOrdersController.ForceClose"],
+  ["My maintenance orders (work-order view)", "WorkOrdersController.MyMaintenanceOrders"],
+  ["Reject work order", "WorkOrdersController.Reject"],
+  ["Send to vendor", "WorkOrdersController.SendToVendor"],
+  ["Resend to vendor", "WorkOrdersController.Resend"],
+  ["Confirm completion", "WorkOrdersController.Confirm"],
+  ["Update priority", "WorkOrdersController.UpdatePriority"],
+  ["Download attachment", "WorkOrdersController.DownloadAttachment"],
+  ["Export work orders — Excel", "WorkOrdersController.ExportExcel"],
+  ["Export work orders — PDF", "WorkOrdersController.ExportPdf"],
+  ["Work order stage pipeline visual", "Views/WorkOrders/_WorkOrderStagePipeline.cshtml"],
+]],
+["Work Order Block Reasons", [
+  ["Block reasons list", "WorkOrderBlockReasonsController.Index"],
+  ["Create block reason", "WorkOrderBlockReasonsController.Create"],
+  ["Edit block reason", "WorkOrderBlockReasonsController.Edit"],
+]],
+["Vendors", [
+  ["Vendors list", "VendorsController.Index"],
+  ["Vendor details", "VendorsController.Details"],
+  ["Create vendor login", "VendorsController.CreateLogin"],
+  ["Reset vendor password", "VendorsController.ResetPassword"],
+  ["Create vendor", "VendorsController.Create"],
+  ["Edit vendor", "VendorsController.Edit"],
+]],
+["Vendor Portal (external-facing)", [
+  ["Vendor portal home", "VendorPortalController.Index"],
+  ["Vendor portal map data view", "VendorPortalController.MapData"],
+  ["Work order details (vendor view)", "VendorPortalController.Details"],
+  ["Submit fix", "VendorPortalController.Fix"],
+  ["Block/flag order with reason", "VendorPortalController.Block"],
+]],
+["Contracts", [
+  ["Contracts list", "ContractsController.Index"],
+  ["Contract details", "ContractsController.Details"],
+  ["Create contract", "ContractsController.Create"],
+  ["Edit contract", "ContractsController.Edit"],
+]],
+["Audit Logs", [
+  ["Audit log viewer", "AuditLogsController.Index"],
+]],
+["User Asset Scopes (asset-level access control)", [
+  ["Scopes list", "UserAssetScopesController.Index"],
+  ["Create scope", "UserAssetScopesController.Create"],
+  ["Edit scope", "UserAssetScopesController.Edit"],
+  ["Delete scope", "UserAssetScopesController.Delete"],
+]],
+["AI Assistant", [
+  ["AI assistant chat page", "AiAssistantController.Index"],
+  ["Speech-to-text token (voice input)", "AiAssistantController.SpeechToken"],
+  ["Avatar/ICE token (video avatar)", "AiAssistantController.AvatarIceToken"],
+  ["Chat query backend", "AiAssistantController.Query"],
+  ["Tool: get my inspection orders", "AiInspectionToolFunctions.GetMyInspectionOrdersAsync"],
+  ["Tool: get inspection order detail", "AiInspectionToolFunctions.GetInspectionOrderDetailAsync"],
+  ["Tool: get dashboard KPIs", "AiInspectionToolFunctions.GetDashboardKpisAsync"],
+  ["Tool: find employee", "AiInspectionToolFunctions.FindEmployeeAsync"],
+  ["Tool: list teams", "AiInspectionToolFunctions.ListTeamsAsync"],
+  ["Tool: get team detail", "AiInspectionToolFunctions.GetTeamDetailAsync"],
+  ["Tool: create inspection order", "AiInspectionToolFunctions.CreateInspectionOrderAsync"],
+  ["Tool: report inspection outcome", "AiInspectionToolFunctions.ReportInspectionOutcomeAsync"],
+  ["Tool: cancel inspection order", "AiInspectionToolFunctions.CancelInspectionOrderAsync"],
+  ["Tool: create team", "AiInspectionToolFunctions.CreateTeamAsync"],
+  ["Tool: add team member", "AiInspectionToolFunctions.AddTeamMemberAsync"],
+  ["Tool: remove team member", "AiInspectionToolFunctions.RemoveTeamMemberAsync"],
+]],
+["Shared Components / UX Widgets", [
+  ["Employee picker component", "Views/Shared/_EmployeePicker.cshtml"],
+  ["Asset single-picker component", "Views/Shared/_AssetSinglePicker.cshtml"],
+  ["Asset multi-picker component", "Views/Shared/_AssetMultiPicker.cshtml"],
+  ["Zone combobox", "Views/Shared/_ZoneCombobox.cshtml"],
+  ["KPI card widget", "Views/Shared/_KpiCard.cshtml"],
+  ["Status badge widget", "Views/Shared/_StatusBadge.cshtml"],
+  ["Floating avatar (global AI assistant launcher)", "Views/Shared/_FloatingAvatar.cshtml"],
+  ["Page header component", "Views/Shared/_PageHeader.cshtml"],
+]],
+];
+
+const state = {}; // id -> {status, note}
+let uid = 0;
+const catsEl = document.getElementById('categories');
+
+DATA.forEach(([catName, items]) => {
+  const det = document.createElement('details');
+  det.className = 'category';
+  det.open = true;
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<span>${catName}</span><span class="catmeta">${items.length} item${items.length>1?'s':''}</span>`;
+  det.appendChild(summary);
+
+  items.forEach(([label, desc]) => {
+    const id = 'i' + (uid++);
+    state[id] = {status:'keep', note:'', label, desc, cat:catName};
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.dataset.id = id;
+    row.dataset.search = (label + ' ' + desc + ' ' + catName).toLowerCase();
+    row.innerHTML = `
+      <div>
+        <div class="label">${label}</div>
+        <div class="desc">${desc}</div>
+      </div>
+      <div class="controls">
+        <div class="seg">
+          <input type="radio" name="${id}" id="${id}-k" value="keep" checked onchange="setStatus('${id}','keep')"><label class="keep-l" for="${id}-k">Keep</label>
+          <input type="radio" name="${id}" id="${id}-r" value="rework" onchange="setStatus('${id}','rework')"><label class="rework-l" for="${id}-r">Rework</label>
+          <input type="radio" name="${id}" id="${id}-x" value="remove" onchange="setStatus('${id}','remove')"><label class="remove-l" for="${id}-x">Remove</label>
+        </div>
+        <input type="text" class="note" placeholder="note (optional)" oninput="setNote('${id}', this.value)">
+      </div>
+    `;
+    det.appendChild(row);
+  });
+  catsEl.appendChild(det);
+});
+
+function setStatus(id, status){ state[id].status = status; updateStats(); }
+function setNote(id, note){ state[id].note = note; }
+
+function setAll(status){
+  Object.keys(state).forEach(id=>{
+    state[id].status = status;
+    const input = document.getElementById(id + '-' + (status==='keep'?'k':status==='rework'?'r':'x'));
+    if(input) input.checked = true;
+  });
+  updateStats();
+}
+
+function resetAll(){
+  if(!confirm('Reset all statuses to Keep and clear notes?')) return;
+  Object.keys(state).forEach(id=>{
+    state[id].status = 'keep';
+    state[id].note = '';
+    document.getElementById(id+'-k').checked = true;
+  });
+  document.querySelectorAll('.note').forEach(n=>n.value='');
+  document.getElementById('output').style.display='none';
+  updateStats();
+}
+
+function expandAll(open){
+  document.querySelectorAll('details.category').forEach(d=>d.open=open);
+}
+
+function filterItems(q){
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('.item').forEach(row=>{
+    row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+  });
+  document.querySelectorAll('details.category').forEach(det=>{
+    const anyVisible = Array.from(det.querySelectorAll('.item')).some(r=>r.style.display!=='none');
+    det.style.display = anyVisible ? '' : 'none';
+    if(q) det.open = true;
+  });
+}
+
+function updateStats(){
+  const vals = Object.values(state);
+  const keep = vals.filter(v=>v.status==='keep').length;
+  const rework = vals.filter(v=>v.status==='rework').length;
+  const remove = vals.filter(v=>v.status==='remove').length;
+  const bar = `<span class="pill keep">Keep ${keep}</span><span class="pill rework">Rework ${rework}</span><span class="pill remove">Remove ${remove}</span><span>Total <b>${vals.length}</b></span>`;
+  document.getElementById('statsBar').innerHTML = bar;
+  document.getElementById('footerStats').innerHTML = `${vals.length} items · ${rework+remove} flagged for change`;
+}
+
+function generate(){
+  let out = 'SHIFTFLOW FEATURE AUDIT — full inventory with decisions\n';
+  out += 'Generated: ' + new Date().toLocaleString() + '\n';
+  out += 'Legend: [KEEP] no change · [REWORK] needs changes (see note) · [REMOVE] delete/disable\n';
+  out += '='.repeat(70) + '\n';
+
+  let lastCat = null;
+  Object.values(state).forEach(v=>{
+    if(v.cat !== lastCat){
+      out += '\n## ' + v.cat + '\n';
+      lastCat = v.cat;
+    }
+    const tag = v.status === 'keep' ? '[KEEP]  ' : v.status === 'rework' ? '[REWORK]' : '[REMOVE]';
+    out += `${tag} ${v.label}`;
+    if(v.note && v.note.trim()) out += `  — note: ${v.note.trim()}`;
+    out += '\n';
+  });
+
+  out += '\n' + '='.repeat(70) + '\n';
+  out += 'Instruction: apply REWORK and REMOVE items above across the codebase (controllers, views, services, nav/menu, permissions). Leave KEEP items untouched.\n';
+
+  const outputEl = document.getElementById('output');
+  outputEl.style.display = 'block';
+  outputEl.value = out;
+  outputEl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function copyOutput(){
+  const outputEl = document.getElementById('output');
+  if(outputEl.style.display === 'none' || !outputEl.value){
+    generate();
+  }
+  outputEl.select();
+  try{
+    document.execCommand('copy');
+    const btn = document.getElementById('copyBtn');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(()=>btn.textContent=orig, 1200);
+  }catch(e){
+    alert('Copy failed — please select the text manually.');
+  }
+}
+
+updateStats();
+</script>
+</body>
+</html>

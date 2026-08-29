@@ -25,72 +25,20 @@
         }
         @foreach (var m in Model.Members.OrderBy(m => m.User.FullName))
         {
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="fw-semibold small">@m.User.FullName</div>
-                    <div class="text-muted" style="font-size:.75rem">@m.User.Email</div>
-                </div>
-                @if (canManage)
-                {
-                    <form method="post" asp-action="RemoveMember" asp-route-teamId="@Model.Id" asp-route-userId="@m.UserId"
-                          onsubmit="return confirm('@Loc.T("Remove") @m.User.FullName?')">
-                        @Html.AntiForgeryToken()
-                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-person-dash"></i></button>
-                    </form>
-                }
+            <div class="list-group-item">
+                <div class="fw-semibold small">@m.User.FullName</div>
+                <div class="text-muted" style="font-size:.75rem">@m.User.Email</div>
             </div>
         }
     </div>
     @if (canManage)
     {
         <div class="card-body border-top">
-            <form method="post" asp-action="AddMember" asp-route-teamId="@Model.Id" class="position-relative">
-                @Html.AntiForgeryToken()
-                <label class="form-label small">@Loc.T("Add Member")</label>
-                <div class="d-flex gap-2">
-                    <div class="position-relative flex-grow-1">
-                        <input type="text" id="addMemberSearch" class="form-control form-control-sm" autocomplete="off" placeholder="@Loc.T("Search by name or email…")" />
-                        <input type="hidden" name="userId" id="addMemberUserId" />
-                        <div id="addMemberResults" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:220px;overflow:auto"></div>
-                    </div>
-                    <button type="submit" class="btn btn-sm btn-primary" id="addMemberBtn" disabled>@Loc.T("Add")</button>
-                </div>
-            </form>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-people me-1"></i>@Loc.T("Manage Members")
+            </a>
         </div>
     }
 </div>
 
 <a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
-
-@section Scripts {
-<script>
-(function () {
-    const search = document.getElementById('addMemberSearch');
-    if (!search) return;
-    const results = document.getElementById('addMemberResults');
-    const hidden = document.getElementById('addMemberUserId');
-    const btn = document.getElementById('addMemberBtn');
-    let timer = null;
-    function query() {
-        const q = search.value.trim();
-        hidden.value = ''; btn.disabled = true;
-        fetch(`/api/users/search?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } })
-            .then(r => r.ok ? r.json() : [])
-            .then(list => {
-                if (list.length === 0) { results.classList.add('d-none'); return; }
-                results.innerHTML = list.map(u =>
-                    `<button type="button" class="list-group-item list-group-item-action py-1" data-id="${u.id}" data-label="${(u.fullName||'').replace(/"/g,'&quot;')}">
-                        <div class="fw-semibold small">${u.fullName||''}</div><div class="text-muted" style="font-size:.72rem">${u.email||''}</div></button>`).join('');
-                results.classList.remove('d-none');
-                results.querySelectorAll('[data-id]').forEach(b => b.addEventListener('click', () => {
-                    hidden.value = b.dataset.id; search.value = b.dataset.label; btn.disabled = false;
-                    results.classList.add('d-none');
-                }));
-            });
-    }
-    search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(query, 220); });
-    search.addEventListener('focus', query);
-    document.addEventListener('click', e => { if (!results.contains(e.target) && e.target !== search) results.classList.add('d-none'); });
-})();
-</script>
-}

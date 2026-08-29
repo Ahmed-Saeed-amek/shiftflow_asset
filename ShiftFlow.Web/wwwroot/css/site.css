@@ -312,6 +312,27 @@ body.sidebar-locked { overflow: hidden; }
   overflow-y: hidden;
 }
 
+/* The overflow-y:hidden above (rounded-corner clipping) also clips any
+   absolutely-positioned dropdown menu opened inside the table — e.g. a
+   Bootstrap dropdown-menu that opens downward from a row action, or the
+   Maintenance Actions picker in InspectionOrders/Details.cshtml — collapsing
+   it to zero size via Popper's overflow detection instead of just visually
+   cropping it. The .table-card-stack mobile-stacking breakpoint already had
+   this exact fix (see below, originally for a "Mark Attendance" dropdown),
+   but scoped only to <768px; a dropdown in a normal (non-stacked) table needs
+   the same treatment at every width, not just mobile.
+   overflow-x:auto + overflow-y:visible was tried first to keep horizontal
+   scroll protection, but per the CSS Overflow spec, pairing a non-visible
+   overflow-x with overflow-y:visible forces the "visible" axis to compute as
+   auto instead — which still clips/collapses Popper-positioned content — so
+   this needs true overflow:visible on both axes, same as the working mobile
+   rule below, accepting that a table using .table-card-stack won't
+   horizontal-scroll at desktop widths either (none currently do; they're all
+   narrow enough not to need it). */
+.table-responsive:has(.table-card-stack) {
+  overflow: visible;
+}
+
 /* Opt-in table→card stacking for data-dense tables on phones. Most tables
    default to horizontal scroll via the existing .table-responsive wrapper
    (acceptable and cheaper); reserve .table-card-stack for a table where
@@ -419,8 +440,8 @@ body.sidebar-locked { overflow: hidden; }
 
 /* KPI card icon chip */
 .kpi-icon-chip {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -48,11 +48,11 @@ public class AssetService : IAssetService
     }
 
     private async Task<List<Asset>> GetExportRowsAsync() =>
-        await _db.Assets.Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.Block).ThenInclude(bl => bl!.Area).ThenInclude(a => a!.Governorate)
+        await _db.Assets.Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory)
             .OrderBy(a => a.AssetTag).ToListAsync();
 
     private static string ZoneLabel(Asset a) =>
-        a.Zone == null ? "" : $"{a.Zone.Name} ({a.Zone.Block?.Area?.Name}, {a.Zone.Block?.Area?.Governorate?.Name})";
+        a.Zone == null ? "" : $"{a.Zone.Name} ({a.Zone.LocationCategory?.Name})";
 
     public async Task<byte[]> ExportToExcelAsync()
     {

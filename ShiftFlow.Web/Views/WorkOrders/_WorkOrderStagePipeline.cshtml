@@ -4,36 +4,71 @@
 }
 @if (Model.Stage == "Draft" || Model.Stage == "Rejected")
 {
-    <div class="d-flex align-items-center gap-2">
-        <partial name="_StatusBadge" model="@Model.Stage" />
-        <span class="small text-muted">
-            @(Model.Stage == "Draft" ? Loc.T("Awaiting admin review — not yet a published work order.") : Loc.T("This report was rejected and will not become a work order."))
-        </span>
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-0">
+        <i class="bi @(Model.Stage == "Draft" ? "bi-hourglass-split" : "bi-x-circle") fs-5"></i>
+        <div>
+            <partial name="_StatusBadge" model="@Model.Stage" />
+            <span class="small text-muted ms-1">
+                @(Model.Stage == "Draft" ? Loc.T("Awaiting admin review — not yet a published work order.") : Loc.T("This report was rejected and will not become a work order."))
+            </span>
+        </div>
     </div>
 }
 else if (Model.Stage == "Blocked")
 {
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <partial name="_StatusBadge" model="@Model.Stage" />
-        <span class="small text-muted">
-            @Loc.T("The vendor can't proceed")@(Model.BlockReason != null ? $" — {Model.BlockReason.Name}" : "")@(!string.IsNullOrWhiteSpace(Model.BlockDetail) ? $": {Model.BlockDetail}" : "").
-        </span>
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-0">
+        <i class="bi bi-exclamation-triangle fs-5"></i>
+        <div>
+            <partial name="_StatusBadge" model="@Model.Stage" />
+            <span class="small ms-1">
+                @Loc.T("The vendor can't proceed")@(Model.BlockReason != null ? $" — {Model.BlockReason.Name}" : "")@(!string.IsNullOrWhiteSpace(Model.BlockDetail) ? $": {Model.BlockDetail}" : "").
+            </span>
+        </div>
     </div>
 }
 else
 {
-    <div class="d-flex flex-wrap align-items-center gap-1">
+    <div class="wo-stepper">
         @for (var i = 0; i < WorkOrder.Stages.Length; i++)
         {
             var stage = WorkOrder.Stages[i];
             var isDone = i < currentIndex;
             var isActive = i == currentIndex;
-            var cls = isDone ? "bg-success text-white" : isActive ? "bg-primary text-white" : "bg-light text-muted";
-            <span class="badge rounded-pill @cls px-3 py-2">@(i + 1). @Loc.T(stage)</span>
+            <div class="wo-step @(isDone ? "done" : "") @(isActive ? "active" : "")">
+                <div class="wo-step-circle">
+                    @if (isDone)
+                    {
+                        <i class="bi bi-check-lg"></i>
+                    }
+                    else
+                    {
+                        <span>@(i + 1)</span>
+                    }
+                </div>
+                <div class="wo-step-label">@Loc.T(stage)</div>
+            </div>
             if (i < WorkOrder.Stages.Length - 1)
             {
-                <i class="bi bi-chevron-right text-muted small"></i>
+                <div class="wo-step-line @(isDone ? "done" : "")"></div>
             }
         }
     </div>
+    <style>
+        .wo-stepper { display: flex; align-items: flex-start; width: 100%; }
+        .wo-step { display: flex; flex-direction: column; align-items: center; text-align: center; flex: 0 0 auto; }
+        .wo-step-circle {
+            width: 2.25rem; height: 2.25rem; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-weight: 600; font-size: .85rem;
+            border: 2px solid hsl(var(--border));
+        }
+        .wo-step.active .wo-step-circle { background: #0EA5E9; border-color: #0EA5E9; color: #fff; }
+        .wo-step.done .wo-step-circle { background: hsl(var(--success)); border-color: hsl(var(--success)); color: #fff; }
+        .wo-step-label { font-size: .75rem; margin-top: .4rem; color: hsl(var(--muted-foreground)); max-width: 7rem; }
+        .wo-step.active .wo-step-label { color: hsl(var(--foreground)); font-weight: 600; }
+        .wo-step-line { flex: 1 1 auto; height: 2px; background: hsl(var(--border)); margin-top: 1.1rem; min-width: .75rem; }
+        .wo-step-line.done { background: hsl(var(--success)); }
+        @@media (max-width: 575.98px) {
+            .wo-step-label { display: none; }
+        }
+    </style>
 }

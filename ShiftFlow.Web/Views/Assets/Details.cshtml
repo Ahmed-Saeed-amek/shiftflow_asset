@@ -28,7 +28,7 @@
                         @if (Model.Zone != null)
                         {
                             <a asp-controller="Zones" asp-action="Details" asp-route-id="@Model.Zone.Id">@Loc.LocalizedName(Model.Zone.Name, Model.Zone.NameAr)</a>
-                            <span class="text-muted">(@(Model.Zone.Block?.Area is { } ar ? Loc.LocalizedName(ar.Name, ar.NameAr) : null), @(Model.Zone.Block?.Area?.Governorate is { } gov ? Loc.LocalizedName(gov.Name, gov.NameAr) : null))</span>
+                            <span class="text-muted">(@(Model.Zone.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span>
                         }
                     </span>
                 </div>
@@ -120,7 +120,7 @@
             <div class="card-header bg-white fw-semibold border-0">@Loc.T("Inspection History")</div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>@Loc.T("Inspected At")</th><th>@Loc.T("Outcome")</th><th>@Loc.T("Inspected By")</th><th>@Loc.T("Notes")</th><th></th></tr></thead>
+                    <thead><tr><th>@Loc.T("Inspected At")</th><th>@Loc.T("Outcome")</th><th>@Loc.T("Inspected By")</th><th>@Loc.T("Maintenance Actions")</th><th></th></tr></thead>
                     <tbody>
                         @{ var inspections = (List<InspectionRunAsset>)ViewBag.Inspections; }
                         @if (inspections.Count == 0)
@@ -133,7 +133,7 @@
                                 <td class="small">@insp.InspectedAt?.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td><partial name="_StatusBadge" model="@insp.Outcome" /></td>
                                 <td class="small">@insp.InspectedByUser?.FullName</td>
-                                <td class="small">@insp.Notes</td>
+                                <td class="small">@string.Join(", ", insp.MaintenanceActions.Select(m => Loc.LocalizedName(m.MaintenanceActionType.Name, m.MaintenanceActionType.NameAr)))</td>
                                 <td class="small">
                                     @if (insp.WorkOrderId.HasValue)
                                     {

@@ -6,6 +6,7 @@
         ["Inactive"] = "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle",
         ["Planned"] = "bg-primary-subtle text-primary-emphasis border-primary-subtle",
         ["Completed"] = "bg-success-subtle text-success-emphasis border-success-subtle",
+        ["Done"] = "bg-success-subtle text-success-emphasis border-success-subtle",
         ["Cancelled"] = "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle",
         ["Pending"] = "bg-warning-subtle text-warning-emphasis border-warning-subtle",
         ["Approved"] = "bg-success-subtle text-success-emphasis border-success-subtle",
@@ -54,6 +55,8 @@
         ["Fixed - Pending Confirmation"] = "bg-warning-subtle text-warning-emphasis border-warning-subtle",
         ["Blocked"] = "bg-danger-subtle text-danger-emphasis border-danger-subtle",
         ["OK"] = "bg-success-subtle text-success-emphasis border-success-subtle",
+        ["QuickCheck"] = "bg-info-subtle text-info-emphasis border-info-subtle",
+        ["Inspection"] = "bg-primary-subtle text-primary-emphasis border-primary-subtle",
     };
     var cls = styles.TryGetValue(Model ?? "", out var s) ? s : "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle";
 }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Web.Authorization;
@@ -64,7 +65,12 @@ public class TeamsController : Controller
     {
         var team = await _teams.GetByIdAsync(id);
         if (team == null) return NotFound();
-        return View(new TeamEditVm { Id = team.Id, Name = team.Name, NameAr = team.NameAr, Description = team.Description, IsActive = team.IsActive });
+        ViewBag.CurrentMembers = team.Members.Select(m => new TeamMemberChip { UserId = m.UserId, Label = m.User.FullName }).ToList();
+        return View(new TeamEditVm
+        {
+            Id = team.Id, Name = team.Name, NameAr = team.NameAr, Description = team.Description, IsActive = team.IsActive,
+            MemberUserIds = team.Members.Select(m => m.UserId).ToList(),
+        });
     }
 
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
@@ -77,6 +83,7 @@ public class TeamsController : Controller
         {
             await _teams.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
             await _teams.SetActiveAsync(id, vm.IsActive, CurrentUserId);
+            await _teams.SetMembersAsync(id, vm.MemberUserIds ?? new(), CurrentUserId);
             TempData["Success"] = "Team updated.";
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -85,27 +92,12 @@ public class TeamsController : Controller
             ModelState.AddModelError("", ex.Message);
             return View(vm);
         }
-    }
-
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
-    public async Task<IActionResult> AddMember(int teamId, string userId)
-    {
-        await _teams.AddMemberAsync(teamId, userId, CurrentUserId);
-        return RedirectToAction(nameof(Details), new { id = teamId });
-    }
-
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
-    public async Task<IActionResult> RemoveMember(int teamId, string userId)
-    {
-        await _teams.RemoveMemberAsync(teamId, userId, CurrentUserId);
-        return RedirectToAction(nameof(Details), new { id = teamId });
-    }
-
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
-    public async Task<IActionResult> SetActive(int id, bool isActive)
-    {
-        await _teams.SetActiveAsync(id, isActive, CurrentUserId);
-        TempData["Success"] = isActive ? "Team activated." : "Team deactivated.";
-        return RedirectToAction(nameof(Index));
+        catch (DbUpdateException)
+        {
+            // A stale member id (e.g. the user was deleted mid-edit) fails at the FK level —
+            // surface it the same friendly way as elsewhere rather than the generic 500 page.
+            ModelState.AddModelError("", "Could not save membership — one of the selected users may no longer exist.");
+            return View(vm);
+        }
     }
 }

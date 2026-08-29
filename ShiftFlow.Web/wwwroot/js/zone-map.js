@@ -67,7 +67,7 @@ async function initZoneOverviewMap(mapElId, dataUrl, detailsUrlTemplate) {
     zones.forEach(z => {
         const marker = L.marker([z.latitude, z.longitude]).addTo(map);
         marker.bindPopup(
-            `<strong>${z.name}</strong><br>${z.areaName}, ${z.governorateName}<br>` +
+            `<strong>${z.name}</strong><br>${z.categoryName}<br>` +
             `${z.assetCount} asset(s)<br><a href="${detailsUrlTemplate.replace('__ID__', z.id)}">View →</a>`
         );
         markers.push(marker);
@@ -96,6 +96,73 @@ function workOrderStageIcon(stage) {
     });
 }
 
+// Asset status dot colors + stacking order for the Zone Overview split-view map. Assets share
+// their Zone's coordinates (no per-asset lat/lng), so co-located assets stack at the exact same
+// point — zIndexOffset controls which one ends up on top/clickable: Defective (red) beats
+// Maintenance (yellow) beats Working (green) beats anything else.
+const ASSET_STATUS_STYLE = {
+    'Defective':   { color: '#dc3545', zIndexOffset: 1000 },
+    'Maintenance': { color: '#ffc107', zIndexOffset: 500 },
+    'Working':     { color: '#198754', zIndexOffset: 0 },
+};
+
+function assetStatusIcon(status) {
+    const style = ASSET_STATUS_STYLE[status] || { color: '#6c757d', zIndexOffset: -100 };
+    return {
+        icon: L.divIcon({
+            className: '',
+            html: `<div style="width:14px;height:14px;border-radius:50%;background:${style.color};border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.5)"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -7],
+        }),
+        zIndexOffset: style.zIndexOffset,
+    };
+}
+
+/** Split-view map for Zone Overview — one dot per asset, colored by status, at its Zone's
+ * coordinates. Multiple assets in the same Zone stack at the same point; the zIndexOffset above
+ * makes the worst status (Defective > Maintenance > Working) render on top so it's what's seen
+ * and clicked first at a glance.
+ *
+ * Returns a handle whose setFilter({category, status}) re-draws only matching markers, so the
+ * Zone Overview quick filters can narrow the map without a full reload. Only fits the map's
+ * bounds to the very first (unfiltered) render — refitting on every filter change would jump the
+ * viewport around distractingly for what's meant to be a quick, lightweight toggle. */
+async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplate) {
+    const map = L.map(mapElId).setView(KUWAIT_CENTER, KUWAIT_ZOOM);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+
+    const assets = await (await fetch(dataUrl)).json();
+    const layer = L.layerGroup().addTo(map);
+    let hasFitBounds = false;
+
+    function render(filter) {
+        layer.clearLayers();
+        const matching = assets.filter(a =>
+            (!filter || !filter.category || a.categoryName === filter.category) &&
+            (!filter || !filter.status || a.status === filter.status)
+        );
+        const markers = matching.map(a => {
+            const { icon, zIndexOffset } = assetStatusIcon(a.status);
+            const marker = L.marker([a.lat, a.lng], { icon, zIndexOffset });
+            marker.bindPopup(
+                `<strong>${a.assetTag}</strong> — ${a.name}<br>${a.status}<br>${a.zoneName}, ${a.categoryName}<br>` +
+                `<a href="${assetDetailsUrlTemplate.replace('__ID__', a.id)}">View →</a>`
+            );
+            marker.addTo(layer);
+            return marker;
+        });
+        if (!hasFitBounds && markers.length > 0) {
+            hasFitBounds = true;
+            map.fitBounds(L.featureGroup(markers).getBounds().pad(0.2));
+        }
+    }
+
+    render(null);
+    return { setFilter: render };
+}
+
 /** Overview map for the Vendor Portal "Map View" — plots every work order assigned to the
  * signed-in vendor, at its asset's Zone location, color-coded by stage. Multiple work orders
  * that share a Zone stack as separate markers at the same point (acceptable at this scale). */
@@ -111,7 +178,7 @@ async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
         const marker = L.marker([w.latitude, w.longitude], { icon: workOrderStageIcon(w.stage) }).addTo(map);
         marker.bindPopup(
             `<strong>${w.workOrderNumber}</strong> — ${w.stage}<br>` +
-            `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.areaName}, ${w.governorateName}<br>` +
+            `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.categoryName}<br>` +
             `<a href="${detailsUrlTemplate.replace('__ID__', w.id)}">View →</a>`
         );
         markers.push(marker);

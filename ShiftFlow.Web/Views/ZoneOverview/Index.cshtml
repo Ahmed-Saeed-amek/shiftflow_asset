@@ -1,0 +1,130 @@
+@model List<Zone>
+@{
+    ViewData["Title"] = Loc.T("Zone Overview");
+    var zoneStatus = (Dictionary<int, (bool HasDefective, bool HasMaintenance)>)ViewBag.ZoneStatus;
+    var dispatchedByZone = (Dictionary<int, int>)ViewBag.DispatchedByZone;
+    var categories = Model.Where(z => z.LocationCategory != null).Select(z => z.LocationCategory!)
+        .GroupBy(c => c.Id).Select(g => g.First()).OrderBy(c => c.Id).ToList();
+
+    string RowStatus(int zoneId) => zoneStatus.TryGetValue(zoneId, out var s)
+        ? (s.HasDefective ? "Defective" : s.HasMaintenance ? "Maintenance" : "OK")
+        : "OK";
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Zone Overview"),Subtitle=Loc.T("Latest orders by zone")})" />
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="small text-muted fw-semibold me-1">@Loc.T("Location Category")</span>
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-primary" data-filter-category="">@Loc.T("All")</button>
+        @foreach (var c in categories)
+        {
+            <button type="button" class="btn btn-outline-secondary" data-filter-category="@c.Name">@Loc.LocalizedName(c.Name, c.NameAr)</button>
+        }
+    </div>
+    <span class="small text-muted fw-semibold ms-2 me-1">@Loc.T("Status")</span>
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-primary" data-filter-status="">@Loc.T("All")</button>
+        <button type="button" class="btn btn-outline-secondary" data-filter-status="Defective">@Loc.T("Defective")</button>
+        <button type="button" class="btn btn-outline-secondary" data-filter-status="Maintenance">@Loc.T("Maintenance")</button>
+        <button type="button" class="btn btn-outline-secondary" data-filter-status="OK">@Loc.T("OK")</button>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive" style="max-height:600px;overflow-y:auto">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>@Loc.T("Location Category")</th>
+                            <th>@Loc.T("Zone")</th>
+                            <th>@Loc.T("Dispatched Orders")</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="zoneTableBody">
+                        @if (Model.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                        }
+                        @foreach (var z in Model)
+                        {
+                            var rowStatus = RowStatus(z.Id);
+                            var rowClass = rowStatus == "Defective" ? "table-danger" : rowStatus == "Maintenance" ? "table-warning" : "";
+                            <tr class="cursor-pointer @rowClass" data-zone-row data-category="@z.LocationCategory?.Name" data-status="@rowStatus"
+                                onclick="location.href='@Url.Action("Details", new { zoneId = z.Id })'">
+                                <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
+                                <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
+                                <td>@dispatchedByZone.GetValueOrDefault(z.Id, 0)</td>
+                                <td class="text-end"><a asp-action="Details" asp-route-zoneId="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
+                            </tr>
+                        }
+                        <tr id="zoneNoMatchRow" class="d-none"><td colspan="4" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <span class="fw-semibold"><i class="bi bi-map me-1 text-primary"></i>@Loc.T("Asset Map")</span>
+                <div class="d-flex align-items-center gap-3 small text-muted">
+                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#dc3545"></span>@Loc.T("Defective")</span>
+                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#ffc107"></span>@Loc.T("Maintenance")</span>
+                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#198754"></span>@Loc.T("Working")</span>
+                </div>
+            </div>
+            <div id="assetOverviewMap" style="height:600px;border-radius:2px"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    let mapHandle = null;
+    let activeCategory = '';
+    let activeStatus = '';
+
+    const rows = () => document.querySelectorAll('[data-zone-row]');
+    const noMatchRow = document.getElementById('zoneNoMatchRow');
+
+    function applyFilters() {
+        let visibleCount = 0;
+        rows().forEach(r => {
+            const matches = (!activeCategory || r.dataset.category === activeCategory)
+                && (!activeStatus || r.dataset.status === activeStatus);
+            r.classList.toggle('d-none', !matches);
+            if (matches) visibleCount++;
+        });
+        noMatchRow.classList.toggle('d-none', visibleCount > 0);
+
+        if (mapHandle) {
+            mapHandle.setFilter({
+                category: activeCategory || null,
+                status: activeStatus === 'OK' ? 'Working' : (activeStatus || null),
+            });
+        }
+    }
+
+    function wireGroup(selector, onSelect) {
+        const buttons = document.querySelectorAll(selector);
+        buttons.forEach(btn => btn.addEventListener('click', () => {
+            buttons.forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary'); });
+            btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary');
+            onSelect(btn);
+        }));
+    }
+
+    wireGroup('[data-filter-category]', btn => { activeCategory = btn.dataset.filterCategory; applyFilters(); });
+    wireGroup('[data-filter-status]', btn => { activeStatus = btn.dataset.filterStatus; applyFilters(); });
+
+    initZoneOverviewAssetMap('assetOverviewMap', '@Url.Action("AssetMap")', '@Url.Action("Details", "Assets", new { id = "__ID__" })')
+        .then(handle => { mapHandle = handle; });
+})();
+</script>

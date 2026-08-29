@@ -22,7 +22,7 @@ public class UserAssetScopesController : Controller
         var scopes = await _db.UserAssetScopes.Include(s => s.User).OrderBy(s => s.User!.FullName).ToListAsync();
         var labels = new Dictionary<int, string>();
         foreach (var s in scopes)
-            labels[s.Id] = await DescribeScopeValueAsync(s.ScopeType, s.ScopeValueId);
+            labels[s.Id] = await DescribeScopeValueAsync(s);
         ViewBag.ScopeValueLabels = labels;
         return View(scopes);
     }
@@ -40,7 +40,7 @@ public class UserAssetScopesController : Controller
         if (await _db.UserAssetScopes.AnyAsync(s => s.UserId == vm.UserId))
             ModelState.AddModelError(nameof(vm.UserId), _loc.T("This user already has a scope assigned — edit or remove it first."));
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
-        _db.UserAssetScopes.Add(new UserAssetScope { UserId = vm.UserId, ScopeType = vm.ScopeType, ScopeValueId = vm.ScopeValueId });
+        _db.UserAssetScopes.Add(new UserAssetScope { UserId = vm.UserId, ZoneId = vm.ZoneId, LocationCategoryId = vm.LocationCategoryId, CategoryId = vm.CategoryId });
         await _db.SaveChangesAsync();
         TempData["Success"] = _loc.T("Scope assigned.");
         return RedirectToAction(nameof(Index));
@@ -53,7 +53,7 @@ public class UserAssetScopesController : Controller
         await PopulateLookupsAsync();
         ViewBag.SelectedUserName = scope.User?.FullName;
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new UserAssetScopeViewModel { Id = scope.Id, UserId = scope.UserId, ScopeType = scope.ScopeType, ScopeValueId = scope.ScopeValueId });
+        return View(new UserAssetScopeViewModel { Id = scope.Id, UserId = scope.UserId, ZoneId = scope.ZoneId, LocationCategoryId = scope.LocationCategoryId, CategoryId = scope.CategoryId });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -62,7 +62,7 @@ public class UserAssetScopesController : Controller
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         var scope = await _db.UserAssetScopes.FindAsync(vm.Id);
         if (scope == null) return NotFound();
-        scope.ScopeType = vm.ScopeType; scope.ScopeValueId = vm.ScopeValueId;
+        scope.ZoneId = vm.ZoneId; scope.LocationCategoryId = vm.LocationCategoryId; scope.CategoryId = vm.CategoryId;
         await _db.SaveChangesAsync();
         TempData["Success"] = _loc.T("Scope updated.");
         return RedirectToAction(nameof(Index));
@@ -76,18 +76,19 @@ public class UserAssetScopesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task<string> DescribeScopeValueAsync(string scopeType, int valueId) => scopeType switch
+    private async Task<string> DescribeScopeValueAsync(UserAssetScope scope)
     {
-        "Zone" => (await _db.Zones.FindAsync(valueId))?.Name ?? "—",
-        "Area" => (await _db.Areas.FindAsync(valueId))?.Name ?? "—",
-        "Category" => (await _db.AssetCategories.FindAsync(valueId))?.Name ?? "—",
-        _ => "—",
-    };
+        var parts = new List<string>();
+        if (scope.ZoneId.HasValue) parts.Add($"{_loc.T("Zone")}: {(await _db.Zones.FindAsync(scope.ZoneId.Value))?.Name ?? "—"}");
+        if (scope.LocationCategoryId.HasValue) parts.Add($"{_loc.T("Location Type")}: {(await _db.LocationCategories.FindAsync(scope.LocationCategoryId.Value))?.Name ?? "—"}");
+        if (scope.CategoryId.HasValue) parts.Add($"{_loc.T("Category")}: {(await _db.AssetCategories.FindAsync(scope.CategoryId.Value))?.Name ?? "—"}");
+        return parts.Count > 0 ? string.Join(" + ", parts) : "—";
+    }
 
     private async Task PopulateLookupsAsync()
     {
         ViewBag.Zones = await _db.Zones.OrderBy(z => z.Name).ToListAsync();
-        ViewBag.Areas = await _db.Areas.OrderBy(a => a.Name).ToListAsync();
+        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.OrderBy(c => c.Name).ToListAsync();
     }
 }
