@@ -28,6 +28,13 @@ public class AccountController : Controller
     private bool IsEntraConfigured =>
         !string.IsNullOrWhiteSpace(_config["AzureAd:ClientId"]) && !string.IsNullOrWhiteSpace(_config["AzureAd:TenantId"]);
 
+    // The site root ("/") routes here (see Program.cs's default route) so every role lands
+    // somewhere they actually have access to — Dashboard for managers, VendorPortal for
+    // vendors, MyHome for everyone else — instead of the old default of routing straight to
+    // DashboardController, which Access-Denied anyone without InspectionOrder.Manage.
+    [Authorize]
+    public async Task<IActionResult> Home() => await HomeRedirect();
+
     [AllowAnonymous]
     public async Task<IActionResult> Login(string? returnUrl = null, string? remoteError = null)
     {

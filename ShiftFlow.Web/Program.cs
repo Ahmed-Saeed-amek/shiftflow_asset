@@ -361,6 +361,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 
+// The bare root ("/", no segments at all) gets its own route straight to the role-aware
+// redirect, so it lands each role somewhere they actually have access to instead of straight
+// into DashboardController (which requires InspectionOrder.Manage and Access-Denies everyone
+// else — engineers, HR, vendors — who visit the site root). This must NOT change the default
+// route's own default action below — every implicit-action URL sitewide (e.g. "/MyHome",
+// "/Assets") relies on that default staying "Index", not "Home".
+app.MapControllerRoute(name: "root", pattern: "", defaults: new { controller = "Account", action = "Home" });
 app.MapControllerRoute(name: "default", pattern: "{controller=Dashboard}/{action=Index}/{id?}");
 
 using (var scope = app.Services.CreateScope())
