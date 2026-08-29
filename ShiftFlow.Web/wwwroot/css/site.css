@@ -188,6 +188,8 @@ h1, h2, h3, h4, h5, h6 {
   background: #0EA5E9;
   color: #fff;
 }
+#sidebar .nav-group-chevron { transition: transform .15s; }
+#sidebar a[aria-expanded="true"] .nav-group-chevron { transform: rotate(180deg); }
 #sidebar .text-white-50 { color: hsl(var(--muted-foreground)) !important; }
 #sidebar .btn-outline-light,
 #sidebar .btn-outline-secondary {
