@@ -87,12 +87,15 @@ const WORK_ORDER_STAGE_COLORS = {
     'Closed': '#198754',
 };
 
+// The colored dot stays 16px so the map doesn't look cluttered, but its actual click target is
+// widened to 28px via a transparent centered wrapper — a bare 16px hit box was easy to miss,
+// especially where several markers sit close together and a near-miss silently did nothing.
 function workOrderStageIcon(stage) {
     const color = WORK_ORDER_STAGE_COLORS[stage] || '#6c757d';
     return L.divIcon({
         className: '',
-        html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.5)"></div>`,
-        iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -8],
+        html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer"><div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.5)"></div></div>`,
+        iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14],
     });
 }
 
