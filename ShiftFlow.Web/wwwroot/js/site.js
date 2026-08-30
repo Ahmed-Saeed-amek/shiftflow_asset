@@ -70,7 +70,7 @@ function initEmployeePickers(){
     var timer=null;
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
-      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
+      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(u){
         var sub=[u.email,u.employeeNumber].filter(Boolean).map(esc).join(' · ');
         return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(u.id)+'" data-label="'+esc(u.fullName||'')+'">'+
@@ -105,7 +105,7 @@ function initAssetPickers(){
     var timer=null;
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
-      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
+      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(a){
         var label=a.assetTag+' — '+(a.name||'');
         return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(a.id)+'" data-label="'+esc(label)+'">'+
@@ -141,7 +141,7 @@ function initZonePickers(){
     var zones=[];
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
-      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">No matches</div>';results.classList.remove('d-none');return;}
+      if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(z){
         var label=z.nameAr&&document.documentElement.dir==='rtl'?z.nameAr:z.name;
         return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(z.id)+'" data-label="'+esc(label||'')+'">'+esc(label||'')+'</button>';

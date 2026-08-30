@@ -5,6 +5,7 @@ public static class Translations
     public static readonly Dictionary<string, string> Ar = new()
     {
         // Sidebar groups
+        ["Settings"] = "الإعدادات",
         ["Overview"] = "نظرة عامة",
         ["Maintenance"] = "الصيانة",
         ["Assets & Materials"] = "الأصول والمواد",
@@ -278,6 +279,7 @@ public static class Translations
         ["Entity"] = "الكيان",
         ["User"] = "المستخدم",
         ["Details"] = "التفاصيل",
+        ["Change"] = "التغيير",
 
         // ── Arabic pass: navigation ──────────────────────────────────────────────
         ["Task Analytics"] = "تحليلات المهام",
@@ -345,7 +347,10 @@ public static class Translations
         ["New Contract"] = "عقد جديد",
         ["No linked contract"] = "لا يوجد عقد مرتبط",
         ["Search by asset tag or name…"] = "ابحث بواسطة رمز الأصل أو الاسم…",
+        ["No matching assets"] = "لا توجد أصول مطابقة",
+        ["No matches"] = "لا توجد نتائج مطابقة",
         ["Add categories and subcategories, then edit or manage their actions below"] = "أضف فئات وفئات فرعية، ثم قم بتعديلها أو إدارة إجراءاتها أدناه",
+        ["Browse the asset category and subcategory taxonomy"] = "استعرض تصنيف فئات وفئات الأصول الفرعية",
         // Both rewritten as single natural status phrases rather than literal action/clause
         // translations — "Sent to Vendor" describes the current state (work order is with the
         // vendor now), not a one-time completed action; "Fixed - Pending Confirmation" drops the
@@ -494,8 +499,11 @@ public static class Translations
         ["All Orders"] = "كل الأوامر",
         ["Assigned Via"] = "طريقة التعيين",
         ["No inspection orders assigned yet."] = "لا توجد أوامر معاينة مسندة حتى الآن.",
+        ["Showing overdue orders only"] = "عرض الأوامر المتأخرة فقط",
         ["No inspection orders in this period."] = "لا توجد أوامر معاينة في هذه الفترة.",
         ["Order breakdown"] = "تفاصيل الأوامر",
+        ["No orders in this period."] = "لا توجد أوامر في هذه الفترة.",
+        ["Inspection order performance — Work Orders and Maintenance Orders aren't counted here"] = "أداء أوامر المعاينة — لا تُحتسب أوامر العمل وأوامر الصيانة هنا",
         ["Orders Assigned"] = "الأوامر المسندة",
         ["Assign inspections to employees or teams"] = "وزّع مهام المعاينة على الموظفين أو الفرق",
         ["Search by order # or title..."] = "ابحث برقم الأمر أو العنوان...",

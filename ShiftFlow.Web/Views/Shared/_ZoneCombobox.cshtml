@@ -21,6 +21,6 @@
         <input type="text" class="form-control @Model.CssClass" autocomplete="off"
                placeholder="@(Model.Placeholder ?? Loc.T("Search zones…"))"
                value="@Model.SelectedZoneLabel" data-zc-search />
-        <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-zc-results></div>
+        <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-zc-results data-nomatch="@Loc.T("No matches")"></div>
     </div>
 </div>
