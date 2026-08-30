@@ -20,6 +20,8 @@ public class MyHomeController : Controller
 
     public async Task<IActionResult> Index()
     {
+        if (User.IsInRole("Vendor")) return RedirectToAction("Index", "VendorPortal");
+
         var user = await _um.GetUserAsync(User);
         var id = user!.Id;
 
