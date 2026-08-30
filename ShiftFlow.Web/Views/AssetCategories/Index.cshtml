@@ -22,7 +22,10 @@
                     @if (canManage)
                     {
                         <div>
-                            <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
+                                    onclick='openEdit(@c.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(c.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(c.NameAr)), null)'>
+                                @Loc.T("Edit")
+                            </button>
                             <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@c.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
                         </div>
                     }
@@ -39,7 +42,10 @@
                             @if (canManage)
                             {
                                 <div>
-                                    <a asp-action="Edit" asp-route-id="@sub.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
+                                            onclick='openEdit(@sub.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sub.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sub.NameAr)), @c.Id)'>
+                                        @Loc.T("Edit")
+                                    </button>
                                     <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@sub.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
                                 </div>
                             }
@@ -95,4 +101,59 @@
 @if (Model.Count == 0 && !canManage)
 {
     <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-4">@Loc.T("No records found")</div></div>
+}
+
+@if (canManage)
+{
+    <div class="modal fade" id="categoryEditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" asp-action="Edit">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="acId" value="0" />
+                    <div class="modal-header">
+                        <h5 class="modal-title">@Loc.T("Edit Category")</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">@Loc.T("Name")</label>
+                                <input name="Name" id="acName" class="form-control" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                                <input name="NameAr" id="acNameAr" class="form-control" dir="rtl" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">@Loc.T("Parent Category")</label>
+                                <select name="ParentCategoryId" id="acParentCategoryId" class="form-select">
+                                    <option value="">@Loc.T("None (top-level)")</option>
+                                    @foreach (var c in Model)
+                                    {
+                                        <option value="@c.Id">@c.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                        <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @section Scripts {
+    <script>
+        function openEdit(id, name, nameAr, parentId) {
+            document.getElementById('acId').value = id;
+            document.getElementById('acName').value = name || '';
+            document.getElementById('acNameAr').value = nameAr || '';
+            document.getElementById('acParentCategoryId').value = parentId || '';
+        }
+    </script>
+    }
 }

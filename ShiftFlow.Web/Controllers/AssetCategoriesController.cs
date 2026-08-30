@@ -48,16 +48,9 @@ public class AssetCategoriesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
-    public async Task<IActionResult> Edit(int id)
-    {
-        var category = await _db.AssetCategories.FindAsync(id);
-        if (category == null) return NotFound();
-        await PopulateParentsAsync(excludeId: id);
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new AssetCategoryViewModel { Id = category.Id, Name = category.Name, NameAr = category.NameAr, ParentCategoryId = category.ParentCategoryId });
-    }
-
+    // Edit is a modal on Index now, matching Create — a separate full page was pure overhead
+    // for 3 fields. Invalid submits report the error on Index instead of returning a page
+    // that no longer exists.
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetCategoryViewModel vm)
     {
@@ -75,7 +68,11 @@ public class AssetCategoriesController : Controller
             if (hasChildren)
                 ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("This category already has subcategories, so it can't become a subcategory itself."));
         }
-        if (!ModelState.IsValid) { await PopulateParentsAsync(excludeId: vm.Id); return View(vm); }
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return RedirectToAction(nameof(Index));
+        }
         var category = await _db.AssetCategories.FindAsync(vm.Id);
         if (category == null) return NotFound();
         category.Name = vm.Name; category.NameAr = vm.NameAr; category.ParentCategoryId = vm.ParentCategoryId;
@@ -91,12 +88,5 @@ public class AssetCategoriesController : Controller
         var subcategories = await _db.AssetCategories.Where(c => c.ParentCategoryId == parentId)
             .OrderBy(c => c.Name).Select(c => new { c.Id, c.Name, c.NameAr }).ToListAsync();
         return Json(subcategories);
-    }
-
-    private async Task PopulateParentsAsync(int? excludeId = null)
-    {
-        var query = _db.AssetCategories.Where(c => c.ParentCategoryId == null);
-        if (excludeId.HasValue) query = query.Where(c => c.Id != excludeId.Value);
-        ViewBag.ParentCategories = await query.OrderBy(c => c.Name).ToListAsync();
     }
 }
