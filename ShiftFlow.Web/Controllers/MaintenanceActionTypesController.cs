@@ -21,36 +21,31 @@ public class MaintenanceActionTypesController : Controller
         return View(types);
     }
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderManage)]
-    public IActionResult Create()
-    {
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new MaintenanceActionTypeViewModel());
-    }
-
+    // Create/Edit are modals on Index now (this list is small and single-purpose enough that a
+    // separate full-page form was pure overhead) — both just redirect back to Index either way,
+    // so an invalid submit reports the error there instead of returning a page that no longer exists.
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MaintenanceActionTypeViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name is required.";
+            return RedirectToAction(nameof(Index));
+        }
         _db.MaintenanceActionTypes.Add(new MaintenanceActionType { Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
         await _db.SaveChangesAsync();
         TempData["Success"] = "Maintenance action created.";
         return RedirectToAction(nameof(Index));
     }
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderManage)]
-    public async Task<IActionResult> Edit(int id)
-    {
-        var type = await _db.MaintenanceActionTypes.FindAsync(id);
-        if (type == null) return NotFound();
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new MaintenanceActionTypeViewModel { Id = type.Id, Name = type.Name, NameAr = type.NameAr, IsActive = type.IsActive });
-    }
-
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(MaintenanceActionTypeViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name is required.";
+            return RedirectToAction(nameof(Index));
+        }
         var type = await _db.MaintenanceActionTypes.FindAsync(vm.Id);
         if (type == null) return NotFound();
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.IsActive = vm.IsActive;

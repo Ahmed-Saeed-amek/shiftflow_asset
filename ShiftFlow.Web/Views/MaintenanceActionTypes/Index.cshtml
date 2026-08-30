@@ -1,7 +1,7 @@
 @model List<MaintenanceActionType>
 @{
     ViewData["Title"] = Loc.T("Maintenance Action Types");
-    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</a>";
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#actionTypeModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</button>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),ActionsHtml=actionsHtml})" />
 
@@ -19,10 +19,77 @@
                     <tr>
                         <td>@Loc.LocalizedName(m.Name, m.NameAr)</td>
                         <td><partial name="_StatusBadge" model="@(m.IsActive ? "Active" : "Inactive")" /></td>
-                        <td><a asp-action="Edit" asp-route-id="@m.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeModal"
+                                    onclick='openEdit(@m.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.NameAr)), @(m.IsActive ? "true" : "false"))'>
+                                @Loc.T("Edit")
+                            </button>
+                        </td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 </div>
+
+<div class="modal fade" id="actionTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="actionTypeForm" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="actionTypeId" value="0" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="actionTypeModalTitle">@Loc.T("New Maintenance Action")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name")</label>
+                            <input name="Name" id="actionTypeName" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <input name="NameAr" id="actionTypeNameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="IsActive" id="actionTypeIsActive" class="form-check-input" value="true" checked />
+                                <label class="form-check-label small" for="actionTypeIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const jsNewActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Maintenance Action")));
+    const jsEditActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Maintenance Action")));
+
+    function openCreate() {
+        document.getElementById('actionTypeModalTitle').textContent = jsNewActionType;
+        document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Create")');
+        document.getElementById('actionTypeId').value = 0;
+        document.getElementById('actionTypeName').value = '';
+        document.getElementById('actionTypeNameAr').value = '';
+        document.getElementById('actionTypeIsActive').checked = true;
+    }
+
+    function openEdit(id, name, nameAr, isActive) {
+        document.getElementById('actionTypeModalTitle').textContent = jsEditActionType;
+        document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Edit")');
+        document.getElementById('actionTypeId').value = id;
+        document.getElementById('actionTypeName').value = name || '';
+        document.getElementById('actionTypeNameAr').value = nameAr || '';
+        document.getElementById('actionTypeIsActive').checked = isActive;
+    }
+</script>
+}
