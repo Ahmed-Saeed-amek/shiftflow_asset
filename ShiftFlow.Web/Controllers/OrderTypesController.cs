@@ -34,6 +34,11 @@ public class OrderTypesController : Controller
             TempData["Error"] = "Name and prefix are required.";
             return RedirectToAction(nameof(Index));
         }
+        if (await _db.OrderTypes.AnyAsync(t => t.Prefix == vm.Prefix))
+        {
+            TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
+            return RedirectToAction(nameof(Index));
+        }
         _db.OrderTypes.Add(new OrderType
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,
@@ -55,6 +60,11 @@ public class OrderTypesController : Controller
         }
         var type = await _db.OrderTypes.FindAsync(vm.Id);
         if (type == null) return NotFound();
+        if (await _db.OrderTypes.AnyAsync(t => t.Id != vm.Id && t.Prefix == vm.Prefix))
+        {
+            TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
+            return RedirectToAction(nameof(Index));
+        }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;
         type.TracksDefectOutcome = vm.TracksDefectOutcome; type.RequiresVendor = vm.RequiresVendor;
         type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
