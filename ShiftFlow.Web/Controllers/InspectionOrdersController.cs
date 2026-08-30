@@ -96,7 +96,11 @@ public class InspectionOrdersController : Controller
             : null;
     }
 
-    [Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
+    // No policy attribute here — access is decided below by manager/assignee/team-member
+    // status instead, since InspectionOrder.Report is a role-level permission that doesn't
+    // account for team membership (a team can include members outside roles that normally
+    // hold it, e.g. HR on a mixed team — they should still be able to open an order their
+    // team is assigned).
     public async Task<IActionResult> Details(int id)
     {
         var order = await _orders.GetByIdAsync(id);
@@ -121,7 +125,7 @@ public class InspectionOrdersController : Controller
         return result.Succeeded;
     }
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
+    [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateItem(int itemId, string outcome, int? actionTypeId, int? causeId, List<int>? maintenanceActionTypeIds)
     {
         if (!InspectionRunAsset.Outcomes.Contains(outcome) || outcome == "Pending")
@@ -171,7 +175,7 @@ public class InspectionOrdersController : Controller
     /// outcome — see UpdateMaintenanceActionsAsync. Unlike UpdateItem, this is safe to call
     /// repeatedly (including after the outcome is already recorded) since it never creates a
     /// Work Order or touches the outcome/order-completion state.</summary>
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderReport)]
+    [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateMaintenanceActions(int itemId, List<int>? maintenanceActionTypeIds)
     {
         var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
