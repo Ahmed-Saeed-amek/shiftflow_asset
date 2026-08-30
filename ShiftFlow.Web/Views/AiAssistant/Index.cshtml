@@ -513,49 +513,60 @@
     }
 
     async function initAvatar() {
+        // startAvatarAsync negotiates a WebRTC session with Azure's avatar service and has no
+        // built-in timeout of its own — if that negotiation never completes (blocked network,
+        // unreachable media ports, etc.) it just hangs forever, leaving the "Connecting avatar…"
+        // overlay up indefinitely with no indication anything went wrong. Race it against a fixed
+        // timeout so a stuck connection falls back to the same "unavailable" message a fast
+        // failure would show, instead of misleading the user forever.
+        const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('avatar connection timed out')), ms));
         try {
-            const [speechResp, iceResp] = await Promise.all([
-                fetch('/AiAssistant/SpeechToken').then(r => r.ok ? r.json() : Promise.reject(new Error('speech token failed'))),
-                fetch('/AiAssistant/AvatarIceToken').then(r => r.ok ? r.json() : Promise.reject(new Error('avatar not configured'))),
-            ]);
-
-            const avatarSpeechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechResp.token, speechResp.region);
-            avatarSpeechConfig.speechSynthesisVoiceName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(avatarVoice));
-
-            const videoFormat = new SpeechSDK.AvatarVideoFormat();
-            const avatarConfig = new SpeechSDK.AvatarConfig('harry', 'business', videoFormat);
-            avatarConfig.backgroundColor = '#F3F4F6FF';
-
-            const videoStream = new MediaStream();
-            const audioStream = new MediaStream();
-            avatarPc = new RTCPeerConnection({
-                iceServers: [{ urls: iceResp.Urls, username: iceResp.Username, credential: iceResp.Password }],
-            });
-            avatarPc.ontrack = e => {
-                if (e.track.kind === 'video') {
-                    videoStream.addTrack(e.track);
-                    document.getElementById('avatarVideo').srcObject = videoStream;
-                } else {
-                    audioStream.addTrack(e.track);
-                    document.getElementById('avatarAudio').srcObject = audioStream;
-                }
-            };
-            avatarPc.addTransceiver('video', { direction: 'sendrecv' });
-            avatarPc.addTransceiver('audio', { direction: 'sendrecv' });
-
-            avatarSynth = new SpeechSDK.AvatarSynthesizer(avatarSpeechConfig, avatarConfig);
-            const result = await avatarSynth.startAvatarAsync(avatarPc);
-
-            if (result.reason === SpeechSDK.ResultReason.Canceled) {
-                const details = SpeechSDK.CancellationDetails.fromResult(result);
-                throw new Error(details.errorDetails || 'Avatar failed to start');
-            }
-            avatarReady = true;
-            hideAvatarOverlay();
+            await Promise.race([initAvatarInner(), timeout(8000)]);
         } catch (e) {
             console.warn('AI Assistant: avatar unavailable —', e);
             showAvatarOverlay(@Html.Raw(avatarErrJson), true);
         }
+    }
+
+    async function initAvatarInner() {
+        const [speechResp, iceResp] = await Promise.all([
+            fetch('/AiAssistant/SpeechToken').then(r => r.ok ? r.json() : Promise.reject(new Error('speech token failed'))),
+            fetch('/AiAssistant/AvatarIceToken').then(r => r.ok ? r.json() : Promise.reject(new Error('avatar not configured'))),
+        ]);
+
+        const avatarSpeechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechResp.token, speechResp.region);
+        avatarSpeechConfig.speechSynthesisVoiceName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(avatarVoice));
+
+        const videoFormat = new SpeechSDK.AvatarVideoFormat();
+        const avatarConfig = new SpeechSDK.AvatarConfig('harry', 'business', videoFormat);
+        avatarConfig.backgroundColor = '#F3F4F6FF';
+
+        const videoStream = new MediaStream();
+        const audioStream = new MediaStream();
+        avatarPc = new RTCPeerConnection({
+            iceServers: [{ urls: iceResp.Urls, username: iceResp.Username, credential: iceResp.Password }],
+        });
+        avatarPc.ontrack = e => {
+            if (e.track.kind === 'video') {
+                videoStream.addTrack(e.track);
+                document.getElementById('avatarVideo').srcObject = videoStream;
+            } else {
+                audioStream.addTrack(e.track);
+                document.getElementById('avatarAudio').srcObject = audioStream;
+            }
+        };
+        avatarPc.addTransceiver('video', { direction: 'sendrecv' });
+        avatarPc.addTransceiver('audio', { direction: 'sendrecv' });
+
+        avatarSynth = new SpeechSDK.AvatarSynthesizer(avatarSpeechConfig, avatarConfig);
+        const result = await avatarSynth.startAvatarAsync(avatarPc);
+
+        if (result.reason === SpeechSDK.ResultReason.Canceled) {
+            const details = SpeechSDK.CancellationDetails.fromResult(result);
+            throw new Error(details.errorDetails || 'Avatar failed to start');
+        }
+        avatarReady = true;
+        hideAvatarOverlay();
     }
 
     // A tab close/refresh never runs cleanup below, so without this the avatar session
