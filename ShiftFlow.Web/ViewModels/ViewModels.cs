@@ -44,20 +44,6 @@ public class PageHeaderModel
     public string? ActionsHtml { get; set; }
 }
 
-public class LocationViewModel
-{
-    public int Id { get; set; }
-    [Required, MaxLength(200)] public string Name { get; set; } = string.Empty;
-    public string? NameAr { get; set; }
-    [Required, MaxLength(50)] public string Code { get; set; } = string.Empty;
-    public string? City { get; set; }
-    public string? Address { get; set; }
-    [Required] public string Status { get; set; } = "Active";
-    public string? Notes { get; set; }
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
-}
-
 public class ZoneViewModel : IValidatableObject
 {
     public int Id { get; set; }

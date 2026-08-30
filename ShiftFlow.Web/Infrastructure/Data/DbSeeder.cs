@@ -454,8 +454,6 @@ public static class DbSeeder
             // Teams
             new Permission { Name = "Team.View",                    Category = "Teams", Description = "See the list of teams and their members" },
             new Permission { Name = "Team.Manage",                  Category = "Teams", Description = "Create teams and manage their membership" },
-            // Locations
-            new Permission { Name = "Location.Manage",              Category = "Locations", Description = "Add, edit, or remove physical site locations" },
             // AI Assistant
             new Permission { Name = "AiAssistant.Use",              Category = "AI Assistant", Description = "Access the AI assistant for inspection-order-related questions and actions" },
             // Administration
@@ -515,7 +513,7 @@ public static class DbSeeder
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
                 "Team.View", "Team.Manage",
                 "AiAssistant.Use",
-                "AuditLog.View", "Location.Manage", "Rbac.Manage",
+                "AuditLog.View", "Rbac.Manage",
                 "Asset.View", "Asset.Manage", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
@@ -659,9 +657,14 @@ public static class DbSeeder
 
         // Report.View / Report.Export were retired along with the standalone Reports
         // page (its one chart worth keeping — Incidents by Severity — moved to the
-        // Executive Dashboard). Clean up any grants, overrides, and the Permission
-        // catalog rows from earlier seeded runs, same pattern as Shift.Manage above.
-        foreach (var retiredPermission in new[] { "Report.View", "Report.Export" })
+        // Executive Dashboard). Location.Manage was retired along with the standalone
+        // Locations CRUD (LocationsController/Views/Locations) — confirmed unreachable
+        // from any nav link and never displayed/edited from any other page (the Zone/
+        // LocationCategory system replaced it; the underlying Location entity/table is
+        // left alone since ApplicationUser.LocationId still references it). Clean up
+        // any grants, overrides, and the Permission catalog rows from earlier seeded
+        // runs, same pattern as Shift.Manage above.
+        foreach (var retiredPermission in new[] { "Report.View", "Report.Export", "Location.Manage" })
         {
             var staleGrants = await db.RolePermissions
                 .Where(rp => rp.PermissionName == retiredPermission)

@@ -26,9 +26,6 @@ public static class PermissionCatalog
     // ── Audit Logs ──────────────────────────────────────────────────────────────
     public const string AuditLogView                = "AuditLog.View";
 
-    // ── Locations ───────────────────────────────────────────────────────────────
-    public const string LocationManage              = "Location.Manage";
-
     // ── RBAC Administration ─────────────────────────────────────────────────────
     public const string RbacManage                  = "Rbac.Manage";
 
@@ -68,7 +65,6 @@ public static class PermissionCatalog
         TeamView, TeamManage,
         AiAssistantUse,
         AuditLogView,
-        LocationManage,
         RbacManage,
         AssetView, AssetManage, AssetCategoryManage,
         VendorView, VendorManage,

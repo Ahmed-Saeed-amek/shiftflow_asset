@@ -35,7 +35,6 @@ public static class PermissionDisplay
         [PermissionCatalog.InspectionOrderExport]    = "Export Inspection Orders",
         [PermissionCatalog.TeamView]                 = "View Teams",
         [PermissionCatalog.TeamManage]                = "Manage Teams",
-        [PermissionCatalog.LocationManage]           = "Manage Locations",
         [PermissionCatalog.AiAssistantUse]           = "Use AI Assistant",
         [PermissionCatalog.AuditLogView]             = "View Audit Log",
         [PermissionCatalog.RbacManage]                = "Manage Roles & Permissions",
