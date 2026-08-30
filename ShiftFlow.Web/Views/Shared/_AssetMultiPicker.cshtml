@@ -102,12 +102,25 @@
 
     chipsEl.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => btn.closest('[data-chip]').remove()));
 
+    const jsNoMatches = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("No matching assets")));
+
     async function search(term) {
         const res = await fetch(`/Assets/Search?q=${encodeURIComponent(term)}`);
         const items = await res.json();
         resultsEl.innerHTML = '';
         const available = items.filter(i => !selectedIds().includes(i.id));
-        if (available.length === 0) { resultsEl.classList.add('d-none'); return; }
+        if (available.length === 0) {
+            if (term) {
+                const empty = document.createElement('div');
+                empty.className = 'list-group-item small text-muted';
+                empty.textContent = jsNoMatches;
+                resultsEl.appendChild(empty);
+                resultsEl.classList.remove('d-none');
+            } else {
+                resultsEl.classList.add('d-none');
+            }
+            return;
+        }
         available.forEach(i => {
             const item = document.createElement('button');
             item.type = 'button';
