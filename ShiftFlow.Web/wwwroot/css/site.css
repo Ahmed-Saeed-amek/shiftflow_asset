@@ -555,15 +555,16 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
 .cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .cal-scroll .cal-grid { min-width: 640px; }
 
-/* Floating AI avatar widget. Pinned to the inline-start (left in LTR) corner rather than
-   inline-end — list pages consistently right-align their row actions (Users, Vendors, etc.
-   all use text-end), so end-corner placement put the bubble permanently on top of them with
-   no way to reach the action underneath. Start-corner avoids that collision regardless of
-   language direction, since it stays the opposite side from wherever those actions land. */
+/* Floating AI avatar widget. Tried moving this to the inline-start corner to dodge list
+   pages' right-aligned row actions (Users, Vendors, etc. all use text-end) — but a fresh-eyes
+   pass across more pages found start-corner is net worse: it lands on left-aligned names,
+   dates, and permission checkboxes (Users, Dashboard, Audit Logs, Rbac), which is more content
+   and harder to work around than the original icon-button collision. Reverted to inline-end;
+   the narrower mobile footprint below still stands since it shrinks the collision either way. */
 #floatingAvatar {
   position: fixed;
   bottom: 1.5rem;
-  inset-inline-start: 1.5rem;
+  inset-inline-end: 1.5rem;
   z-index: 1050;
 }
 #floatingAvatar .avatar-bubble {
@@ -583,7 +584,7 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
 #floatingAvatar .avatar-card {
   position: absolute;
   bottom: 76px;
-  inset-inline-start: 0;
+  inset-inline-end: 0;
   width: 220px;
   background: #fff;
   border: 1px solid hsl(var(--border));
@@ -597,7 +598,7 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
    right-aligned row actions (e.g. Users) with no way to reach them underneath it —
    shrinking it here reduces how much of the corner it permanently occupies. */
 @media (max-width: 575.98px) {
-  #floatingAvatar { bottom: .75rem; inset-inline-start: .75rem; }
+  #floatingAvatar { bottom: .75rem; inset-inline-end: .75rem; }
   #floatingAvatar .avatar-bubble { width: 44px; height: 44px; }
   #floatingAvatar .avatar-bubble i { font-size: 1.1rem; }
   #floatingAvatar .avatar-card { bottom: 54px; width: 200px; }
