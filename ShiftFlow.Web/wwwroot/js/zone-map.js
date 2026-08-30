@@ -163,9 +163,27 @@ async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplat
     return { setFilter: render };
 }
 
+/** Nudges markers that land on the exact same coordinates into a small ring around that point
+ * so every one of them stays individually clickable — without this, a Leaflet marker placed
+ * directly on top of another is entirely unreachable (no click-through, no popup cycling), which
+ * silently hides every work order but the last one drawn at a shared Zone. ~15m radius at Kuwait's
+ * latitude — small enough to still read as "the same location" at any zoom level that matters here. */
+function spreadCoincidentPoints(items, getLat, getLng) {
+    const seen = new Map();
+    return items.map(item => {
+        const key = `${getLat(item)},${getLng(item)}`;
+        const count = seen.get(key) || 0;
+        seen.set(key, count + 1);
+        if (count === 0) return { item, lat: getLat(item), lng: getLng(item) };
+        const angle = (count - 1) * (2 * Math.PI / 6);
+        const r = 0.00015;
+        return { item, lat: getLat(item) + r * Math.sin(angle), lng: getLng(item) + r * Math.cos(angle) };
+    });
+}
+
 /** Overview map for the Vendor Portal "Map View" — plots every work order assigned to the
- * signed-in vendor, at its asset's Zone location, color-coded by stage. Multiple work orders
- * that share a Zone stack as separate markers at the same point (acceptable at this scale). */
+ * signed-in vendor, at its asset's Zone location, color-coded by stage. Work orders that share a
+ * Zone are spread into a small ring (see spreadCoincidentPoints) so each stays clickable. */
 async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
     const map = L.map(mapElId).setView(KUWAIT_CENTER, KUWAIT_ZOOM);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -173,9 +191,10 @@ async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
     }).addTo(map);
 
     const workOrders = await (await fetch(dataUrl)).json();
+    const placed = spreadCoincidentPoints(workOrders, w => w.latitude, w => w.longitude);
     const markers = [];
-    workOrders.forEach(w => {
-        const marker = L.marker([w.latitude, w.longitude], { icon: workOrderStageIcon(w.stage) }).addTo(map);
+    placed.forEach(({ item: w, lat, lng }) => {
+        const marker = L.marker([lat, lng], { icon: workOrderStageIcon(w.stage) }).addTo(map);
         marker.bindPopup(
             `<strong>${w.workOrderNumber}</strong> — ${w.stage}<br>` +
             `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.categoryName}<br>` +
