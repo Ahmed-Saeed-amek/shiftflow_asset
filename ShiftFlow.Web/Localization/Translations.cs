@@ -511,6 +511,7 @@ public static class Translations
         ["No inspection orders found."] = "لا توجد أوامر معاينة حالياً.",
         ["Order #"] = "رقم الأمر",
         ["My Orders"] = "أوامري",
+        ["Every inspection, maintenance, and work order assigned to you or your teams, in one place"] = "كل أوامر المعاينة والصيانة والعمل المسندة إليك أو إلى فرقك، في مكان واحد",
         ["Inspection orders assigned to you or your teams"] = "أوامر المعاينة المسندة لك أو لفريقك",
         ["No inspection orders assigned to you."] = "لا توجد أوامر معاينة مسندة لك.",
         ["No open inspection orders — you're all caught up."] = "رائع! لا توجد أوامر معاينة قائمة حالياً.",

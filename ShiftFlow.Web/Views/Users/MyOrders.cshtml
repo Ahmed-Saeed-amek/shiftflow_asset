@@ -51,8 +51,8 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th>@Loc.T("Asset")</th>
-                        <th>@Loc.T("Status")</th><th>@Loc.T("Due Date")</th><th></th>
+                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th class="d-none d-sm-table-cell">@Loc.T("Asset")</th>
+                        <th>@Loc.T("Status")</th><th class="d-none d-md-table-cell">@Loc.T("Due Date")</th><th class="text-end"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,14 +61,10 @@
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", o.DetailsController, new { id = o.Id })'">
                             <td><span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
                             <td class="fw-semibold">@o.OrderNumber</td>
-                            <td class="small">@(o.AssetLabel ?? "—")</td>
+                            <td class="small d-none d-sm-table-cell">@(o.AssetLabel ?? "—")</td>
                             <td><partial name="_StatusBadge" model="@o.Status" /></td>
-                            <td>@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
-                            <td class="text-end" onclick="event.stopPropagation()">
-                                <a asp-controller="@o.DetailsController" asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">
-                                    @Loc.T("View")
-                                </a>
-                            </td>
+                            <td class="d-none d-md-table-cell">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
+                            <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
                         </tr>
                     }
                 </tbody>

@@ -90,7 +90,7 @@
                         <td>
                             @if (item.Outcome == "Pending")
                             {
-                                <div class="d-flex gap-2 outcome-actions">
+                                <div class="d-flex flex-wrap gap-2 gap-sm-3 outcome-actions">
                                     <button type="button" class="btn btn-sm btn-outline-success outcome-btn" data-outcome="OK">@Loc.T("OK")</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger outcome-btn" data-outcome="Defective">@Loc.T("Defective")</button>
                                     <button type="button" class="btn btn-sm btn-outline-primary maintenance-only-btn" data-item-id="@item.Id">@Loc.T("Maintenance")</button>
