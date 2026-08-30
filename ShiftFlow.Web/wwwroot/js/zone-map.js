@@ -7,6 +7,17 @@ const KUWAIT_ZOOM = 9;
 const GOVERNORATE_ZOOM = 12;
 const PIN_ZOOM = 15;
 
+// This file has no access to the Razor Loc.T() dictionary, so the map popups' one recurring
+// static string ("View →") and the raw asset-status enum get a small hardcoded lookup here,
+// keyed off the same document.documentElement.dir the rest of the app's RTL logic reads.
+function mapViewLinkText() {
+    return document.documentElement.dir === 'rtl' ? 'عرض ←' : 'View →';
+}
+const ASSET_STATUS_LABELS_AR = { Working: 'يعمل', Maintenance: 'صيانة', Defective: 'معطل' };
+function mapAssetStatusLabel(status) {
+    return document.documentElement.dir === 'rtl' ? (ASSET_STATUS_LABELS_AR[status] || status) : status;
+}
+
 /** Editable single-marker map for Zone Create/Edit — two-way synced with the Lat/Lng inputs. */
 function initZonePickerMap(mapElId, latInputId, lngInputId, initialLat, initialLng) {
     const latInput = document.getElementById(latInputId);
@@ -68,7 +79,7 @@ async function initZoneOverviewMap(mapElId, dataUrl, detailsUrlTemplate) {
         const marker = L.marker([z.latitude, z.longitude]).addTo(map);
         marker.bindPopup(
             `<strong>${z.name}</strong><br>${z.categoryName}<br>` +
-            `${z.assetCount} asset(s)<br><a href="${detailsUrlTemplate.replace('__ID__', z.id)}">View →</a>`
+            `${z.assetCount} asset(s)<br><a href="${detailsUrlTemplate.replace('__ID__', z.id)}">${mapViewLinkText()}</a>`
         );
         markers.push(marker);
     });
@@ -150,8 +161,8 @@ async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplat
             const { icon, zIndexOffset } = assetStatusIcon(a.status);
             const marker = L.marker([a.lat, a.lng], { icon, zIndexOffset });
             marker.bindPopup(
-                `<strong>${a.assetTag}</strong> — ${a.name}<br>${a.status}<br>${a.zoneName}, ${a.categoryName}<br>` +
-                `<a href="${assetDetailsUrlTemplate.replace('__ID__', a.id)}">View →</a>`
+                `<strong>${a.assetTag}</strong> — ${a.name}<br>${mapAssetStatusLabel(a.status)}<br>${a.zoneName}, ${a.categoryName}<br>` +
+                `<a href="${assetDetailsUrlTemplate.replace('__ID__', a.id)}">${mapViewLinkText()}</a>`
             );
             marker.addTo(layer);
             return marker;
@@ -201,7 +212,7 @@ async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
         marker.bindPopup(
             `<strong>${w.workOrderNumber}</strong> — ${w.stage}<br>` +
             `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.categoryName}<br>` +
-            `<a href="${detailsUrlTemplate.replace('__ID__', w.id)}">View →</a>`
+            `<a href="${detailsUrlTemplate.replace('__ID__', w.id)}">${mapViewLinkText()}</a>`
         );
         markers.push(marker);
     });

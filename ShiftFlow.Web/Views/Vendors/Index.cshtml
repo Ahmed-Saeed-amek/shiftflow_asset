@@ -29,7 +29,7 @@
                         <td onclick="event.stopPropagation()">
                             @if (canManage)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#vendorModal"
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#vendorModal" data-vendor-id="@v.Id"
                                         onclick='openEdit(@v.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.ContactName)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Phone)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Email)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Specialization)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Status)))'>
                                     @Loc.T("Edit")
                                 </button>
@@ -129,6 +129,14 @@
             document.getElementById('vEmail').value = email || '';
             document.getElementById('vSpecialization').value = specialization || '';
             document.getElementById('vStatus').value = status;
+        }
+
+        // Arriving here from a vendor's Details page ("Edit" button) via ?edit=<id> — open
+        // straight to that vendor's edit modal instead of leaving the admin back on a bare list.
+        const editId = new URLSearchParams(location.search).get('edit');
+        if (editId) {
+            const btn = document.querySelector(`button[data-vendor-id="${editId}"]`);
+            if (btn) btn.click();
         }
     </script>
     }
