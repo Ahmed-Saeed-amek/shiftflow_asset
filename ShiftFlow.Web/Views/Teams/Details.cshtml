@@ -5,6 +5,7 @@
 @{
     ViewData["Title"] = Model.Name;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
+    var canViewProfiles = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     string actionsHtml = canManage
         ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-pencil me-1\"></i>" + Loc.T("Edit") + "</a>"
         : "";
@@ -26,7 +27,14 @@
         @foreach (var m in Model.Members.OrderBy(m => m.User.FullName))
         {
             <div class="list-group-item">
-                <div class="fw-semibold small">@m.User.FullName</div>
+                @if (canViewProfiles)
+                {
+                    <a asp-controller="Users" asp-action="Profile" asp-route-id="@m.UserId" class="fw-semibold small text-decoration-none">@m.User.FullName</a>
+                }
+                else
+                {
+                    <div class="fw-semibold small">@m.User.FullName</div>
+                }
                 <div class="text-muted" style="font-size:.75rem">@m.User.Email</div>
             </div>
         }
