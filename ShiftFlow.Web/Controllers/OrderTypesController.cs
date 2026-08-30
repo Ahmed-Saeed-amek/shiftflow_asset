@@ -23,16 +23,17 @@ public class OrderTypesController : Controller
         return View(types);
     }
 
-    public IActionResult Create()
-    {
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new OrderTypeViewModel());
-    }
-
+    // Create/Edit are modals on Index now — 6 fields is still small enough that a separate
+    // full-page form was pure overhead. Both just redirect back to Index either way, so an
+    // invalid submit reports the error there instead of returning a page that no longer exists.
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(OrderTypeViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name and prefix are required.";
+            return RedirectToAction(nameof(Index));
+        }
         _db.OrderTypes.Add(new OrderType
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,
@@ -44,23 +45,14 @@ public class OrderTypesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Edit(int id)
-    {
-        var type = await _db.OrderTypes.FindAsync(id);
-        if (type == null) return NotFound();
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new OrderTypeViewModel
-        {
-            Id = type.Id, Name = type.Name, NameAr = type.NameAr, Prefix = type.Prefix,
-            TracksDefectOutcome = type.TracksDefectOutcome, RequiresVendor = type.RequiresVendor,
-            IsActive = type.IsActive, SortOrder = type.SortOrder,
-        });
-    }
-
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(OrderTypeViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name and prefix are required.";
+            return RedirectToAction(nameof(Index));
+        }
         var type = await _db.OrderTypes.FindAsync(vm.Id);
         if (type == null) return NotFound();
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;

@@ -1,7 +1,7 @@
 @model List<OrderType>
 @{
     ViewData["Title"] = Loc.T("Order Types");
-    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order Type") + "</a>";
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#orderTypeModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order Type") + "</button>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Order Types"),Subtitle=Loc.T("Shared by Inspection Orders and Maintenance Orders"),ActionsHtml=actionsHtml})" />
 
@@ -22,10 +22,101 @@
                         <td>@(t.TracksDefectOutcome ? Loc.T("Yes") : Loc.T("No"))</td>
                         <td>@(t.RequiresVendor ? Loc.T("Yes") : Loc.T("No"))</td>
                         <td><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
-                        <td><a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
+                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"))'>
+                                @Loc.T("Edit")
+                            </button>
+                        </td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 </div>
+
+<div class="modal fade" id="orderTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="orderTypeForm" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="otId" value="0" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="orderTypeModalTitle">@Loc.T("New Order Type")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Name")</label>
+                            <input name="Name" id="otName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <input name="NameAr" id="otNameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Order Number Prefix")</label>
+                            <input name="Prefix" id="otPrefix" class="form-control" placeholder="INS" required maxlength="10" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Sort Order")</label>
+                            <input name="SortOrder" id="otSortOrder" type="number" class="form-control" value="0" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="TracksDefectOutcome" id="otTracksDefect" class="form-check-input" value="true" />
+                                <label class="form-check-label small" for="otTracksDefect">@Loc.T("Tracks defect outcome (Action Type + Cause required on Defective)")</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="RequiresVendor" id="otRequiresVendor" class="form-check-input" value="true" />
+                                <label class="form-check-label small" for="otRequiresVendor">@Loc.T("Requires vendor (routes through the Work Order vendor pipeline)")</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="IsActive" id="otIsActive" class="form-check-input" value="true" checked />
+                                <label class="form-check-label small" for="otIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const jsNewOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Order Type")));
+    const jsEditOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Order Type")));
+
+    function openCreate() {
+        document.getElementById('orderTypeModalTitle').textContent = jsNewOrderType;
+        document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Create")');
+        document.getElementById('otId').value = 0;
+        document.getElementById('otName').value = '';
+        document.getElementById('otNameAr').value = '';
+        document.getElementById('otPrefix').value = '';
+        document.getElementById('otSortOrder').value = 0;
+        document.getElementById('otTracksDefect').checked = false;
+        document.getElementById('otRequiresVendor').checked = false;
+        document.getElementById('otIsActive').checked = true;
+    }
+
+    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive) {
+        document.getElementById('orderTypeModalTitle').textContent = jsEditOrderType;
+        document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Edit")');
+        document.getElementById('otId').value = id;
+        document.getElementById('otName').value = name || '';
+        document.getElementById('otNameAr').value = nameAr || '';
+        document.getElementById('otPrefix').value = prefix || '';
+        document.getElementById('otSortOrder').value = sortOrder;
+        document.getElementById('otTracksDefect').checked = tracksDefect;
+        document.getElementById('otRequiresVendor').checked = requiresVendor;
+        document.getElementById('otIsActive').checked = isActive;
+    }
+</script>
+}
