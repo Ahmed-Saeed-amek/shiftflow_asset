@@ -90,7 +90,7 @@
                 {
                     <form method="post" asp-action="AssignEmployee" asp-route-id="@Model.Id" class="mt-2 pt-2 border-top">
                         @Html.AntiForgeryToken()
-                        <label class="form-label small text-muted mb-1">@Loc.T("Reassign Employee")</label>
+                        <label class="form-label small text-muted mb-1">@(Model.AssignedToUserId != null ? Loc.T("Reassign Employee") : Loc.T("Assign Employee"))</label>
                         <partial name="_EmployeePicker" model='new EmployeePickerModel {
                             Name = "employeeUserId", SelectedId = Model.AssignedToUserId, SelectedLabel = Model.AssignedToUser?.FullName,
                             Placeholder = Loc.T("Search by name or email…"), CssClass = "form-control-sm" }' />
