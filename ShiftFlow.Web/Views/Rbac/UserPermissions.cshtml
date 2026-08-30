@@ -25,7 +25,7 @@
             <span class="text-muted fw-normal fs-6 ms-1">— @Loc.T("Permission Overrides")</span>
         </h4>
         <small class="text-muted">
-            @Loc.T("Roles"): @string.Join(", ", userRoles.Select(r => $"<span class='badge bg-info-subtle text-info border border-info-subtle'>{RoleLabel(r)}</span>"))
+            @Loc.T("Roles"): @Html.Raw(string.Join(", ", userRoles.Select(r => $"<span class='badge bg-info-subtle text-info border border-info-subtle'>{System.Net.WebUtility.HtmlEncode(RoleLabel(r))}</span>")))
         </small>
     </div>
 </div>
