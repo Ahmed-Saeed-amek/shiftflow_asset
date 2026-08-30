@@ -161,7 +161,6 @@ public interface IMaintenanceOrderService
     Task CancelAsync(int orderId, string? reason, string userId);
     Task<MaintenanceOrder?> GetByIdAsync(int id);
     Task<List<MaintenanceOrder>> GetAllAsync(string? status, string? search);
-    Task<List<MaintenanceOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
     Task<byte[]> ExportToExcelAsync();
 }
 

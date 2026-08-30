@@ -109,61 +109,75 @@ public class UsersController : Controller
     // Team they belong to). Open work by default; showAll=true also includes Done.
     // Employees see only this month's tasks by default (range=null -> "month"); pass range=all
     // for the full history (no date bound), matching MyMetrics' range convention.
+    // Unified "what's assigned to me" list — combines Inspection Orders (direct or via team),
+    // Maintenance Orders, and Work Orders into one list with a Category badge, replacing what
+    // used to be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work
+    // Orders) that all did the same "show me my open work" job for a different order type.
     [Authorize]
-    public async Task<IActionResult> MyTasks(bool showAll = false, string? range = null)
+    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null, string? category = null)
     {
         var id = _um.GetUserId(User)!;
-        // The date range only makes sense when browsing history (showAll) — a still-open task
+        // The date range only makes sense when browsing history (showAll) — a still-open order
         // stays relevant no matter how long ago it was created, so the default "open work" view
         // must never let a "this month" bound silently hide it.
         var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
         ViewBag.SelectedRange = range ?? "month";
-        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
         ViewBag.ShowAll = showAll;
+        ViewBag.Category = category;
+
+        var rows = await BuildMyWorkOrderRowsAsync(id, showAll, from, to);
+        if (!string.IsNullOrWhiteSpace(category))
+            rows = rows.Where(r => r.Category == category).ToList();
+
         return View(rows);
     }
 
-    // Same query/shape as MyTasks, rendered to PDF instead of HTML.
-    [Authorize]
-    public async Task<IActionResult> MyTasksPdf(bool showAll = false, string? range = null)
-    {
-        var id = _um.GetUserId(User)!;
-        var user = await _um.FindByIdAsync(id);
-        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
-        var rows = await BuildMyInspectionOrderRowsAsync(id, showAll, from, to);
-
-        var bytes = BuildTasksPdf(rows, user?.FullName ?? user?.Email ?? id, showAll);
-        return File(bytes, "application/pdf", $"MyTasks_{DateTime.Today:yyyyMMdd}.pdf");
-    }
-
-    private async Task<List<InspectionOrderRow>> BuildMyInspectionOrderRowsAsync(string userId, bool showAll, DateTime? from = null, DateTime? to = null)
+    private async Task<List<MyWorkOrderRow>> BuildMyWorkOrderRowsAsync(string userId, bool showAll, DateTime? from = null, DateTime? to = null)
     {
         var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == userId).Select(m => m.TeamId).ToListAsync();
 
-        var query = _db.InspectionOrders.AsNoTracking()
+        var inspectionQuery = _db.InspectionOrders.AsNoTracking()
             .Where(o => o.AssignedToUserId == userId || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
-
-        if (!showAll)
-            query = query.Where(o => o.Status != "Done");
-        if (from.HasValue) query = query.Where(o => o.CreatedAt >= from.Value);
-        if (to.HasValue) query = query.Where(o => o.CreatedAt <= to.Value);
-
-        return await query
-            .OrderByDescending(o => o.CreatedAt)
-            .Select(o => new InspectionOrderRow
+        if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done");
+        if (from.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt >= from.Value);
+        if (to.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt <= to.Value);
+        var inspectionRows = await inspectionQuery
+            .Select(o => new MyWorkOrderRow
             {
-                OrderId         = o.Id,
-                OrderNumber     = o.OrderNumber,
-                OrderTypeName   = o.OrderType!.Name,
-                Status          = o.Status,
-                DueDate         = o.DueDate,
-                AssignedContext = o.AssignedToUserId == userId ? "Me" : "Team",
-                CreatedAt       = o.CreatedAt,
-                TotalAssets     = o.InspectionRun!.Items.Count,
-                CheckedAssets   = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending"),
+                Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+                AssetLabel = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending") + "/" + o.InspectionRun!.Items.Count + " " + "assets",
+                Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
             })
-            .Take(300)
             .ToListAsync();
+
+        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset).Where(m => m.AssignedToUserId == userId);
+        if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == "Open");
+        if (from.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate >= from.Value);
+        if (to.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate <= to.Value);
+        var maintenanceRows = await maintenanceQuery
+            .Select(m => new MyWorkOrderRow
+            {
+                Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
+                AssetLabel = m.Asset!.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
+            })
+            .ToListAsync();
+
+        var workOrderQuery = _db.WorkOrders.AsNoTracking().Include(w => w.Asset).Where(w => w.AssignedToUserId == userId);
+        if (!showAll) workOrderQuery = workOrderQuery.Where(w => w.Stage != "Closed");
+        if (from.HasValue) workOrderQuery = workOrderQuery.Where(w => w.CreatedDate >= from.Value);
+        if (to.HasValue) workOrderQuery = workOrderQuery.Where(w => w.CreatedDate <= to.Value);
+        var workOrderRows = await workOrderQuery
+            .Select(w => new MyWorkOrderRow
+            {
+                Category = "WorkOrder", CategoryLabel = "Work Order", Id = w.Id, OrderNumber = w.WorkOrderNumber,
+                AssetLabel = w.Asset!.AssetTag, Status = w.Stage, DueDate = null, CreatedAt = w.CreatedDate, DetailsController = "WorkOrders",
+            })
+            .ToListAsync();
+
+        return inspectionRows.Concat(maintenanceRows).Concat(workOrderRows)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(300)
+            .ToList();
     }
 
     // Unified employee-facing history: their own Inspection/QuickCheck orders and assigned
@@ -186,8 +200,15 @@ public class UsersController : Controller
             .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
             .ToListAsync();
 
+        var workOrderGroups = await _db.WorkOrders.AsNoTracking()
+            .Where(w => w.AssignedToUserId == id)
+            .GroupBy(w => new { w.CreatedDate.Year, w.CreatedDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .ToListAsync();
+
         var months = inspectionGroups.Select(g => (g.Year, g.Month))
             .Union(maintenanceGroups.Select(g => (g.Year, g.Month)))
+            .Union(workOrderGroups.Select(g => (g.Year, g.Month)))
             .OrderByDescending(m => m.Year).ThenByDescending(m => m.Month)
             .Select(m => new MyHistoryMonthRow
             {
@@ -195,92 +216,11 @@ public class UsersController : Controller
                 Month = m.Month,
                 InspectionCount = inspectionGroups.FirstOrDefault(g => g.Year == m.Year && g.Month == m.Month)?.Count ?? 0,
                 MaintenanceCount = maintenanceGroups.FirstOrDefault(g => g.Year == m.Year && g.Month == m.Month)?.Count ?? 0,
+                WorkOrderCount = workOrderGroups.FirstOrDefault(g => g.Year == m.Year && g.Month == m.Month)?.Count ?? 0,
             })
             .ToList();
 
         return View(months);
-    }
-
-    private static byte[] BuildTasksPdf(List<InspectionOrderRow> rows, string userName, bool showAll)
-    {
-        using var ms = new MemoryStream();
-        var writer = new iText.Kernel.Pdf.PdfWriter(ms);
-        var pdf    = new iText.Kernel.Pdf.PdfDocument(writer);
-        var doc    = new iText.Layout.Document(pdf, iText.Kernel.Geom.PageSize.A4);
-        doc.SetMargins(20, 20, 20, 20);
-
-        // Shared colors — Rased design system
-        var navyBg  = new iText.Kernel.Colors.DeviceRgb(0x1A, 0x27, 0x44);
-        var lightBg = new iText.Kernel.Colors.DeviceRgb(0xF0, 0xF4, 0xF8);
-        var white   = iText.Kernel.Colors.ColorConstants.WHITE;
-        var mutedTx = new iText.Kernel.Colors.DeviceRgb(0x60, 0x7D, 0x8B);
-        var borderC = new iText.Kernel.Colors.DeviceRgb(0xDE, 0xE2, 0xE6);
-
-        static (iText.Kernel.Colors.DeviceRgb bg, iText.Kernel.Colors.DeviceRgb fg) StatusColors(string s) => s switch
-        {
-            "Done"       => (new(0xE8, 0xF5, 0xE9), new(0x1B, 0x5E, 0x20)),
-            "InProgress" => (new(0xE3, 0xF2, 0xFD), new(0x0D, 0x47, 0xA1)),
-            _            => (new(0xEC, 0xEF, 0xF1), new(0x49, 0x50, 0x57)),
-        };
-
-        doc.Add(new iText.Layout.Element.Paragraph("MY TASKS")
-            .SetFontSize(8).SetFontColor(white).SetBold()
-            .SetBackgroundColor(navyBg).SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
-            .SetMarginBottom(0));
-        doc.Add(new iText.Layout.Element.Paragraph(userName)
-            .SetFontSize(14).SetFontColor(white).SetBold()
-            .SetBackgroundColor(navyBg).SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
-            .SetMarginBottom(0));
-        doc.Add(new iText.Layout.Element.Paragraph(showAll ? "All orders" : "Open orders")
-            .SetFontSize(8).SetFontColor(white)
-            .SetBackgroundColor(new iText.Kernel.Colors.DeviceRgb(0x34, 0x49, 0x5E))
-            .SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
-            .SetMarginBottom(10));
-
-        var tbl = new iText.Layout.Element.Table(new float[] { 1.5f, 1.2f, 1.2f, 1.2f, 1.2f })
-            .UseAllAvailableWidth().SetMarginBottom(8).SetFontSize(8);
-
-        foreach (var h in new[] { "Order #", "Status", "Checked", "Due Date", "Context" })
-            tbl.AddHeaderCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(h).SetBold())
-                .SetBackgroundColor(lightBg)
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-
-        foreach (var r in rows)
-        {
-            var (statusBg, statusFg) = StatusColors(r.Status);
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(r.OrderNumber))
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(r.Status))
-                .SetBackgroundColor(statusBg).SetFontColor(statusFg)
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph($"{r.CheckedAssets}/{r.TotalAssets}"))
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(r.DueDate?.ToString("dd/MM/yyyy") ?? "-"))
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-            tbl.AddCell(new iText.Layout.Element.Cell()
-                .Add(new iText.Layout.Element.Paragraph(r.AssignedContext))
-                .SetPadding(4).SetBorder(new iText.Layout.Borders.SolidBorder(borderC, 0.5f)));
-        }
-
-        doc.Add(tbl);
-
-        if (rows.Count == 0)
-            doc.Add(new iText.Layout.Element.Paragraph("No orders to show.")
-                .SetFontColor(mutedTx).SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER));
-
-        doc.Add(new iText.Layout.Element.Paragraph($"Generated {DateTime.Now:dd/MM/yyyy, HH:mm}  |  {rows.Count} order(s)")
-            .SetFontSize(7).SetFontColor(mutedTx)
-            .SetBackgroundColor(lightBg)
-            .SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
-            .SetMarginTop(4));
-
-        doc.Close();
-        return ms.ToArray();
     }
 
     private static (DateTime? from, DateTime? to) ResolveRange(string? range)

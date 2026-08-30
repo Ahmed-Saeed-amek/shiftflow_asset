@@ -26,6 +26,7 @@
                         <th>@Loc.T("Month")</th>
                         <th>@Loc.T("Inspection")</th>
                         <th>@Loc.T("Maintenance Order")</th>
+                        <th>@Loc.T("Work Order")</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -37,9 +38,9 @@
                             <td class="fw-semibold">@monthDate.ToString("MMMM yyyy", culture)</td>
                             <td>@m.InspectionCount</td>
                             <td>@m.MaintenanceCount</td>
+                            <td>@m.WorkOrderCount</td>
                             <td class="text-end">
-                                <a asp-controller="Users" asp-action="MyTasks" asp-route-showAll="true" asp-route-range="all" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
-                                <a asp-controller="MaintenanceOrders" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="all" class="btn btn-sm btn-outline-secondary">@Loc.T("Maintenance Order")</a>
+                                <a asp-controller="Users" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="all" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
                             </td>
                         </tr>
                     }

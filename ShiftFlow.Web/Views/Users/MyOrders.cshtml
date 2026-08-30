@@ -1,0 +1,78 @@
+@model List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>
+@{
+    ViewData["Title"] = Loc.T("My Orders");
+    bool showAll = ViewBag.ShowAll is true;
+    var range = (ViewBag.SelectedRange as string) ?? "month";
+    var category = ViewBag.Category as string;
+
+    string CategoryBadgeClass(string c) => c switch
+    {
+        "Inspection" => "bg-primary-subtle text-primary-emphasis",
+        "Maintenance" => "bg-warning-subtle text-warning-emphasis",
+        _ => "bg-info-subtle text-info-emphasis",
+    };
+}
+
+<div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="mb-1 fw-bold"><i class="bi bi-list-check me-2 text-primary"></i>@Loc.T("My Orders")</h4>
+        <div class="text-muted small">@Loc.T("Every inspection, maintenance, and work order assigned to you or your teams, in one place")</div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="btn-group btn-group-sm" role="group">
+            <a class="btn @(range == "month" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="month" asp-route-category="@category">@Loc.T("This month")</a>
+            <a class="btn @(range == "all" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="all" asp-route-category="@category">@Loc.T("All time")</a>
+        </div>
+        <div class="btn-group btn-group-sm" role="group">
+            <a class="btn @(!showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="false" asp-route-range="@range" asp-route-category="@category">@Loc.T("Open")</a>
+            <a class="btn @(showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="@range" asp-route-category="@category">@Loc.T("All")</a>
+        </div>
+    </div>
+</div>
+
+<div class="btn-group btn-group-sm mb-3" role="group">
+    <a class="btn @(string.IsNullOrEmpty(category) ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range">@Loc.T("All Categories")</a>
+    <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Inspection">@Loc.T("Inspection")</a>
+    <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
+    <a class="btn @(category == "WorkOrder" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="WorkOrder">@Loc.T("Work Order")</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    @if (Model.Count == 0)
+    {
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-check2-circle fs-1 d-block mb-2 opacity-25"></i>
+            @(showAll ? Loc.T("No orders assigned to you.") : Loc.T("No open orders — you're all caught up."))
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th>@Loc.T("Asset")</th>
+                        <th>@Loc.T("Status")</th><th>@Loc.T("Due Date")</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model)
+                    {
+                        <tr>
+                            <td><span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
+                            <td class="fw-semibold">@o.OrderNumber</td>
+                            <td class="small">@(o.AssetLabel ?? "—")</td>
+                            <td><partial name="_StatusBadge" model="@o.Status" /></td>
+                            <td>@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
+                            <td class="text-end">
+                                <a asp-controller="@o.DetailsController" asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">
+                                    @Loc.T("View")
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

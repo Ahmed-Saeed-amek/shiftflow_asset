@@ -37,31 +37,9 @@ public class InspectionOrdersController : Controller
         return View(orders);
     }
 
-    // Employees see only this month's orders by default; range=all lifts the date bound.
-    [Authorize]
-    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null)
-    {
-        // The date range only makes sense when browsing history (showAll) — a still-open order
-        // stays relevant no matter how long ago it was created, so the default "open work" view
-        // must never let a "this month" bound silently hide it.
-        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
-        var orders = await _orders.GetMyOrdersAsync(CurrentUserId, includeDone: showAll, from: from, to: to);
-        ViewBag.ShowAll = showAll;
-        ViewBag.SelectedRange = range ?? "month";
-        return View(orders);
-    }
-
-    private static (DateTime? from, DateTime? to) ResolveRange(string? range)
-    {
-        var today = DateTime.Today;
-        return range switch
-        {
-            // "to" is the current moment, not midnight-today, so anything created later today
-            // (the common case right after this feature ships) still falls inside the range.
-            "month" => (new DateTime(today.Year, today.Month, 1), DateTime.Now),
-            _ => (null, null),
-        };
-    }
+    // "My assigned inspection orders" now lives on the unified Users/MyOrders page (combined
+    // with Maintenance Orders and Work Orders) — see UsersController.MyOrders. GetMyOrdersAsync
+    // stays on the service since the AI assistant tool functions still call it directly.
 
     [Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
     public async Task<IActionResult> Create()

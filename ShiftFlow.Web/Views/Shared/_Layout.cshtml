@@ -5,11 +5,8 @@
     var isRTL = Loc.IsRTL;
     var currentPath = Context.Request.Path + Context.Request.QueryString;
     var canUseAi = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AiAssistantUse)).Succeeded;
-    var canViewInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
     var canManageInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
-    var canReportInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderReport)).Succeeded;
     var canViewTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamView)).Succeeded;
-    var canManageTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
     var canViewAssets = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetView)).Succeeded;
     var canViewVendors = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
     var canViewWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderView)).Succeeded;
@@ -67,9 +64,7 @@
         {
             <li class="nav-section-label">@Loc.T("My Work")</li>
             <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
-            <li><a class="nav-link" asp-controller="Users" asp-action="MyTasks"><i class="bi bi-check2-square me-2"></i>@Loc.T("My Tasks")</a></li>
-            <li><a class="nav-link" asp-controller="MaintenanceOrders" asp-action="MyOrders"><i class="bi bi-wrench-adjustable me-2"></i>@Loc.T("My Maintenance Orders")</a></li>
-            <li><a class="nav-link" asp-controller="WorkOrders" asp-action="MyMaintenanceOrders"><i class="bi bi-tools me-2"></i>@Loc.T("My Assigned Work Orders")</a></li>
+            <li><a class="nav-link" asp-controller="Users" asp-action="MyOrders"><i class="bi bi-list-check me-2"></i>@Loc.T("My Orders")</a></li>
             <li><a class="nav-link" asp-controller="Users" asp-action="MyMetrics"><i class="bi bi-graph-up-arrow me-2"></i>@Loc.T("My Metrics")</a></li>
             <li><a class="nav-link" asp-controller="Users" asp-action="MyHistory"><i class="bi bi-clock-history me-2"></i>@Loc.T("History")</a></li>
 
@@ -80,15 +75,11 @@
                 <li><a class="nav-link" asp-controller="ZoneOverview" asp-action="Index"><i class="bi bi-geo me-2"></i>@Loc.T("Zone Overview")</a></li>
             }
 
-            @if (canViewInspectionOrders || canManageInspectionOrders || canReportInspectionOrders)
+            @if (canManageInspectionOrders)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Inspection Orders")</li>
-                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="MyOrders"><i class="bi bi-clipboard-check me-2"></i>@Loc.T("My Orders")</a></li>
-                @if (canManageInspectionOrders)
-                {
-                    <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
-                    <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Create"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Order")</a></li>
-                }
+                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
+                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Create"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Order")</a></li>
             }
 
             @if (canViewTeams)

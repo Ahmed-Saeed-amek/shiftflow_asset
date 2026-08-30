@@ -157,30 +157,8 @@ public class MaintenanceOrdersController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    /// <summary>Employee self-service: maintenance orders assigned directly to me.
-    /// Only this month's by default; range=all lifts the date bound.</summary>
-    [Authorize]
-    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null)
-    {
-        // The date range only makes sense when browsing history (showAll) — a still-open order
-        // stays relevant no matter how long ago it was created, so the default "open work" view
-        // must never let a "this month" bound silently hide it.
-        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
-        var orders = await _orders.GetMyOrdersAsync(CurrentUserId, includeDone: showAll, from: from, to: to);
-        ViewBag.ShowAll = showAll;
-        ViewBag.SelectedRange = range ?? "month";
-        return View(orders);
-    }
-
-    private static (DateTime? from, DateTime? to) ResolveRange(string? range)
-    {
-        var today = DateTime.Today;
-        return range switch
-        {
-            "month" => (new DateTime(today.Year, today.Month, 1), DateTime.Now),
-            _ => (null, null),
-        };
-    }
+    // "My assigned maintenance orders" now lives on the unified Users/MyOrders page (combined
+    // with Inspection Orders and Work Orders) — see UsersController.MyOrders.
 
     [Authorize(Policy = PermissionCatalog.MaintenanceOrderExport)]
     public async Task<IActionResult> ExportExcel()

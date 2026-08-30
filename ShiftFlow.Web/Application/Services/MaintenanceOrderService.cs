@@ -114,15 +114,6 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         return await query.OrderByDescending(m => m.CreatedDate).Take(500).ToListAsync();
     }
 
-    public async Task<List<MaintenanceOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null)
-    {
-        var query = _db.MaintenanceOrders.Include(m => m.Asset).Where(m => m.AssignedToUserId == userId);
-        if (!includeDone) query = query.Where(m => m.Status == "Open");
-        if (from.HasValue) query = query.Where(m => m.CreatedDate >= from.Value);
-        if (to.HasValue) query = query.Where(m => m.CreatedDate <= to.Value);
-        return await query.OrderByDescending(m => m.CreatedDate).Take(300).ToListAsync();
-    }
-
     public async Task<byte[]> ExportToExcelAsync()
     {
         var orders = await _db.MaintenanceOrders

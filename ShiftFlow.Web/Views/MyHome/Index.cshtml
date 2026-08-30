@@ -7,12 +7,12 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-6">
-        <a href="@Url.Action("MyOrders","InspectionOrders")" class="text-decoration-none">
+        <a href="@Url.Action("MyOrders","Users")" class="text-decoration-none">
             <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("My Open Inspection Orders"),Value=ViewBag.OpenOrderCount.ToString(),Icon="bi-clipboard-check",Color="amber"})" />
         </a>
     </div>
     <div class="col-6 col-md-6">
-        <a href="@Url.Action("MyOrders","InspectionOrders")" class="text-decoration-none">
+        <a href="@Url.Action("MyOrders","Users")" class="text-decoration-none">
             <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue"),Value=ViewBag.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" />
         </a>
     </div>
@@ -47,9 +47,8 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-grid me-2"></i>@Loc.T("Quick Links")</div>
             <div class="list-group list-group-flush">
-                <a asp-controller="InspectionOrders" asp-action="MyOrders" class="list-group-item list-group-item-action"><i class="bi bi-clipboard-check me-2 text-muted"></i>@Loc.T("My Orders")</a>
+                <a asp-controller="Users" asp-action="MyOrders" class="list-group-item list-group-item-action"><i class="bi bi-list-check me-2 text-muted"></i>@Loc.T("My Orders")</a>
                 <a asp-controller="Users" asp-action="MyMetrics" class="list-group-item list-group-item-action"><i class="bi bi-graph-up-arrow me-2 text-muted"></i>@Loc.T("My Metrics")</a>
-                <a asp-controller="Users" asp-action="MyTasks" class="list-group-item list-group-item-action"><i class="bi bi-check2-square me-2 text-muted"></i>@Loc.T("My Tasks")</a>
             </div>
         </div>
     </div>

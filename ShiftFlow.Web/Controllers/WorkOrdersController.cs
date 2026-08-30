@@ -185,36 +185,8 @@ public class WorkOrdersController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    /// <summary>Employee self-service: work orders assigned directly to me (no vendor portal involved).
-    /// Only this month's by default; range=all lifts the date bound.</summary>
-    [Authorize]
-    public async Task<IActionResult> MyMaintenanceOrders(bool showAll = false, string? range = null)
-    {
-        var userId = _userManager.GetUserId(User)!;
-        // The date range only makes sense when browsing history (showAll) — a still-open work
-        // order stays relevant no matter how long ago it was created, so the default "open work"
-        // view must never let a "this month" bound silently hide it.
-        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
-        var query = _db.WorkOrders.Include(w => w.Asset).Where(w => w.AssignedToUserId == userId);
-        if (!showAll) query = query.Where(w => w.Stage != "Closed");
-        if (from.HasValue) query = query.Where(w => w.CreatedDate >= from.Value);
-        if (to.HasValue) query = query.Where(w => w.CreatedDate <= to.Value);
-        ViewBag.ShowAll = showAll;
-        ViewBag.SelectedRange = range ?? "month";
-        return View(await query.OrderByDescending(w => w.CreatedDate).ToListAsync());
-    }
-
-    private static (DateTime? from, DateTime? to) ResolveRange(string? range)
-    {
-        var today = DateTime.Today;
-        return range switch
-        {
-            // "to" is the current moment, not midnight-today, so anything created later today
-            // (the common case right after this feature ships) still falls inside the range.
-            "month" => (new DateTime(today.Year, today.Month, 1), DateTime.Now),
-            _ => (null, null),
-        };
-    }
+    // "My assigned work orders" now lives on the unified Users/MyOrders page (combined with
+    // Inspection Orders and Maintenance Orders) — see UsersController.MyOrders.
 
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Reject(int id, string? reason)

@@ -36,18 +36,40 @@ public class InspectionOrderCreateVm : IValidatableObject
     }
 }
 
-/// <summary>Row shape for My Tasks / My Orders lists and PDFs.</summary>
+/// <summary>Row shape for the Profile / My Metrics "recent orders" list — unrelated to the
+/// unified My Orders page (MyWorkOrderRow below); this one is Inspection-Orders-only, scoped to
+/// whichever employee's profile is being viewed.</summary>
 public sealed class InspectionOrderRow
 {
     public int OrderId { get; init; }
     public string OrderNumber { get; init; } = "";
-    public string OrderTypeName { get; init; } = "";
     public string Status { get; init; } = "";
     public DateTime? DueDate { get; init; }
     public string AssignedContext { get; init; } = "";
     public DateTime CreatedAt { get; init; }
     public int TotalAssets { get; init; }
     public int CheckedAssets { get; init; }
+}
+
+/// <summary>One row on the unified "My Orders" page — combines Inspection Orders, Maintenance
+/// Orders, and Work Orders assigned to the current user (or their team, for Inspection Orders)
+/// into a single list, with Category identifying which one it actually is. Replaces what used to
+/// be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work Orders).</summary>
+public sealed class MyWorkOrderRow
+{
+    /// <summary>"Inspection" | "Maintenance" | "WorkOrder" — drives the category filter and badge; matches the category query param.</summary>
+    public string Category { get; init; } = "";
+    public string CategoryLabel { get; init; } = "";
+    public int Id { get; init; }
+    public string OrderNumber { get; init; } = "";
+    /// <summary>Asset tag for single-asset orders (Maintenance/Work Order), or "N assets" for a multi-asset Inspection Order.</summary>
+    public string? AssetLabel { get; init; }
+    /// <summary>Raw status/stage string (each category has its own vocabulary) — rendered via _StatusBadge same as before.</summary>
+    public string Status { get; init; } = "";
+    public DateTime? DueDate { get; init; }
+    public DateTime CreatedAt { get; init; }
+    /// <summary>Controller to route "View" to — InspectionOrders / MaintenanceOrders / WorkOrders.</summary>
+    public string DetailsController { get; init; } = "";
 }
 
 /// <summary>One calendar-month row on the employee's unified History page.</summary>
@@ -57,4 +79,5 @@ public sealed class MyHistoryMonthRow
     public int Month { get; init; }
     public int InspectionCount { get; init; }
     public int MaintenanceCount { get; init; }
+    public int WorkOrderCount { get; init; }
 }
