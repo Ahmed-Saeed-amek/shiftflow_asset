@@ -49,8 +49,8 @@
 <body>
 <div class="d-flex" id="wrapper">
     <nav id="sidebar" class="p-3 d-flex flex-column">
-        <div class="d-flex align-items-center justify-content-center mb-2 pb-2 border-bottom border-secondary">
-            <img src="~/images/logo.png" asp-append-version="true" alt="Ministry of Electricity, Water and Renewable Energy" style="width:120px;object-fit:contain" />
+        <div class="d-flex align-items-center justify-content-center mb-1 pb-1 border-bottom border-secondary">
+            <img src="~/images/logo.png" asp-append-version="true" alt="Ministry of Electricity, Water and Renewable Energy" style="width:90px;object-fit:contain" />
         </div>
 
         <ul class="nav flex-column gap-1 flex-grow-1 sidebar-nav-scroll">
@@ -177,23 +177,25 @@
         }
         </ul>
 
-        <div class="border-top border-secondary pt-3 mt-3">
-            <div class="small text-white-50 mb-2">
+        <div class="border-top border-secondary pt-2 mt-2">
+            <div class="small text-white-50 mb-1 text-truncate">
                 <i class="bi bi-person-circle me-1"></i>@User.Identity?.Name
             </div>
-            <form asp-controller="Language" asp-action="SetLanguage" method="post" class="mb-2">
-                <input type="hidden" name="returnUrl" value="@currentPath" />
-                <input type="hidden" name="lang" value="@(isRTL ? "en" : "ar")" />
-                <button type="submit" class="btn btn-sm btn-outline-light w-100">
-                    <i class="bi bi-translate me-1"></i>@(isRTL ? "English" : "عربي")
-                </button>
-            </form>
-            <form asp-controller="Account" asp-action="Logout" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
-                    <i class="bi bi-box-arrow-right me-1"></i>@Loc.T("Logout")
-                </button>
-            </form>
+            <div class="d-flex gap-1">
+                <form asp-controller="Language" asp-action="SetLanguage" method="post" class="flex-fill">
+                    <input type="hidden" name="returnUrl" value="@currentPath" />
+                    <input type="hidden" name="lang" value="@(isRTL ? "en" : "ar")" />
+                    <button type="submit" class="btn btn-sm btn-outline-light w-100">
+                        <i class="bi bi-translate me-1"></i>@(isRTL ? "English" : "عربي")
+                    </button>
+                </form>
+                <form asp-controller="Account" asp-action="Logout" method="post" class="flex-fill">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-box-arrow-right me-1"></i>@Loc.T("Logout")
+                    </button>
+                </form>
+            </div>
         </div>
     </nav>
     <div id="sidebarBackdrop"></div>
