@@ -24,6 +24,7 @@
             @Model.FullName
             &nbsp;·&nbsp; @roleLabel
         </div>
+        <div class="text-muted small fst-italic mt-1">@Loc.T("Inspection order performance — Work Orders and Maintenance Orders aren't counted here")</div>
     </div>
     <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
         @foreach (var key in new[] { "month", "30", "90", "all" })
