@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = Model.Name;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorManage)).Succeeded;
-    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
+    string actionsHtml = canManage ? "<a href='" + Url.Action("Index") + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.Name,Subtitle=Model.Specialization,ActionsHtml=actionsHtml})" />
 

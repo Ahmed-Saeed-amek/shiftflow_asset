@@ -81,17 +81,17 @@ public class VendorsController : Controller
         return RedirectToAction(nameof(Details), new { id = vendorId });
     }
 
-    [Authorize(Policy = PermissionCatalog.VendorManage)]
-    public IActionResult Create()
-    {
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new VendorViewModel());
-    }
-
+    // Create/Edit are modals on Index now — 7 fields is still small enough that a separate
+    // full-page form was pure overhead. Both just redirect back to Index either way, so an
+    // invalid submit reports the error there instead of returning a page that no longer exists.
     [HttpPost, Authorize(Policy = PermissionCatalog.VendorManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(VendorViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name and status are required, and email must be valid.";
+            return RedirectToAction(nameof(Index));
+        }
         var userId = _userManager.GetUserId(User)!;
         await _vendorService.CreateAsync(new Vendor
         {
@@ -102,23 +102,14 @@ public class VendorsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    [Authorize(Policy = PermissionCatalog.VendorManage)]
-    public async Task<IActionResult> Edit(int id)
-    {
-        var vendor = await _db.Vendors.FindAsync(id);
-        if (vendor == null) return NotFound();
-        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
-        return View(new VendorViewModel
-        {
-            Id = vendor.Id, Name = vendor.Name, NameAr = vendor.NameAr, ContactName = vendor.ContactName,
-            Phone = vendor.Phone, Email = vendor.Email, Specialization = vendor.Specialization, Status = vendor.Status,
-        });
-    }
-
     [HttpPost, Authorize(Policy = PermissionCatalog.VendorManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(VendorViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name and status are required, and email must be valid.";
+            return RedirectToAction(nameof(Index));
+        }
         var userId = _userManager.GetUserId(User)!;
         await _vendorService.UpdateAsync(new Vendor
         {

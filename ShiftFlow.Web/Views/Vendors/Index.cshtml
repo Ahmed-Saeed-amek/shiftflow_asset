@@ -5,7 +5,7 @@
     ViewData["Title"] = Loc.T("Vendors");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorManage)).Succeeded;
     string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Vendor") + "</a>"
+        ? "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#vendorModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Vendor") + "</button>"
         : "";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Vendors"),ActionsHtml=actionsHtml})" />
@@ -29,7 +29,10 @@
                         <td onclick="event.stopPropagation()">
                             @if (canManage)
                             {
-                                <a asp-action="Edit" asp-route-id="@v.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#vendorModal"
+                                        onclick='openEdit(@v.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.ContactName)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Phone)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Email)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Specialization)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(v.Status)))'>
+                                    @Loc.T("Edit")
+                                </button>
                             }
                         </td>
                     </tr>
@@ -38,3 +41,95 @@
         </table>
     </div>
 </div>
+
+@if (canManage)
+{
+    <div class="modal fade" id="vendorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" id="vendorForm" asp-action="Create">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="vId" value="0" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="vendorModalTitle">@Loc.T("New Vendor")</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label small">@Loc.T("Name")</label>
+                                <input name="Name" id="vName" class="form-control" required />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">@Loc.T("Status")</label>
+                                <select name="Status" id="vStatus" class="form-select">
+                                    @foreach (var s in Vendor.Statuses)
+                                    {
+                                        <option value="@s">@Loc.T(s)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                                <input name="NameAr" id="vNameAr" class="form-control" dir="rtl" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">@Loc.T("Contact Name")</label>
+                                <input name="ContactName" id="vContactName" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">@Loc.T("Phone")</label>
+                                <input name="Phone" id="vPhone" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">@Loc.T("Email")</label>
+                                <input name="Email" id="vEmail" type="email" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">@Loc.T("Specialization")</label>
+                                <input name="Specialization" id="vSpecialization" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                        <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @section Scripts {
+    <script>
+        const jsNewVendor = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Vendor")));
+        const jsEditVendor = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Vendor")));
+
+        function openCreate() {
+            document.getElementById('vendorModalTitle').textContent = jsNewVendor;
+            document.getElementById('vendorForm').setAttribute('action', '@Url.Action("Create")');
+            document.getElementById('vId').value = 0;
+            document.getElementById('vName').value = '';
+            document.getElementById('vNameAr').value = '';
+            document.getElementById('vContactName').value = '';
+            document.getElementById('vPhone').value = '';
+            document.getElementById('vEmail').value = '';
+            document.getElementById('vSpecialization').value = '';
+            document.getElementById('vStatus').value = 'Active';
+        }
+
+        function openEdit(id, name, nameAr, contactName, phone, email, specialization, status) {
+            document.getElementById('vendorModalTitle').textContent = jsEditVendor;
+            document.getElementById('vendorForm').setAttribute('action', '@Url.Action("Edit")');
+            document.getElementById('vId').value = id;
+            document.getElementById('vName').value = name || '';
+            document.getElementById('vNameAr').value = nameAr || '';
+            document.getElementById('vContactName').value = contactName || '';
+            document.getElementById('vPhone').value = phone || '';
+            document.getElementById('vEmail').value = email || '';
+            document.getElementById('vSpecialization').value = specialization || '';
+            document.getElementById('vStatus').value = status;
+        }
+    </script>
+    }
+}
