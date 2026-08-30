@@ -576,7 +576,11 @@ public static class DbSeeder
             ],
             ["HR"] =
             [
-                "Asset.View",
+                // View-only: employee directory and team rosters — the actual point of an "HR"
+                // role — plus Asset.View which was already granted. Deliberately not User.Manage
+                // or Team.Manage; account creation/deactivation and team membership changes stay
+                // with whoever already holds those (Admin) rather than assumed onto HR here.
+                "User.View", "Team.View", "Asset.View",
             ],
         };
 
