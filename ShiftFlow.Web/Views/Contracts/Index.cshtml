@@ -14,11 +14,11 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Contract Number")</th><th class="d-none d-sm-table-cell">@Loc.T("Vendor")</th><th class="d-none d-lg-table-cell">@Loc.T("Contract Type")</th><th class="d-none d-xl-table-cell">@Loc.T("Assets")</th><th>@Loc.T("Status")</th></tr></thead>
+            <thead><tr><th>@Loc.T("Contract Number")</th><th class="d-none d-sm-table-cell">@Loc.T("Vendor")</th><th class="d-none d-lg-table-cell">@Loc.T("Contract Type")</th><th class="d-none d-xl-table-cell">@Loc.T("Assets")</th><th>@Loc.T("Status")</th><th class="text-end"></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
-                    <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                 }
                 @foreach (var c in Model)
                 {
@@ -29,6 +29,7 @@
                         <td class="d-none d-lg-table-cell"><partial name="_StatusBadge" model="@c.ContractType" /></td>
                         <td class="d-none d-xl-table-cell">@c.AssetLinks.Count</td>
                         <td><partial name="_StatusBadge" model="@(isActive ? "Active" : "Expired")" /></td>
+                        <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
                     </tr>
                 }
             </tbody>

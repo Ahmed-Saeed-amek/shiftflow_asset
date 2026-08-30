@@ -478,6 +478,7 @@ public static class Translations
         ["Reusable groups of employees for inspection orders"] = "مجموعات موظفين قابلة لإعادة الاستخدام لأوامر المعاينة",
         ["New Team"] = "فريق جديد",
         ["Members"] = "الأعضاء",
+        ["Manage Members"] = "إدارة الأعضاء",
         ["Combine filters"] = "دمج الفلاتر",
         ["Both"] = "كلاهما",
         ["Arabic Name"] = "الاسم بالعربية",
