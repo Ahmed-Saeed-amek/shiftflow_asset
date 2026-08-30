@@ -58,13 +58,13 @@
                 <tbody>
                     @foreach (var o in Model)
                     {
-                        <tr>
+                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", o.DetailsController, new { id = o.Id })'">
                             <td><span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
                             <td class="fw-semibold">@o.OrderNumber</td>
                             <td class="small">@(o.AssetLabel ?? "—")</td>
                             <td><partial name="_StatusBadge" model="@o.Status" /></td>
                             <td>@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
-                            <td class="text-end">
+                            <td class="text-end" onclick="event.stopPropagation()">
                                 <a asp-controller="@o.DetailsController" asp-action="Details" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">
                                     @Loc.T("View")
                                 </a>
