@@ -134,6 +134,9 @@
                                 <div class="col-md-2">
                                     <button type="button" class="btn btn-sm btn-primary w-100 save-outcome-btn">@Loc.T("Save")</button>
                                 </div>
+                                <div class="col-12 small text-muted d-none maintenance-only-hint">
+                                    <i class="bi bi-info-circle me-1"></i>@Loc.T("This just logs maintenance work performed — the asset still needs OK or Defective recorded separately.")
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -207,7 +210,7 @@ else
     // regardless of order kind, and Save posts to UpdateMaintenanceActions instead of UpdateItem,
     // touching only the maintenance-action join rows — never the outcome, Work Order, or the
     // order's completion status.
-    function openMaintenanceOnly(itemId) {
+    function openMaintenanceOnly(itemId, stillPending) {
         const formRow = document.querySelector(`tr.inline-form-row[data-form-for="${itemId}"]`);
         formRow.classList.remove('d-none');
         formRow.dataset.mode = 'maintenance';
@@ -216,10 +219,15 @@ else
         updateMaintenanceCount(formRow);
         const saveBtn = formRow.querySelector('.save-outcome-btn');
         if (saveBtn) saveBtn.textContent = jsSaveMaintenance;
+        const hint = formRow.querySelector('.maintenance-only-hint');
+        if (hint) hint.classList.toggle('d-none', !stillPending);
     }
 
-    document.querySelectorAll('.maintenance-only-btn, .edit-maintenance-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMaintenanceOnly(btn.dataset.itemId));
+    document.querySelectorAll('.maintenance-only-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMaintenanceOnly(btn.dataset.itemId, true));
+    });
+    document.querySelectorAll('.edit-maintenance-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMaintenanceOnly(btn.dataset.itemId, false));
     });
 
     document.querySelectorAll('.outcome-btn').forEach(btn => {
@@ -242,6 +250,8 @@ else
             formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
             const saveBtn = formRow.querySelector('.save-outcome-btn');
             if (saveBtn) saveBtn.textContent = isDefect ? jsConfirmDefective : jsConfirmOk;
+            const hint = formRow.querySelector('.maintenance-only-hint');
+            if (hint) hint.classList.add('d-none');
             const actionTypeSel = formRow.querySelector('.action-type-select');
             const causeSel = formRow.querySelector('.cause-select');
             if (isDefect && actionTypeSel) {
