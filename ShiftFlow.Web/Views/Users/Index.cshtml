@@ -57,7 +57,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Email")</th><th>@Loc.T("Role")</th><th>@Loc.T("Department")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <thead><tr><th>@Loc.T("Name")</th><th class="d-none d-md-table-cell">@Loc.T("Email")</th><th>@Loc.T("Role")</th><th class="d-none d-lg-table-cell">@Loc.T("Department")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -68,10 +68,10 @@
                     var isSelf = u.Id == currentUserId;
                     <tr>
                         <td>@u.FullName</td>
-                        <td class="small text-muted">@u.Email</td>
+                        <td class="small text-muted d-none d-md-table-cell">@u.Email</td>
                         <td>@string.Join(", ", rolesByUser[u.Id].Select(RoleLabel))</td>
-                        <td>@u.Department</td>
-                        <td><partial name="_StatusBadge" model="@(u.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="d-none d-lg-table-cell">@u.Department</td>
+                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(u.IsActive ? "Active" : "Inactive")" /></td>
                         <td class="text-end pe-3">
                             <div class="d-flex justify-content-end gap-1">
                                 @if (canViewProfile)

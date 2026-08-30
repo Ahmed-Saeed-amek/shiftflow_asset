@@ -52,23 +52,23 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        async Task CreateUser(string email, string pass, string name, string role, string emp)
+        async Task CreateUser(string email, string pass, string name, string role, string emp, string department)
         {
             if (await um.FindByEmailAsync(email) != null) return;
             var u = new ApplicationUser
             {
                 UserName = email, Email = email, FullName = name,
-                EmployeeNumber = emp, Department = role, IsActive = true, EmailConfirmed = true
+                EmployeeNumber = emp, Department = department, IsActive = true, EmailConfirmed = true
             };
             var r = await um.CreateAsync(u, pass);
             if (r.Succeeded) await um.AddToRoleAsync(u, role);
         }
 
-        await CreateUser("admin@shiftflow.com",    "Admin@123456",   "System Administrator", "Admin",            "EMP-0001");
-        await CreateUser("manager@shiftflow.com",  "Manager@123456", "Ahmed Al-Rashidi",     "OperationsManager", "EMP-0002");
-        await CreateUser("engineer@shiftflow.com", "Engineer@123456","Khalid Al-Mutairi",    "Engineer",         "EMP-0003");
+        await CreateUser("admin@shiftflow.com",    "Admin@123456",   "System Administrator", "Admin",            "EMP-0001", "IT Administration");
+        await CreateUser("manager@shiftflow.com",  "Manager@123456", "Ahmed Al-Rashidi",     "OperationsManager", "EMP-0002", "Operations");
+        await CreateUser("engineer@shiftflow.com", "Engineer@123456","Khalid Al-Mutairi",    "Engineer",         "EMP-0003", "Engineering");
         // "Hr@123456" (9 chars) no longer meets the 12-char password policy below.
-        await CreateUser("hr@shiftflow.com",       "HrDept@123456",  "Sara Al-Kandari",      "HR",               "EMP-0004");
+        await CreateUser("hr@shiftflow.com",       "HrDept@123456",  "Sara Al-Kandari",      "HR",               "EMP-0004", "Human Resources");
 
         await SeedPermissionsAsync(db, rm);
         await SeedAssetManagementAsync(db, um);
@@ -681,21 +681,6 @@ public static class DbSeeder
                 .ToListAsync();
             if (stalePermission.Count > 0)
                 db.Permissions.RemoveRange(stalePermission);
-        }
-
-        // User.View is now actually policy-enforced (Users.Profile) — trim grants back
-        // to exactly the roles the hardcoded check it replaced already allowed, so
-        // wiring it up doesn't silently widen access for roles that were seeded earlier
-        // before this enforcement existed.
-        var userViewAllowedRoles = new HashSet<string> { "Admin", "OperationsManager" };
-        var staleUserViewGrants = await db.RolePermissions
-            .Where(rp => rp.PermissionName == "User.View")
-            .ToListAsync();
-        foreach (var grant in staleUserViewGrants)
-        {
-            var roleName = (await rm.FindByIdAsync(grant.RoleId))?.Name;
-            if (roleName != null && !userViewAllowedRoles.Contains(roleName))
-                db.RolePermissions.Remove(grant);
         }
 
         await db.SaveChangesAsync();
