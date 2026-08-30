@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 
+/* Not a Bootstrap utility class — every row-clickable table across the app (Assets, Work
+   Orders, Vendors, Contracts, Zones, Inspection Orders, My Orders, Vendor Portal, etc.) applies
+   this class alongside its onclick handler, but with no matching rule the cursor stayed the
+   default arrow everywhere, giving no visual hint those rows were interactive. */
+.cursor-pointer { cursor: pointer; }
+
 :root {
   /* MEW (Ministry of Electricity, Water and Renewable Energy) design system tokens
      — palette inspired by the UrbanHub admin template, primary retinted to light blue */
