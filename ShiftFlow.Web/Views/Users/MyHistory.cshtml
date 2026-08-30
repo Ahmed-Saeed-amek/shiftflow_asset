@@ -40,7 +40,10 @@
                             <td>@m.MaintenanceCount</td>
                             <td>@m.WorkOrderCount</td>
                             <td class="text-end">
-                                <a asp-controller="Users" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="all" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
+                                <a asp-controller="Users" asp-action="MyOrders" asp-route-showAll="true"
+                                   asp-route-fromDate="@monthDate.ToString("yyyy-MM-dd")"
+                                   asp-route-toDate="@monthDate.AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd")"
+                                   class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
                             </td>
                         </tr>
                     }

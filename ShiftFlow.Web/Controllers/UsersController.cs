@@ -114,13 +114,18 @@ public class UsersController : Controller
     // used to be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work
     // Orders) that all did the same "show me my open work" job for a different order type.
     [Authorize]
-    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null, string? category = null)
+    public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null, string? category = null, DateTime? fromDate = null, DateTime? toDate = null)
     {
         var id = _um.GetUserId(User)!;
         // The date range only makes sense when browsing history (showAll) — a still-open order
         // stays relevant no matter how long ago it was created, so the default "open work" view
         // must never let a "this month" bound silently hide it.
-        var (from, to) = showAll ? ResolveRange(range ?? "month") : (null, null);
+        // fromDate/toDate (used by History's per-month "View" links) take priority over the
+        // named-preset range so a specific month can be linked to directly instead of always
+        // landing on "this month" or "all time" regardless of which row was clicked.
+        var (from, to) = fromDate.HasValue || toDate.HasValue
+            ? (fromDate, toDate)
+            : showAll ? ResolveRange(range ?? "month") : (null, null);
         ViewBag.SelectedRange = range ?? "month";
         ViewBag.ShowAll = showAll;
         ViewBag.Category = category;

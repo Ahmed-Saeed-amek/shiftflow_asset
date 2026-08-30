@@ -39,7 +39,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Work Order Number")</th><th class="d-none d-sm-table-cell">@Loc.T("Asset Tag")</th><th class="d-none d-lg-table-cell">@Loc.T("Type")</th><th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th class="d-none d-lg-table-cell">@Loc.T("Vendor")</th><th class="d-none d-xl-table-cell">@Loc.T("Assigned Employee")</th></tr></thead>
+            <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th class="d-none d-lg-table-cell">@Loc.T("Type")</th><th class="d-none d-sm-table-cell">@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th class="d-none d-lg-table-cell">@Loc.T("Vendor")</th><th class="d-none d-xl-table-cell">@Loc.T("Assigned Employee")</th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -49,7 +49,7 @@
                 {
                     <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = w.Id })'">
                         <td class="small font-monospace">@w.WorkOrderNumber</td>
-                        <td class="small d-none d-sm-table-cell">@w.Asset?.AssetTag</td>
+                        <td class="small">@w.Asset?.AssetTag</td>
                         <td class="d-none d-lg-table-cell">
                             @if (w.SourceContractId != null)
                             {
@@ -62,7 +62,7 @@
                                 <span class="text-muted small">@Loc.T("Manual")</span>
                             }
                         </td>
-                        <td><partial name="_StatusBadge" model="@w.Priority" /></td>
+                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@w.Priority" /></td>
                         <td><partial name="_StatusBadge" model="@w.Stage" /></td>
                         <td class="small d-none d-lg-table-cell">@w.Vendor?.Name</td>
                         <td class="small d-none d-xl-table-cell">@w.AssignedToUser?.FullName</td>
