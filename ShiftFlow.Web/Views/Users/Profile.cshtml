@@ -7,6 +7,8 @@
     var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
     var roleLabel = string.Join(", ", Model.Roles.Select(r => Loc.LocalizedName(r, roleNameArByName.GetValueOrDefault(r))));
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
+    var canViewOrderDetails = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded
+        || (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
 }
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -137,7 +139,16 @@
                             @foreach (var o in Model.Orders)
                             {
                                 <tr>
-                                    <td class="fw-semibold"><a asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.OrderId">@o.OrderNumber</a></td>
+                                    <td class="fw-semibold">
+                                        @if (canViewOrderDetails)
+                                        {
+                                            <a asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.OrderId">@o.OrderNumber</a>
+                                        }
+                                        else
+                                        {
+                                            @o.OrderNumber
+                                        }
+                                    </td>
                                     <td><partial name="_StatusBadge" model="@o.Status" /></td>
                                     <td>@o.CheckedAssets/@o.TotalAssets</td>
                                     <td class="small text-nowrap">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>

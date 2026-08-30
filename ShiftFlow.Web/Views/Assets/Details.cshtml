@@ -6,6 +6,7 @@
     var canManageWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
     var canManageAsset = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
     var canReportAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
+    var canViewVendor = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
     string actionsHtml = "<a href='" + Url.Action("Label", new { id = Model.Id }) + "' target='_blank' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-upc-scan me-1\"></i>" + Loc.T("Print Label") + "</a> ";
     if (canReportAction)
         actionsHtml += "<a href='" + Url.Action("Report", "WorkOrders", new { assetId = Model.Id }) + "' class='btn btn-outline-warning btn-sm'><i class=\"bi bi-flag me-1\"></i>" + Loc.T("Report Action") + "</a> ";
@@ -38,7 +39,14 @@
                         @{ var derivedVendor = (Vendor?)ViewBag.DerivedVendor; }
                         @if (derivedVendor != null)
                         {
-                            <a asp-controller="Vendors" asp-action="Details" asp-route-id="@derivedVendor.Id">@derivedVendor.Name</a>
+                            @if (canViewVendor)
+                            {
+                                <a asp-controller="Vendors" asp-action="Details" asp-route-id="@derivedVendor.Id">@derivedVendor.Name</a>
+                            }
+                            else
+                            {
+                                @derivedVendor.Name
+                            }
                         }
                         else
                         {
