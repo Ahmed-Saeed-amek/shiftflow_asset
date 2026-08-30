@@ -4,8 +4,9 @@
 @{
     ViewData["Title"] = Loc.T("Asset Categories");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetCategoryManage)).Succeeded;
+    var subtitle = canManage ? Loc.T("Add categories and subcategories, then edit or manage their actions below") : Loc.T("Browse the asset category and subcategory taxonomy");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Categories"),Subtitle=Loc.T("Add categories and subcategories, then edit or manage their actions below")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Categories"),Subtitle=subtitle})" />
 
 @if (TempData["Error"] != null)
 {

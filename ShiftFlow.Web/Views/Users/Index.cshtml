@@ -67,13 +67,14 @@
                 @foreach (var u in Model)
                 {
                     var isSelf = u.Id == currentUserId;
-                    <tr>
+                    var profileUrl = canViewProfile ? Url.Action("Profile", new { id = u.Id }) : null;
+                    <tr class="@(canViewProfile ? "cursor-pointer" : "")" onclick="@(profileUrl != null ? $"location.href='{profileUrl}'" : null)">
                         <td>@u.FullName</td>
                         <td class="small text-muted d-none d-md-table-cell">@u.Email</td>
                         <td>@string.Join(", ", rolesByUser[u.Id].Select(RoleLabel))</td>
                         <td class="d-none d-lg-table-cell">@u.Department</td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(u.IsActive ? "Active" : "Inactive")" /></td>
-                        <td class="text-end pe-3">
+                        <td class="text-end pe-3" onclick="event.stopPropagation()">
                             <div class="d-flex justify-content-end gap-1">
                                 @if (canViewProfile)
                                 {
