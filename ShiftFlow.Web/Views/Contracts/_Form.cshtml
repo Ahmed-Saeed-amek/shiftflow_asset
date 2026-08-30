@@ -9,6 +9,7 @@
                 <div class="col-md-6">
                     <label class="form-label small">@Loc.T("Vendor")</label>
                     <select asp-for="VendorId" class="form-select">
+                        <option value="0">@Loc.T("Select vendor…")</option>
                         @foreach (var v in (List<Vendor>)ViewBag.Vendors)
                         {
                             <option value="@v.Id">@v.Name</option>
