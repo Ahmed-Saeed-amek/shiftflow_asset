@@ -46,7 +46,10 @@ public class MaintenanceOrdersController : Controller
             if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
         }
         await LoadOrderTypesViewBagAsync();
-        return View(new MaintenanceOrderCreateVm { AssetId = assetId ?? 0 });
+        // Default to "Standard" rather than whichever order type happens to sort first (which
+        // was "Inspection" — a confusing default on a form specifically for a Maintenance Order).
+        var defaultTypeId = ((List<OrderType>)ViewBag.OrderTypes).FirstOrDefault(t => t.Name == "Standard")?.Id ?? 0;
+        return View(new MaintenanceOrderCreateVm { AssetId = assetId ?? 0, OrderTypeId = defaultTypeId });
     }
 
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
