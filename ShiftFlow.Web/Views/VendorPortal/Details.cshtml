@@ -92,6 +92,39 @@
         {
             <div class="alert alert-success small mb-3">@Loc.T("This work order is closed.")</div>
         }
+
+        @if (Model.Stage == "Fixed - Pending Confirmation" || Model.Stage == "Closed")
+        {
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-clipboard-data text-primary"></i>@Loc.T("Fix Report")
+                </div>
+                <div class="card-body">
+                    <dl class="row small mb-0 gy-2">
+                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Fix Cost")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.FixCost</dd>
+                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.FixCompletionDate?.ToString("yyyy-MM-dd")</dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(Model.FixDescription))
+                    {
+                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Fix Description")</div><div class="small">@Model.FixDescription</div></div>
+                    }
+                    @if (Model.Parts.Count > 0)
+                    {
+                        <div class="mt-2 pt-2 border-top">
+                            <div class="text-muted small mb-1"><i class="bi bi-box-seam me-1"></i>@Loc.T("Parts Used")</div>
+                            <ul class="small mb-0 ps-3">
+                                @foreach (var p in Model.Parts)
+                                {
+                                    <li>@p.Name × @p.Quantity</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Loc.T("Back")</a>
     </div>
 
     @if (isSentToVendor)
