@@ -16,6 +16,7 @@
     var canReportAssetAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
     var canManageAssetScope = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetScopeManage)).Succeeded;
     var canManageOrderTypes = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.OrderTypeManage)).Succeeded;
+    var canManageAssetCategories = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetCategoryManage)).Succeeded;
     var canViewUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     var canViewAuditLogs = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AuditLogView)).Succeeded;
     var canManageRbac = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
@@ -115,7 +116,7 @@
                 // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one
                 // group instead of each being its own flat sidebar item — was 5 extra top-level
                 // links, now 1. Auto-expanded when the user is actually on one of these pages.
-                var hasAssetSettingsLinks = canViewAssets || canManageWorkOrders || canManageOrderTypes;
+                var hasAssetSettingsLinks = canViewAssets || canManageAssetCategories || canManageOrderTypes;
                 if (hasAssetSettingsLinks)
                 {
                     var settingsControllers = new[] { "AssetCategories", "Zones", "WorkOrderBlockReasons", "MaintenanceActionTypes", "OrderTypes" };
@@ -133,7 +134,7 @@
                                     <li><a class="nav-link" asp-controller="AssetCategories" asp-action="Index"><i class="bi bi-diagram-2 me-2"></i>@Loc.T("Asset Categories")</a></li>
                                     <li><a class="nav-link" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Asset Locations")</a></li>
                                 }
-                                @if (canManageWorkOrders)
+                                @if (canManageAssetCategories)
                                 {
                                     <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
                                     <li><a class="nav-link" asp-controller="MaintenanceActionTypes" asp-action="Index"><i class="bi bi-wrench me-2"></i>@Loc.T("Maintenance Action Types")</a></li>

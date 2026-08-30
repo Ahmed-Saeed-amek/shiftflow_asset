@@ -14,7 +14,7 @@ public class WorkOrderBlockReasonsController : Controller
     private readonly ApplicationDbContext _db;
     public WorkOrderBlockReasonsController(ApplicationDbContext db) => _db = db;
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderManage)]
+    [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
     {
         var reasons = await _db.WorkOrderBlockReasons.OrderBy(r => r.Name).ToListAsync();
@@ -24,7 +24,7 @@ public class WorkOrderBlockReasonsController : Controller
     // Create/Edit are modals on Index now (this list is small and single-purpose enough that a
     // separate full-page form was pure overhead) — both just redirect back to Index either way,
     // so an invalid submit reports the error there instead of returning a page that no longer exists.
-    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(WorkOrderBlockReasonViewModel vm)
     {
         if (!ModelState.IsValid)
@@ -38,7 +38,7 @@ public class WorkOrderBlockReasonsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(WorkOrderBlockReasonViewModel vm)
     {
         if (!ModelState.IsValid)

@@ -14,7 +14,7 @@ public class MaintenanceActionTypesController : Controller
     private readonly ApplicationDbContext _db;
     public MaintenanceActionTypesController(ApplicationDbContext db) => _db = db;
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderManage)]
+    [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
     {
         var types = await _db.MaintenanceActionTypes.OrderBy(m => m.Name).ToListAsync();
@@ -24,7 +24,7 @@ public class MaintenanceActionTypesController : Controller
     // Create/Edit are modals on Index now (this list is small and single-purpose enough that a
     // separate full-page form was pure overhead) — both just redirect back to Index either way,
     // so an invalid submit reports the error there instead of returning a page that no longer exists.
-    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MaintenanceActionTypeViewModel vm)
     {
         if (!ModelState.IsValid)
@@ -38,7 +38,7 @@ public class MaintenanceActionTypesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
+    [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(MaintenanceActionTypeViewModel vm)
     {
         if (!ModelState.IsValid)
