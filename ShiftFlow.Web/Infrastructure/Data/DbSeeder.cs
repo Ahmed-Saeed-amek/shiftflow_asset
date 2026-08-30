@@ -528,11 +528,18 @@ public static class DbSeeder
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
                 "Team.View", "Team.Manage",
                 "AiAssistant.Use",
-                "Asset.View", "Asset.Manage", "Asset.ScopeManage", "Asset.ReportAction",
+                // AssetCategory.Manage and OrderType.Manage were missing despite this role already
+                // holding Asset.Manage / WorkOrder.Manage / MaintenanceOrder.Manage — a fresh-eyes
+                // test agent found a manager account could manage assets and work orders but had no
+                // way to touch the category taxonomy or order-type catalog those depend on (flat
+                // Access Denied on /OrderTypes, and a totally read-only Asset Categories page with
+                // no Add/Edit controls despite its own subtitle telling the manager to use them).
+                "Asset.View", "Asset.Manage", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
                 "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
+                "OrderType.Manage",
             ],
             ["Supervisor"] =
             [
