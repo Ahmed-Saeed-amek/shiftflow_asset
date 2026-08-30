@@ -330,7 +330,11 @@
 
         .ai-side {
             position: absolute;
-            top: .5rem;
+            /* .ai-layout's top edge lines up with .ai-chat-wrap's own top edge (its blue
+               "Conversation" header), not the space below it — a small top offset here
+               floated this picture-in-picture card straight over that header's text
+               instead of below it. 60px roughly clears .ai-header's height. */
+            top: 60px;
             inset-inline-end: .5rem;
             width: 110px;
             z-index: 5;
