@@ -1,4 +1,7 @@
 @model ShiftFlow.Domain.Entities.InspectionOrder
+@using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Web.Authorization
+@inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Inspection Order");
     var run = Model.InspectionRun!;
@@ -6,6 +9,7 @@
         ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
     var tracksDefectOutcome = Model.OrderType!.TracksDefectOutcome;
     var maintenanceActionTypes = (List<MaintenanceActionType>)ViewBag.MaintenanceActionTypes;
+    var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
 
@@ -139,7 +143,14 @@
     </div>
 </div>
 
-<a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
+@if (canViewOrderList)
+{
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
+}
+else
+{
+    <a asp-controller="Users" asp-action="MyOrders" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
+}
 
 @section Scripts {
 <script>
