@@ -5,7 +5,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Date")</th><th>@Loc.T("Action")</th><th>@Loc.T("Entity")</th><th>@Loc.T("User")</th><th>@Loc.T("Details")</th></tr></thead>
+            <thead><tr><th>@Loc.T("Date")</th><th>@Loc.T("Action")</th><th>@Loc.T("Entity")</th><th>@Loc.T("User")</th><th>@Loc.T("Change")</th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -18,7 +18,23 @@
                         <td><span class="badge bg-secondary-subtle text-secondary-emphasis">@l.Action.Replace('_', ' ')</span></td>
                         <td class="small">@l.EntityType</td>
                         <td class="small">@(l.User?.FullName ?? l.UserName ?? l.UserId)</td>
-                        <td class="small text-muted text-truncate" style="max-width:320px">@l.Details</td>
+                        <td class="small text-muted text-truncate" style="max-width:320px">
+                            @{
+                                var hasChange = !string.IsNullOrWhiteSpace(l.OldValue) || !string.IsNullOrWhiteSpace(l.NewValue);
+                            }
+                            @if (hasChange)
+                            {
+                                @(l.OldValue ?? "—")<text> → </text>@(l.NewValue ?? "—")
+                                @if (!string.IsNullOrWhiteSpace(l.Details))
+                                {
+                                    <text> (@l.Details)</text>
+                                }
+                            }
+                            else
+                            {
+                                @(l.Details ?? "—")
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
