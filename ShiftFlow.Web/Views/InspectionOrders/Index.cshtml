@@ -6,6 +6,7 @@
     ViewData["Title"] = Loc.T("Inspection Orders");
     var status = (string?)ViewBag.Status;
     var search = (string?)ViewBag.Search;
+    var overdue = ViewBag.Overdue is true;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderExport)).Succeeded;
     string actionsHtml = "";
@@ -13,6 +14,14 @@
     if (canExport) actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Export") + "</a>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Inspection Orders"),Subtitle=Loc.T("Assign inspections to employees or teams"),ActionsHtml=actionsHtml})" />
+
+@if (overdue)
+{
+    <div class="alert alert-warning small d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-alarm me-1"></i>@Loc.T("Showing overdue orders only")</span>
+        <a asp-action="Index" asp-route-status="@status" class="text-decoration-none">@Loc.T("Clear")</a>
+    </div>
+}
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
     <div class="btn-group btn-group-sm" role="group">

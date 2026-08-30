@@ -29,11 +29,12 @@ public class InspectionOrdersController : Controller
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
     [Authorize(Policy = PermissionCatalog.InspectionOrderView)]
-    public async Task<IActionResult> Index(string? status, string? search)
+    public async Task<IActionResult> Index(string? status, string? search, bool overdue = false)
     {
-        var orders = await _orders.GetAllAsync(status, search);
+        var orders = await _orders.GetAllAsync(status, search, overdue);
         ViewBag.Status = status;
         ViewBag.Search = search;
+        ViewBag.Overdue = overdue;
         return View(orders);
     }
 

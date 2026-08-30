@@ -99,7 +99,7 @@ public class InspectionOrderService : IInspectionOrderService
         return await query.OrderByDescending(o => o.CreatedAt).Take(300).ToListAsync();
     }
 
-    public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search)
+    public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue = false)
     {
         var query = _db.InspectionOrders
             .Include(o => o.OrderType)
@@ -115,6 +115,14 @@ public class InspectionOrderService : IInspectionOrderService
         {
             var term = search.Trim();
             query = query.Where(o => o.OrderNumber.Contains(term));
+        }
+
+        // Same definition as the Dashboard's Overdue Orders KPI/card, so the "View all" link
+        // there actually lands on the same set instead of the unfiltered full list.
+        if (overdue)
+        {
+            var today = DateTime.Today;
+            query = query.Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < today);
         }
 
         return await query.OrderByDescending(o => o.CreatedAt).Take(500).ToListAsync();

@@ -38,7 +38,7 @@ public interface IInspectionOrderService
         List<int>? assetIds, DateTime? dueDate, string createdByUserId);
     Task<InspectionOrder?> GetByIdAsync(int id);
     Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
-    Task<List<InspectionOrder>> GetAllAsync(string? status, string? search);
+    Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue = false);
     Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
     /// <summary>Records maintenance actions performed on an asset independent of the OK/Defective
     /// outcome decision — logs what maintenance was done without requiring (or changing) an
