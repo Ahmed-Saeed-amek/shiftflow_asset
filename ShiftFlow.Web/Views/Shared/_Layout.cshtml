@@ -1,9 +1,16 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
 @inject IAuthorizationService AuthZ
+@inject UserManager<ApplicationUser> UserManager
 @{
     var isRTL = Loc.IsRTL;
     var currentPath = Context.Request.Path + Context.Request.QueryString;
+    // The sidebar footer used to show User.Identity.Name, which for this app is always the
+    // email (UserName == Email at signup) — every role except the one that lands on MyHome
+    // (which greets by FullName separately) never saw their actual name anywhere in the UI.
+    var displayName = (await UserManager.GetUserAsync(User))?.FullName ?? User.Identity?.Name;
     var canUseAi = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AiAssistantUse)).Succeeded;
     var canManageInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     var canViewTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamView)).Succeeded;
@@ -180,7 +187,7 @@
 
         <div class="border-top border-secondary pt-2 mt-2">
             <div class="small text-white-50 mb-1 text-truncate">
-                <i class="bi bi-person-circle me-1"></i>@User.Identity?.Name
+                <i class="bi bi-person-circle me-1"></i>@displayName
             </div>
             <div class="d-flex gap-1">
                 <form asp-controller="Language" asp-action="SetLanguage" method="post" class="flex-fill">
