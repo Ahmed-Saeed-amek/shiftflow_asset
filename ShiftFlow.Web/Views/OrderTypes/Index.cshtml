@@ -8,7 +8,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Prefix")</th><th>@Loc.T("Tracks Defect Outcome")</th><th>@Loc.T("Requires Vendor")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <thead><tr><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Prefix")</th><th class="d-none d-xl-table-cell">@Loc.T("Tracks Defect Outcome")</th><th class="d-none d-xl-table-cell">@Loc.T("Requires Vendor")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -18,10 +18,10 @@
                 {
                     <tr>
                         <td>@Loc.LocalizedName(t.Name, t.NameAr)</td>
-                        <td class="small font-monospace">@t.Prefix</td>
-                        <td>@(t.TracksDefectOutcome ? Loc.T("Yes") : Loc.T("No"))</td>
-                        <td>@(t.RequiresVendor ? Loc.T("Yes") : Loc.T("No"))</td>
-                        <td><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="small font-monospace d-none d-lg-table-cell">@t.Prefix</td>
+                        <td class="d-none d-xl-table-cell">@(t.TracksDefectOutcome ? Loc.T("Yes") : Loc.T("No"))</td>
+                        <td class="d-none d-xl-table-cell">@(t.RequiresVendor ? Loc.T("Yes") : Loc.T("No"))</td>
+                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
                                     onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"))'>
