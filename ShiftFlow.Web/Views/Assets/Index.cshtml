@@ -84,7 +84,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Category")</th><th class="d-none d-xl-table-cell">@Loc.T("Zone")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -95,9 +95,9 @@
                     <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = a.Id })'">
                         <td class="small text-muted font-monospace">@a.AssetTag</td>
                         <td>@a.Name</td>
-                        <td>@a.Category?.Name</td>
-                        <td class="small">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
-                        <td><partial name="_StatusBadge" model="@a.Status" /></td>
+                        <td class="d-none d-lg-table-cell">@a.Category?.Name</td>
+                        <td class="small d-none d-xl-table-cell">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
+                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@a.Status" /></td>
                         <td onclick="event.stopPropagation()">
                             @if (canManage)
                             {
