@@ -232,10 +232,12 @@ public class UsersController : Controller
 
     private static (DateTime? from, DateTime? to) ResolveRange(string? range)
     {
-        var today = DateTime.Today;
+        // Matched against CreatedDate/ChangedAt, which are all stored as UtcNow — using local
+        // DateTime.Today/Now here would silently shift the boundary by the server's UTC offset.
+        var today = DateTime.UtcNow.Date;
         // "to" is the current moment, not midnight-today, so anything created later today
         // (e.g. a task assigned minutes ago) still falls inside the range.
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         return range switch
         {
             "month" => (new DateTime(today.Year, today.Month, 1), now),

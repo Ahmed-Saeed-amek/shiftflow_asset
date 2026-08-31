@@ -26,7 +26,7 @@ public class MyHomeController : Controller
         var id = user!.Id;
 
         var myOrders = await _orders.GetMyOrdersAsync(id, includeDone: false);
-        var overdueCount = myOrders.Count(o => o.DueDate.HasValue && o.DueDate < DateTime.Today);
+        var overdueCount = myOrders.Count(o => o.DueDate.HasValue && o.DueDate < DateTime.UtcNow.Date);
 
         ViewBag.UserName = user.FullName;
         ViewBag.OpenOrderCount = myOrders.Count;

@@ -224,13 +224,13 @@
                 {
                     <span class="badge bg-danger py-2 px-3">@Loc.T((TempData["Error"] ?? "").ToString()!)</span>
                 }
-                <span class="text-muted small d-none d-sm-inline">@Loc.TDate(DateTime.Now.ToString("dd/MM/yyyy"))</span>
+                <span class="text-muted small d-none d-sm-inline">@Loc.TDate(DateTime.UtcNow.ToString("dd/MM/yyyy"))</span>
             </div>
         </nav>
         <main class="flex-grow-1 p-3 p-md-4" style="background:hsl(var(--background))">
             @RenderBody()
         </main>
-        <footer class="bg-white border-top text-center text-muted small py-2">STEP &copy; @DateTime.Now.Year</footer>
+        <footer class="bg-white border-top text-center text-muted small py-2">STEP &copy; @DateTime.UtcNow.Year</footer>
     </div>
 </div>
 

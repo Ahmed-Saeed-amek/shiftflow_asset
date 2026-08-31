@@ -21,7 +21,7 @@ public class DashboardService : IDashboardService
         if (_cache.TryGetValue(cacheKey, out DashboardKpis? cached) && cached != null)
             return cached;
 
-        var today = DateTime.Today;
+        var today = DateTime.UtcNow.Date;
         // Sequential — a scoped DbContext cannot run these counts concurrently.
         var totalEngineers = await _db.Users.AsNoTracking().CountAsync(u => u.IsActive);
         var openInspectionOrders = await _db.InspectionOrders.AsNoTracking().CountAsync(o => o.Status != "Done");

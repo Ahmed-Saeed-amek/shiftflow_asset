@@ -121,7 +121,7 @@ public class InspectionOrderService : IInspectionOrderService
         // there actually lands on the same set instead of the unfiltered full list.
         if (overdue)
         {
-            var today = DateTime.Today;
+            var today = DateTime.UtcNow.Date;
             query = query.Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < today);
         }
 

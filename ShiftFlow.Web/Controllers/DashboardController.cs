@@ -46,7 +46,7 @@ public class DashboardController : Controller
 
         ViewBag.OverdueOrders = await _db.InspectionOrders.AsNoTracking()
             .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
-            .Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < DateTime.Today)
+            .Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < DateTime.UtcNow.Date)
             .OrderBy(o => o.DueDate).Take(6).ToListAsync();
 
         return View(kpis);
