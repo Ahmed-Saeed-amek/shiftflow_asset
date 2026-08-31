@@ -36,7 +36,7 @@
             {
                 <span><i class="bi bi-geo-alt me-1"></i>@Loc.LocalizedName(zone.Name, zone.NameAr)</span>
             }
-            <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedDate.ToString("yyyy-MM-dd")</span>
+            <span><i class="bi bi-calendar3 me-1"></i>@Loc.TDate(Model.CreatedDate.ToString("dd/MM/yyyy"))</span>
         </div>
     </div>
     <a asp-action="Index" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
@@ -431,7 +431,7 @@
                                     <partial name="_StatusBadge" model="@e.Stage" />
                                     <span class="small text-muted ms-2">@e.ChangedByUser?.FullName</span>
                                 </div>
-                                <span class="small text-muted">@e.ChangedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                <span class="small text-muted">@Loc.TDate(e.ChangedAt.ToString("dd/MM/yyyy")) @e.ChangedAt.ToString("HH:mm")</span>
                             </div>
                         </div>
                     }
