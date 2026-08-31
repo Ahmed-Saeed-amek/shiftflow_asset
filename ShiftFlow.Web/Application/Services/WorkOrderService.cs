@@ -75,30 +75,42 @@ public class WorkOrderService : IWorkOrderService
             throw new InvalidOperationException("Assign a vendor or an employee before accepting this report.");
 
         wo.Priority = priority;
+        string newStage;
         if (vendorId != null)
         {
             await ValidateVendorAsync(vendorId.Value);
-            wo.VendorId = vendorId; wo.Stage = "Sent to Vendor";
+            newStage = "Sent to Vendor";
+            // Atomically claim the transition — closes the same race as Force Close/EmployeeFix/
+            // ConfirmFix: two concurrent Accept calls could otherwise both pass the Draft check
+            // above and each append its own stage-history row.
+            var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, newStage).SetProperty(w => w.VendorId, vendorId).SetProperty(w => w.Priority, priority));
+            if (rows == 0) throw new InvalidOperationException("Only a Draft report can be accepted.");
             AddStageEvent(wo, "Sent to Vendor", userId);
         }
         else
         {
             // No vendor, only an assigned employee — skip the vendor pipeline entirely and go
             // straight to "New" so the employee's own Report Fix action becomes available.
-            wo.Stage = "New";
+            newStage = "New";
+            var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, newStage).SetProperty(w => w.Priority, priority));
+            if (rows == 0) throw new InvalidOperationException("Only a Draft report can be accepted.");
             AddStageEvent(wo, "New", userId);
         }
         await SetAssetStatusAsync(wo.AssetId, "Maintenance");
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Accept", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Draft", newValue: wo.Stage);
+        await _audit.LogAsync("Accept", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Draft", newValue: newStage);
     }
 
     public async Task RejectAsync(int workOrderId, string? reason, string userId)
     {
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Draft") throw new InvalidOperationException("Only a Draft report can be rejected.");
-        wo.Stage = "Rejected";
-        wo.Notes = string.IsNullOrWhiteSpace(reason) ? wo.Notes : $"{wo.Notes}\n\nRejected: {reason}".Trim();
+        var newNotes = string.IsNullOrWhiteSpace(reason) ? wo.Notes : $"{wo.Notes}\n\nRejected: {reason}".Trim();
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Rejected").SetProperty(w => w.Notes, newNotes));
+        if (rows == 0) throw new InvalidOperationException("Only a Draft report can be rejected.");
         AddStageEvent(wo, "Rejected", userId);
         await SetAssetStatusAsync(wo.AssetId, "Working");
         await _db.SaveChangesAsync();
@@ -111,7 +123,9 @@ public class WorkOrderService : IWorkOrderService
         if (wo.Stage != "New") throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
         await ValidateVendorAsync(vendorId);
 
-        wo.VendorId = vendorId; wo.Stage = "Sent to Vendor";
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "New")
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Sent to Vendor").SetProperty(w => w.VendorId, vendorId));
+        if (rows == 0) throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
         AddStageEvent(wo, "Sent to Vendor", userId);
         await SetAssetStatusAsync(wo.AssetId, "Maintenance");
         await _db.SaveChangesAsync();
@@ -124,12 +138,18 @@ public class WorkOrderService : IWorkOrderService
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
-        wo.FixDescription = description; wo.FixCost = cost; wo.FixCompletionDate = completionDate;
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.FixDescription, description)
+                .SetProperty(w => w.FixCost, cost)
+                .SetProperty(w => w.FixCompletionDate, completionDate));
+        if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+
         _db.WorkOrderParts.RemoveRange(wo.Parts);
         foreach (var p in parts.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
             _db.WorkOrderParts.Add(new WorkOrderPart { WorkOrderId = wo.Id, Name = p.Name, Quantity = p.Quantity });
 
-        wo.Stage = "Fixed - Pending Confirmation";
         AddStageEvent(wo, "Fixed - Pending Confirmation", vendorUserId);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("VendorFix", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: "Sent to Vendor", newValue: "Fixed - Pending Confirmation");
@@ -140,8 +160,9 @@ public class WorkOrderService : IWorkOrderService
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
-        wo.BlockReasonId = blockReasonId; wo.BlockDetail = detail;
-        wo.Stage = "Blocked";
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Blocked").SetProperty(w => w.BlockReasonId, blockReasonId).SetProperty(w => w.BlockDetail, detail));
+        if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         AddStageEvent(wo, "Blocked", vendorUserId);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("VendorBlock", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: "Sent to Vendor", newValue: "Blocked", details: detail);
@@ -153,8 +174,9 @@ public class WorkOrderService : IWorkOrderService
         if (wo.Stage != "Blocked") throw new InvalidOperationException("Only a Blocked work order can be resent.");
         if (wo.VendorId == null) throw new InvalidOperationException("This work order has no vendor to resend to.");
 
-        wo.BlockReasonId = null; wo.BlockDetail = null;
-        wo.Stage = "Sent to Vendor";
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Blocked")
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Sent to Vendor").SetProperty(w => w.BlockReasonId, (int?)null).SetProperty(w => w.BlockDetail, (string?)null));
+        if (rows == 0) throw new InvalidOperationException("Only a Blocked work order can be resent.");
         AddStageEvent(wo, "Sent to Vendor", userId);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("Resend", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Blocked", newValue: "Sent to Vendor");
@@ -239,12 +261,18 @@ public class WorkOrderService : IWorkOrderService
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         if (!isManager && wo.AssignedToUserId != userId) throw new InvalidOperationException("This work order isn't assigned to you.");
 
-        wo.FixDescription = description; wo.FixCost = cost; wo.FixCompletionDate = completionDate;
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.FixDescription, description)
+                .SetProperty(w => w.FixCost, cost)
+                .SetProperty(w => w.FixCompletionDate, completionDate));
+        if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+
         _db.WorkOrderParts.RemoveRange(wo.Parts);
         foreach (var p in parts.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
             _db.WorkOrderParts.Add(new WorkOrderPart { WorkOrderId = wo.Id, Name = p.Name, Quantity = p.Quantity });
 
-        wo.Stage = "Fixed - Pending Confirmation";
         AddStageEvent(wo, "Fixed - Pending Confirmation", userId);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("AdvanceWithoutVendor", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Sent to Vendor", newValue: "Fixed - Pending Confirmation");
