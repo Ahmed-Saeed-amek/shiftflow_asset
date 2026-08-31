@@ -362,7 +362,7 @@ public static class Translations
         // English dash-clause structure for a plain Arabic status phrase.
         ["Sent to Vendor"] = "لدى المورد",
         ["Fixed - Pending Confirmation"] = "بانتظار تأكيد الإصلاح",
-        ["Blocked"] = "معلّق",
+        ["Blocked"] = "مسدود",
         ["Send to Vendor"] = "إرسال إلى المورد",
         ["Resend"] = "إعادة الإرسال",
         ["Confirm"] = "تأكيد",
