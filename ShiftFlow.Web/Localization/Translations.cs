@@ -327,6 +327,7 @@ public static class Translations
         ["Open Work Orders"] = "أوامر عمل قائمة",
         ["critical"] = "حرج",
         ["Search"] = "بحث",
+        ["Search by order # or asset tag…"] = "ابحث برقم الأمر أو رمز الأصل…",
         ["records"] = "سجلات",
         // "Zone" is the granular, named facility (e.g. "Block 3 Substation") that Assets/Contracts
         // actually attach to; الموضع ("the specific site") keeps it distinct from Location Category.

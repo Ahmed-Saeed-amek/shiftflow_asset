@@ -23,12 +23,14 @@ public class WorkOrdersController : Controller
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
-    public async Task<IActionResult> Index(string? stage, string? priority)
+    public async Task<IActionResult> Index(string? stage, string? priority, string? q)
     {
         var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
         if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
         if (!string.IsNullOrWhiteSpace(priority)) query = query.Where(w => w.Priority == priority);
-        ViewBag.Stage = stage; ViewBag.Priority = priority;
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(w => w.WorkOrderNumber.Contains(q) || (w.Asset != null && w.Asset.AssetTag.Contains(q)));
+        ViewBag.Stage = stage; ViewBag.Priority = priority; ViewBag.Q = q;
         return View(await query.OrderByDescending(w => w.CreatedDate).ToListAsync());
     }
 
