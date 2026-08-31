@@ -24,6 +24,14 @@ public sealed class EmployeeProfileViewModel
 
     public List<InspectionOrderRow> Orders { get; init; } = new();
     public List<EmpAuditRow>        AuditLog { get; init; } = new();
+    public List<EmpTeamRow> Teams { get; init; } = new();
+}
+
+public sealed class EmpTeamRow
+{
+    public int      Id     { get; init; }
+    public string   Name   { get; init; } = "";
+    public string?  NameAr { get; init; }
 }
 
 public sealed class EmpAuditRow

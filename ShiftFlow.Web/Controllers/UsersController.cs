@@ -255,6 +255,10 @@ public class UsersController : Controller
         var roles = await _um.GetRolesAsync(user);
 
         var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == id).Select(m => m.TeamId).ToListAsync();
+        var teamRows = await _db.Teams.AsNoTracking()
+            .Where(t => myTeamIds.Contains(t.Id))
+            .Select(t => new EmpTeamRow { Id = t.Id, Name = t.Name, NameAr = t.NameAr })
+            .ToListAsync();
         var orderQuery = _db.InspectionOrders.AsNoTracking()
             .Where(o => o.AssignedToUserId == id || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
         if (from.HasValue) orderQuery = orderQuery.Where(o => o.CreatedAt >= from.Value);
@@ -327,6 +331,7 @@ public class UsersController : Controller
 
             Orders     = orders,
             AuditLog   = auditLog,
+            Teams      = teamRows,
         };
 
         return vm;
