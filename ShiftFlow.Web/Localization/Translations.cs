@@ -1975,6 +1975,7 @@ public static class Translations
 
         // Stage 5 — previously untranslated strings
         Ar["Action Type and Cause are required to report a defect."] = "نوع الإجراء والسبب مطلوبان للإبلاغ عن عطل.";
+        Ar["Select at least one maintenance action before saving."] = "اختر إجراء صيانة واحدًا على الأقل قبل الحفظ.";
         Ar["e.g. Building 12, Street 4"] = "مثال: مبنى 12، شارع 4";
         Ar["Mark Attendance"] = "تسجيل الحضور";
         Ar["Vendor is determined automatically from this asset's linked Contracts — link it to a contract to set its vendor."] = "يُحدَّد المورّد تلقائيًا من العقود المرتبطة بهذا الأصل — اربطه بعقد لتحديد مورّده.";

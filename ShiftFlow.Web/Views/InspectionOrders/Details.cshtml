@@ -162,6 +162,7 @@ else
     const alertBox = document.getElementById('inspectAlert');
     const jsFailed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Failed to save.")));
     const jsActionTypeRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Action Type and Cause are required to report a defect.")));
+    const jsMaintenanceActionRequired = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Select at least one maintenance action before saving.")));
     const jsSelectActions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Select actions")));
     const jsSelected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("selected")));
     // The Save button's label doubles as the "nothing is saved yet" cue — a bare "Save" reads as
@@ -290,6 +291,11 @@ else
             let r;
             btn.disabled = true;
             if (formRow.dataset.mode === 'maintenance') {
+                if (maintenanceActionTypeIds.length === 0) {
+                    alertBox.innerHTML = `<div class="alert alert-danger small">${jsMaintenanceActionRequired}</div>`;
+                    btn.disabled = false;
+                    return;
+                }
                 const body = new URLSearchParams({ itemId });
                 maintenanceActionTypeIds.forEach(id => body.append('maintenanceActionTypeIds', id));
                 r = await fetch('/InspectionOrders/UpdateMaintenanceActions', {
