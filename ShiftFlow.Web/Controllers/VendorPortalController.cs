@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
@@ -20,9 +21,10 @@ public class VendorPortalController : Controller
     private readonly ApplicationDbContext _db;
     private readonly IWorkOrderService _workOrderService;
     private readonly UserManager<ApplicationUser> _userManager;
-    public VendorPortalController(ApplicationDbContext db, IWorkOrderService workOrderService, UserManager<ApplicationUser> userManager)
+    private readonly ILanguageService _loc;
+    public VendorPortalController(ApplicationDbContext db, IWorkOrderService workOrderService, UserManager<ApplicationUser> userManager, ILanguageService loc)
     {
-        _db = db; _workOrderService = workOrderService; _userManager = userManager;
+        _db = db; _workOrderService = workOrderService; _userManager = userManager; _loc = loc;
     }
 
     private async Task<int?> GetMyVendorIdAsync()
@@ -107,7 +109,7 @@ public class VendorPortalController : Controller
         if (!ModelState.IsValid)
         {
             FixFormRetainer.Stash(TempData, vm, completionDate);
-            TempData["Error"] = "Fix not submitted — a description is required.";
+            TempData["Error"] = _loc.T("Fix not submitted — a description is required.");
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -119,7 +121,7 @@ public class VendorPortalController : Controller
             if (rejected.Count > 0)
             {
                 FixFormRetainer.Stash(TempData, vm, completionDate);
-                TempData["Error"] = "Fix not submitted — invalid attachment(s): " + string.Join("; ", rejected.Select(r => $"{r.FileName} — {r.Reason}"));
+                TempData["Error"] = _loc.T("Fix not submitted — invalid attachment(s):") + " " + string.Join("; ", rejected.Select(r => $"{r.FileName} — {_loc.T(r.Reason)}"));
                 return RedirectToAction(nameof(Details), new { id });
             }
         }
@@ -130,7 +132,7 @@ public class VendorPortalController : Controller
             var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
             await _workOrderService.VendorFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
             await WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
-            TempData["Success"] = "Fix report submitted.";
+            TempData["Success"] = _loc.T("Fix report submitted.");
         }
         catch (InvalidOperationException ex) { FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
@@ -150,7 +152,7 @@ public class VendorPortalController : Controller
         if (wo.VendorId != vendorId) return NotFound();
 
         var userId = _userManager.GetUserId(User)!;
-        try { await _workOrderService.VendorBlockAsync(id, blockReasonId, detail, userId); TempData["Success"] = "Reported as blocked."; }
+        try { await _workOrderService.VendorBlockAsync(id, blockReasonId, detail, userId); TempData["Success"] = _loc.T("Reported as blocked."); }
         catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
     }
