@@ -204,6 +204,11 @@ public class WorkOrderService : IWorkOrderService
     {
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+        // A non-existent blockReasonId (e.g. a stale dropdown value) used to reach an unhandled
+        // FK-constraint DbUpdateException at ExecuteUpdateAsync below - same bug class as the
+        // ActionType/Cause/VendorId/employeeUserId FK checks already added elsewhere.
+        if (!await _db.WorkOrderBlockReasons.AnyAsync(r => r.Id == blockReasonId))
+            throw new InvalidOperationException("Selected block reason not found.");
 
         var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Blocked").SetProperty(w => w.BlockReasonId, blockReasonId).SetProperty(w => w.BlockDetail, detail));
