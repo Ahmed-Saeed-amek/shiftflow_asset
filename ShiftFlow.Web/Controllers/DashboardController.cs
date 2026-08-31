@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
 
@@ -40,9 +41,7 @@ public class DashboardController : Controller
         ViewBag.OrderStatusLabels = statusOrder;
         ViewBag.OrderStatusData = statusOrder.Select(s => statusCounts.GetValueOrDefault(s, 0)).ToList();
 
-        ViewBag.RecentOrders = await _db.InspectionOrders.AsNoTracking()
-            .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
-            .OrderByDescending(o => o.CreatedAt).Take(6).ToListAsync();
+        ViewBag.RecentOrders = await BuildRecentOrdersAsync();
 
         ViewBag.OverdueOrders = await _db.InspectionOrders.AsNoTracking()
             .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
@@ -50,5 +49,50 @@ public class DashboardController : Controller
             .OrderBy(o => o.DueDate).Take(6).ToListAsync();
 
         return View(kpis);
+    }
+
+    /// <summary>Org-wide "what's happening" feed — the most recent orders across all three
+    /// categories (Inspection, Maintenance, Work Order), not just Inspection Orders, so the
+    /// dashboard reflects actual recent activity rather than one order type.</summary>
+    private async Task<List<MyWorkOrderRow>> BuildRecentOrdersAsync()
+    {
+        var inspectionRows = await _db.InspectionOrders.AsNoTracking()
+            .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
+            .OrderByDescending(o => o.CreatedAt).Take(6)
+            .Select(o => new MyWorkOrderRow
+            {
+                Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+                Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
+                AssignedToLabel = o.AssignedToUser != null ? o.AssignedToUser.FullName
+                    : o.AssignedToTeam != null ? "Team: " + o.AssignedToTeam.Name : null,
+            })
+            .ToListAsync();
+
+        var maintenanceRows = await _db.MaintenanceOrders.AsNoTracking()
+            .Include(m => m.AssignedToUser)
+            .OrderByDescending(m => m.CreatedDate).Take(6)
+            .Select(m => new MyWorkOrderRow
+            {
+                Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
+                Status = m.Status, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
+                AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName : null,
+            })
+            .ToListAsync();
+
+        var workOrderRows = await _db.WorkOrders.AsNoTracking()
+            .Include(w => w.AssignedToUser).Include(w => w.Vendor)
+            .OrderByDescending(w => w.CreatedDate).Take(6)
+            .Select(w => new MyWorkOrderRow
+            {
+                Category = "WorkOrder", CategoryLabel = "Work Order", Id = w.Id, OrderNumber = w.WorkOrderNumber,
+                Status = w.Stage, CreatedAt = w.CreatedDate, DetailsController = "WorkOrders",
+                AssignedToLabel = w.AssignedToUser != null ? w.AssignedToUser.FullName : w.Vendor != null ? w.Vendor.Name : null,
+            })
+            .ToListAsync();
+
+        return inspectionRows.Concat(maintenanceRows).Concat(workOrderRows)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(6)
+            .ToList();
     }
 }

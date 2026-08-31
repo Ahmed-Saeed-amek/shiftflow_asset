@@ -531,6 +531,8 @@ public static class Translations
         ["Inspection Orders by Status"] = "أوامر المعاينة حسب الحالة",
         ["No overdue orders"] = "لا توجد أوامر متأخرة",
         ["Recent Inspection Orders"] = "آخر أوامر المعاينة",
+        ["Recent Orders"] = "آخر الأوامر",
+        ["No orders yet"] = "لا توجد أوامر بعد",
         ["No inspection orders yet"] = "لا توجد أوامر معاينة حتى الآن",
         ["My Open Inspection Orders"] = "أوامر معاينتي القائمة",
         ["Work Order"] = "أمر عمل",

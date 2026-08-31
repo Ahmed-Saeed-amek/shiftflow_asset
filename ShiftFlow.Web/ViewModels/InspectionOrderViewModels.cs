@@ -70,6 +70,9 @@ public sealed class MyWorkOrderRow
     public DateTime CreatedAt { get; init; }
     /// <summary>Controller to route "View" to — InspectionOrders / MaintenanceOrders / WorkOrders.</summary>
     public string DetailsController { get; init; } = "";
+    /// <summary>Assignee display text (a name, "Team: X", or null) — only populated where the
+    /// caller needs to show who an order belongs to (e.g. an org-wide recent-orders feed).</summary>
+    public string? AssignedToLabel { get; init; }
 }
 
 /// <summary>One calendar-month row on the employee's unified History page.</summary>

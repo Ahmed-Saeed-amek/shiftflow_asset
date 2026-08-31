@@ -2,8 +2,15 @@
 @using ShiftFlow.Domain.Entities
 @{
     ViewData["Title"] = Loc.T("Executive Dashboard");
-    var recentOrders = (List<InspectionOrder>)ViewBag.RecentOrders;
+    var recentOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.RecentOrders;
     var overdueOrders = (List<InspectionOrder>)ViewBag.OverdueOrders;
+
+    string CategoryBadgeClass(string c) => c switch
+    {
+        "Inspection" => "bg-primary-subtle text-primary-emphasis",
+        "Maintenance" => "bg-warning-subtle text-warning-emphasis",
+        _ => "bg-info-subtle text-info-emphasis",
+    };
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait")})" />
 
@@ -53,21 +60,24 @@
     <div class="col-12">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
-                <span class="fw-semibold">@Loc.T("Recent Inspection Orders")</span>
+                <span class="fw-semibold">@Loc.T("Recent Orders")</span>
                 <a asp-controller="InspectionOrders" asp-action="Index" class="small text-decoration-none">@Loc.T("View all")</a>
             </div>
             <div class="list-group list-group-flush">
                 @if (recentOrders.Count == 0)
                 {
-                    <div class="list-group-item text-muted small text-center py-3">@Loc.T("No inspection orders yet")</div>
+                    <div class="list-group-item text-muted small text-center py-3">@Loc.T("No orders yet")</div>
                 }
                 @foreach (var o in recentOrders)
                 {
-                    <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
+                    <a class="list-group-item list-group-item-action" asp-controller="@o.DetailsController" asp-action="Details" asp-route-id="@o.Id">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="small fw-semibold">@o.OrderNumber</div>
-                                <div class="small text-muted">@(o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? Loc.T("Team") + ": " + o.AssignedToTeam.Name : "—")) · @o.CreatedAt.ToString("dd/MM/yyyy")</div>
+                                <div class="small fw-semibold d-flex align-items-center gap-2">
+                                    @o.OrderNumber
+                                    <span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span>
+                                </div>
+                                <div class="small text-muted">@(o.AssignedToLabel ?? "—") · @Loc.TDate(o.CreatedAt.ToString("dd/MM/yyyy"))</div>
                             </div>
                             <partial name="_StatusBadge" model="@o.Status" />
                         </div>
