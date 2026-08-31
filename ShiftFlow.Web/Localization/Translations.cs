@@ -373,14 +373,14 @@ public static class Translations
         ["Fix Cost"] = "تكلفة الإصلاح",
         ["Completion Date"] = "تاريخ الإنجاز",
         ["Fix Description"] = "وصف الإصلاح",
-        ["Block Reason"] = "سبب التعطيل",
-        ["Block Detail"] = "تفاصيل التعطيل",
+        ["Block Reason"] = "سبب الحظر",
+        ["Block Detail"] = "تفاصيل الحظر",
         ["The vendor can't proceed"] = "لا يمكن للمورد المتابعة",
         ["Vendor Portal"] = "بوابة المورد",
         ["My Work Orders"] = "أوامر العمل الخاصة بي",
         ["Fix Report"] = "تقرير الإصلاح",
         ["Submit Fix"] = "إرسال الإصلاح",
-        ["Submit Block"] = "إرسال التعطيل",
+        ["Submit Block"] = "إرسال الحظر",
         ["Choose Vendor"] = "اختر المورد",
         ["Assigned Employee"] = "الموظف المكلف",
         ["Assign Employee"] = "تعيين موظف",
@@ -456,7 +456,7 @@ public static class Translations
         ["Access Denied"] = "تم رفض الوصول",
         ["Not Covered by Contract"] = "غير مشمول بالعقد",
         ["Needs Site Visit"] = "يحتاج زيارة ميدانية",
-        ["Block Reasons"] = "أسباب التعطيل",
+        ["Block Reasons"] = "أسباب الحظر",
         ["New Reason"] = "سبب جديد",
         ["Waiting on the vendor to respond via their portal."] = "بانتظار رد المورد عبر بوابته.",
         ["Waiting on admin to resolve and resend."] = "بانتظار الإدارة لحل المشكلة وإعادة الإرسال.",
@@ -932,7 +932,7 @@ public static class Translations
         Ar["External"] = "خارجي";
         Ar["Installation Date"] = "تاريخ التركيب";
         Ar["Purchase"] = "شراء";
-        Ar["Service"] = "صيانة";
+        Ar["Service"] = "خدمة";
         Ar["Insurance"] = "تأمين";
         Ar["Purchased"] = "تم الشراء";
         Ar["Back to Assets"] = "العودة إلى الأصول";
