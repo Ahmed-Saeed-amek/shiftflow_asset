@@ -183,7 +183,12 @@ public class WorkOrderService : IWorkOrderService
         var old = wo.AssignedToUserId;
         wo.AssignedToUserId = string.IsNullOrWhiteSpace(employeeUserId) ? null : employeeUserId;
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("AssignEmployee", "WorkOrder", wo.Id.ToString(), userId, oldValue: old, newValue: wo.AssignedToUserId);
+
+        // Audit values are shown to admins as-is (e.g. on the per-user profile Audit Log tab) —
+        // log the employee's name, not the raw user-id GUID, so the entry is actually readable.
+        async Task<string?> NameOf(string? uid) => uid == null ? null
+            : await _db.Users.Where(u => u.Id == uid).Select(u => u.FullName).FirstOrDefaultAsync();
+        await _audit.LogAsync("AssignEmployee", "WorkOrder", wo.Id.ToString(), userId, oldValue: await NameOf(old), newValue: await NameOf(wo.AssignedToUserId));
     }
 
     public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string employeeUserId)

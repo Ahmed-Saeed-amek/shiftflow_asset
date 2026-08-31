@@ -71,13 +71,18 @@ public class TeamService : ITeamService
         await _audit.LogAsync(isActive ? "Activate" : "Deactivate", "Team", teamId.ToString(), userId);
     }
 
+    // Audit values are shown to admins as-is (e.g. on the per-user profile Audit Log tab) — log
+    // the member's name, not the raw user-id GUID, so the entry is actually readable.
+    private async Task<string?> NameOfAsync(string? uid) => uid == null ? null
+        : await _db.Users.Where(u => u.Id == uid).Select(u => u.FullName).FirstOrDefaultAsync();
+
     public async Task AddMemberAsync(int teamId, string userId, string actingUserId)
     {
         var exists = await _db.TeamMembers.AnyAsync(m => m.TeamId == teamId && m.UserId == userId);
         if (exists) return;
         _db.TeamMembers.Add(new TeamMember { TeamId = teamId, UserId = userId, AddedAt = DateTime.UtcNow });
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("AddMember", "Team", teamId.ToString(), actingUserId, newValue: userId);
+        await _audit.LogAsync("AddMember", "Team", teamId.ToString(), actingUserId, newValue: await NameOfAsync(userId));
     }
 
     public async Task RemoveMemberAsync(int teamId, string userId, string actingUserId)
@@ -86,7 +91,7 @@ public class TeamService : ITeamService
         if (member == null) return;
         _db.TeamMembers.Remove(member);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("RemoveMember", "Team", teamId.ToString(), actingUserId, oldValue: userId);
+        await _audit.LogAsync("RemoveMember", "Team", teamId.ToString(), actingUserId, oldValue: await NameOfAsync(userId));
     }
 
     public Task<bool> IsMemberAsync(int teamId, string userId) =>
@@ -110,8 +115,8 @@ public class TeamService : ITeamService
         await _db.SaveChangesAsync();
 
         foreach (var m in toRemove)
-            await _audit.LogAsync("RemoveMember", "Team", teamId.ToString(), actingUserId, oldValue: m.UserId);
+            await _audit.LogAsync("RemoveMember", "Team", teamId.ToString(), actingUserId, oldValue: await NameOfAsync(m.UserId));
         foreach (var id in toAddIds)
-            await _audit.LogAsync("AddMember", "Team", teamId.ToString(), actingUserId, newValue: id);
+            await _audit.LogAsync("AddMember", "Team", teamId.ToString(), actingUserId, newValue: await NameOfAsync(id));
     }
 }
