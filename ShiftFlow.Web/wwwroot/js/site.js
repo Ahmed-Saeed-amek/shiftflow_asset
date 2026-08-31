@@ -68,6 +68,7 @@ function initEmployeePickers(){
     var results=pk.querySelector('[data-ep-results]');
     var role=pk.dataset.role||'';
     var timer=null;
+    var reqSeq=0;
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
       if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
@@ -86,7 +87,10 @@ function initEmployeePickers(){
       // typing invalidates a previous selection until a row is chosen
       hidden.value='';
       var url='/api/users/search?q='+encodeURIComponent(q)+(role?'&role='+encodeURIComponent(role):'');
-      fetch(url,{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():[];}).then(render).catch(hide);
+      // A faster-typed later query can have its response race ahead of an earlier one still
+      // in flight — track a sequence number so a stale response never overwrites a newer one.
+      var myReq=++reqSeq;
+      fetch(url,{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():[];}).then(function(list){if(myReq===reqSeq)render(list);}).catch(function(){if(myReq===reqSeq)hide();});
     }
     search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(query,220);});
     search.addEventListener('focus',function(){if(search.value.trim()!==''||true)query();});
@@ -103,6 +107,7 @@ function initAssetPickers(){
     var search=pk.querySelector('[data-ap-search]');
     var results=pk.querySelector('[data-ap-results]');
     var timer=null;
+    var reqSeq=0;
     function hide(){results.classList.add('d-none');results.innerHTML='';}
     function render(list){
       if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
@@ -119,7 +124,10 @@ function initAssetPickers(){
     function query(){
       var q=search.value.trim();
       hidden.value='';
-      fetch('/Assets/Search?q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():[];}).then(render).catch(hide);
+      // A faster-typed later query can have its response race ahead of an earlier one still
+      // in flight — track a sequence number so a stale response never overwrites a newer one.
+      var myReq=++reqSeq;
+      fetch('/Assets/Search?q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():[];}).then(function(list){if(myReq===reqSeq)render(list);}).catch(function(){if(myReq===reqSeq)hide();});
     }
     search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(query,220);});
     search.addEventListener('focus',function(){query();});
