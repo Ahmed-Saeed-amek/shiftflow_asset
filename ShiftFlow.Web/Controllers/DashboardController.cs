@@ -43,9 +43,15 @@ public class DashboardController : Controller
 
         ViewBag.RecentOrders = await BuildRecentOrdersAsync();
 
-        ViewBag.OverdueOrders = await _db.InspectionOrders.AsNoTracking()
+        var overdueQuery = _db.InspectionOrders.AsNoTracking()
+            .Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < DateTime.UtcNow.Date);
+        // The KPI card's own count comes from GetKpisAsync's 2-minute cache, so it could lag
+        // behind this list — which always queries live — right after creating/closing an
+        // overdue order. Query the live count here too (cheap: same predicate, no .Include/Take)
+        // so the card and the list under it can never visibly disagree on the same page load.
+        ViewBag.OverdueOrderCount = await overdueQuery.CountAsync();
+        ViewBag.OverdueOrders = await overdueQuery
             .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
-            .Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < DateTime.UtcNow.Date)
             .OrderBy(o => o.DueDate).Take(6).ToListAsync();
 
         return View(kpis);

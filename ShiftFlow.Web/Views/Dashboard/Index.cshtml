@@ -16,7 +16,7 @@
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=Model.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=Model.InspectionOrdersOverdue.ToString(),Icon="bi-alarm",Color="red"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=((int)ViewBag.OverdueOrderCount).ToString(),Icon="bi-alarm",Color="red"})" /></div>
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Teams"),Value=Model.ActiveTeams.ToString(),Icon="bi-people",Color="violet"})" /></div>
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Total Engineers"),Value=Model.TotalEngineers.ToString(),Icon="bi-person-badge",Color="blue"})" /></div>
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{Model.DefectiveAssets}/{Model.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
