@@ -582,10 +582,13 @@ public static class DbSeeder
             ["HR"] =
             [
                 // View-only: employee directory and team rosters — the actual point of an "HR"
-                // role — plus Asset.View which was already granted. Deliberately not User.Manage
-                // or Team.Manage; account creation/deactivation and team membership changes stay
-                // with whoever already holds those (Admin) rather than assumed onto HR here.
-                "User.View", "Team.View", "Asset.View",
+                // role. Deliberately not User.Manage or Team.Manage; account creation/deactivation
+                // and team membership changes stay with whoever already holds those (Admin) rather
+                // than assumed onto HR here. Asset.View was dropped after three separate fresh-eyes
+                // reviews independently flagged HR seeing full operational asset/work-order/
+                // inspection-history data (and the Asset Categories/Locations config submenu it
+                // unlocks) as a permission-scope leak with no HR use case — see the removal below.
+                "User.View", "Team.View",
             ],
         };
 
@@ -601,6 +604,19 @@ public static class DbSeeder
                 if (!exists)
                     db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionName = perm });
             }
+        }
+
+        // HR's Asset.View grant was revoked above (removed from the matrix) — clean up any row
+        // seeded by an earlier run. Unlike Shift.Manage below, Asset.View itself stays in the
+        // catalog since other roles still use it; only HR's specific grant is stale.
+        var hrRole = await rm.FindByNameAsync("HR");
+        if (hrRole is not null)
+        {
+            var staleHrAssetView = await db.RolePermissions
+                .Where(rp => rp.RoleId == hrRole.Id && rp.PermissionName == "Asset.View")
+                .ToListAsync();
+            if (staleHrAssetView.Count > 0)
+                db.RolePermissions.RemoveRange(staleHrAssetView);
         }
 
         // Shift.Manage was removed from the catalog — it only ever gated the dead/
