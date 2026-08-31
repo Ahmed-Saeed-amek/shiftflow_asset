@@ -109,7 +109,7 @@
                             }
                             @if (Model.FixCompletionDate.HasValue)
                             {
-                                <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.FixCompletionDate?.ToString("yyyy-MM-dd")</dd>
+                                <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Loc.TDate(Model.FixCompletionDate?.ToString("dd/MM/yyyy") ?? "")</dd>
                             }
                         </dl>
                     }
