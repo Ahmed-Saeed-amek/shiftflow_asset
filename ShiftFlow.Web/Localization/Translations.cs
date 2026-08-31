@@ -582,6 +582,7 @@ public static class Translations
         ["Company / group name responsible"] = "اسم الشركة/المجموعة المسؤولة",
         ["Sort Order"] = "ترتيب الفرز",
         ["Order Types"] = "أنواع الأوامر",
+        ["Order Type"] = "نوع الأمر",
         ["Shared by Inspection Orders and Maintenance Orders"] = "مشتركة بين أوامر المعاينة وأوامر الصيانة",
         ["New Order Type"] = "نوع أمر جديد",
         ["Edit Order Type"] = "تعديل نوع الأمر",
