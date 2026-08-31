@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -25,6 +26,7 @@ public class WorkOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
     public async Task<IActionResult> Index(string? stage, string? priority, string? q)
     {
+        q = SearchQuery.Cap(q);
         var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
         if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
         if (!string.IsNullOrWhiteSpace(priority)) query = query.Where(w => w.Priority == priority);

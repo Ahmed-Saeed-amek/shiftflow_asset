@@ -35,6 +35,7 @@ public class VendorPortalController : Controller
 
     public async Task<IActionResult> Index(string? stage, string? q)
     {
+        q = SearchQuery.Cap(q);
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
         var query = _db.WorkOrders.Include(w => w.Asset).Where(w => w.VendorId == vendorId);

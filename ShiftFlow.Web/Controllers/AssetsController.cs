@@ -35,6 +35,7 @@ public class AssetsController : Controller
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Index(string? status, int? categoryId, int? zoneId, int? locationCategoryId, string? q)
     {
+        q = SearchQuery.Cap(q);
         var currentUserId = _userManager.GetUserId(User)!;
         var scope = await _db.UserAssetScopes.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == currentUserId);
         IQueryable<Asset> query = (await ScopedAssetsAsync(currentUserId))
@@ -171,6 +172,7 @@ public class AssetsController : Controller
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Search(string? q)
     {
+        q = SearchQuery.Cap(q);
         var userId = _userManager.GetUserId(User)!;
         var query = await ScopedAssetsAsync(userId);
         if (!string.IsNullOrWhiteSpace(q))

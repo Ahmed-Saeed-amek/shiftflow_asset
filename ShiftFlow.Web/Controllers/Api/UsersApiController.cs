@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Services;
 
 namespace ShiftFlow.Web.Controllers.Api;
 
@@ -39,7 +40,7 @@ public sealed class UsersApiController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var term = q.Trim();
+            var term = SearchQuery.Cap(q.Trim())!;
             users = users.Where(u =>
                 u.FullName.Contains(term) ||
                 (u.Email != null && u.Email.Contains(term)) ||
