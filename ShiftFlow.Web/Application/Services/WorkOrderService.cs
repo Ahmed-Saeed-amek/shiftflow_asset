@@ -241,6 +241,11 @@ public class WorkOrderService : IWorkOrderService
         if (wo.Stage == "Closed") throw new InvalidOperationException("Already closed.");
         var old = wo.Stage;
         wo.Stage = "Closed"; wo.ClosedDate = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            var note = $"Force-closed: {reason}";
+            wo.Notes = string.IsNullOrWhiteSpace(wo.Notes) ? note : $"{wo.Notes}\n{note}";
+        }
         AddStageEvent(wo, "Closed", userId);
         var hasOtherOpenWork = await _db.WorkOrders.AnyAsync(w => w.AssetId == wo.AssetId && w.Id != wo.Id && OpenStages.Contains(w.Stage))
             || await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == wo.AssetId && m.Status == "Open");
