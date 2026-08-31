@@ -21,10 +21,14 @@ public sealed class UsersApiController : ControllerBase
         var users = _db.Users.AsNoTracking().AsQueryable();
         if (activeOnly) users = users.Where(u => u.IsActive);
 
-        // This endpoint backs employee-facing pickers only — vendor portal accounts
-        // (Identity role "Vendor") are a separate account type and must never appear here.
+        // This endpoint backs employee-facing pickers used to assign field/maintenance work
+        // (inspection orders, maintenance orders, work orders) app-wide — vendor portal accounts
+        // (a separate account type) and HR (no field-work role) must never appear here. Without
+        // this, e.g. a Work Order's "Reassign Employee" picker could bind an HR account to a
+        // maintenance task with no warning.
+        var excludedRoles = new[] { "Vendor", "HR" };
         users = users.Where(u => !_db.UserRoles.Any(ur => ur.UserId == u.Id &&
-            _db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Vendor")));
+            _db.Roles.Any(r => r.Id == ur.RoleId && excludedRoles.Contains(r.Name))));
 
         if (!string.IsNullOrWhiteSpace(role))
         {
