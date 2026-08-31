@@ -13,6 +13,10 @@
     // only view the employee directory (e.g. HR) shouldn't see them on another user's profile.
     var canViewOrders = canViewOrderDetails;
     var canViewAudit = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AuditLogView)).Succeeded;
+    // Vendor accounts are companies, not employees — Team membership (like Employee #/
+    // Department/Specialization) is a person-only concept, so skip it for them rather than
+    // add yet another blank "—" row to an already sparse company profile.
+    var isVendor = Model.Roles.Contains("Vendor");
 }
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -62,10 +66,13 @@
                 <div class="text-muted small mb-1">@Loc.T("Department")</div>
                 <div class="fw-semibold">@Model.Department</div>
             </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="text-muted small mb-1">@Loc.T("Teams")</div>
-                <div class="fw-semibold">@(Model.Teams.Count > 0 ? string.Join(", ", Model.Teams.Select(t => Loc.LocalizedName(t.Name, t.NameAr))) : "—")</div>
-            </div>
+            @if (!isVendor)
+            {
+                <div class="col-sm-6 col-lg-3">
+                    <div class="text-muted small mb-1">@Loc.T("Teams")</div>
+                    <div class="fw-semibold">@(Model.Teams.Count > 0 ? string.Join(", ", Model.Teams.Select(t => Loc.LocalizedName(t.Name, t.NameAr))) : "—")</div>
+                </div>
+            }
             <div class="col-sm-6 col-lg-3">
                 <div class="text-muted small mb-1">@Loc.T("Specialization")</div>
                 <div class="fw-semibold">@Model.Specialization</div>
