@@ -240,12 +240,24 @@ public class WorkOrderService : IWorkOrderService
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage == "Closed") throw new InvalidOperationException("Already closed.");
         var old = wo.Stage;
-        wo.Stage = "Closed"; wo.ClosedDate = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(reason))
-        {
-            var note = $"Force-closed: {reason}";
-            wo.Notes = string.IsNullOrWhiteSpace(wo.Notes) ? note : $"{wo.Notes}\n{note}";
-        }
+        var closedDate = DateTime.UtcNow;
+        var newNotes = string.IsNullOrWhiteSpace(reason) ? wo.Notes
+            : string.IsNullOrWhiteSpace(wo.Notes) ? $"Force-closed: {reason}" : $"{wo.Notes}\nForce-closed: {reason}";
+
+        // A double-click/double-submit (or two racing requests) could both pass the Stage=="Closed"
+        // check above before either commits, each then appending its own stage-history row - the
+        // in-memory check alone doesn't close that window. ExecuteUpdateAsync's WHERE clause is
+        // evaluated atomically by the database, so only the first request to actually reach it can
+        // match Stage != "Closed" and flip the row; a loser sees 0 rows affected and is turned back
+        // with the same "Already closed" error the check above already gives a non-racing caller.
+        var rows = await _db.WorkOrders
+            .Where(w => w.Id == workOrderId && w.Stage != "Closed")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.Stage, "Closed")
+                .SetProperty(w => w.ClosedDate, closedDate)
+                .SetProperty(w => w.Notes, newNotes));
+        if (rows == 0) throw new InvalidOperationException("Already closed.");
+
         AddStageEvent(wo, "Closed", userId);
         var hasOtherOpenWork = await _db.WorkOrders.AnyAsync(w => w.AssetId == wo.AssetId && w.Id != wo.Id && OpenStages.Contains(w.Stage))
             || await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == wo.AssetId && m.Status == "Open");
