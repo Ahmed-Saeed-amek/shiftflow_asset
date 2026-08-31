@@ -21,6 +21,7 @@ public class UsersController : Controller
     private readonly IEmailService _email;
     private readonly IWhatsAppService _whatsApp;
     private readonly IEntraDirectoryService _directory;
+    private readonly IAuthorizationService _authZ;
 
     public UsersController(
         UserManager<ApplicationUser> um,
@@ -28,8 +29,9 @@ public class UsersController : Controller
         RoleManager<ApplicationRole> rm,
         IEmailService email,
         IWhatsAppService whatsApp,
-        IEntraDirectoryService directory)
-    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; }
+        IEntraDirectoryService directory,
+        IAuthorizationService authZ)
+    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; }
 
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> Index(string? role, string? search)
@@ -83,9 +85,15 @@ public class UsersController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    [Authorize(Policy = PermissionCatalog.UserView)]
+    // No blanket [Authorize(Policy=UserView)] here — a role without that permission (e.g.
+    // Engineer) must still be able to view their OWN profile (it's the only place team
+    // membership is shown), so the check below allows the caller's own id through regardless.
+    [Authorize]
     public async Task<IActionResult> Profile(string id)
     {
+        if (_um.GetUserId(User) != id && !(await _authZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded)
+            return Forbid();
+
         var vm = await BuildProfileAsync(id, null, null);
         if (vm is null) return NotFound();
         ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
