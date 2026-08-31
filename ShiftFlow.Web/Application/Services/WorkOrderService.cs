@@ -27,8 +27,29 @@ public class WorkOrderService : IWorkOrderService
         return workOrder;
     }
 
+    // Both decimal(12,2) columns FixCost lands in (Report/EmployeeFix/VendorFix/AdvanceWithoutVendor
+    // all set it) — an out-of-range value used to reach an unhandled ArgumentException at the SQL
+    // parameter layer instead of a clean message, and a negative value was silently accepted and
+    // persisted with no business validation at all. Confirmed live on EmployeeFix.
+    private const decimal MaxCost = 9_999_999_999.99m;
+
+    private static void ValidateCost(decimal? cost)
+    {
+        if (cost is { } c && (c < 0 || c > MaxCost))
+            throw new InvalidOperationException($"Cost must be between 0 and {MaxCost:N2}.");
+    }
+
     public async Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId)
     {
+        // A non-existent ActionTypeId/CauseId (e.g. a stale dropdown value) used to reach an
+        // unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync - which,
+        // worse, isn't even a duplicate-key error, so the retry loop there just failed the same
+        // way five times before still leaking the raw SQL error. Validate up front instead.
+        if (workOrder.ActionTypeId is { } atId && !await _db.AssetActionTypes.AnyAsync(a => a.Id == atId))
+            throw new InvalidOperationException("Selected action type not found.");
+        if (workOrder.CauseId is { } cId && !await _db.AssetActionCauses.AnyAsync(a => a.Id == cId))
+            throw new InvalidOperationException("Selected cause not found.");
+
         workOrder.Stage = "Draft";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
@@ -160,6 +181,7 @@ public class WorkOrderService : IWorkOrderService
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+        ValidateCost(cost);
 
         var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
             .ExecuteUpdateAsync(s => s
@@ -256,6 +278,7 @@ public class WorkOrderService : IWorkOrderService
         if (wo.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This work order isn't assigned to you.");
         if (wo.VendorId != null) throw new InvalidOperationException("A vendor is already handling this work order.");
         if (wo.Stage != "New") throw new InvalidOperationException("This work order isn't awaiting a fix.");
+        ValidateCost(cost);
 
         // Same race as ForceCloseAsync/ConfirmFixAsync: claim the transition atomically before
         // touching Parts, so two concurrent submissions can't both pass the in-memory check above.
@@ -289,6 +312,7 @@ public class WorkOrderService : IWorkOrderService
         if (wo.RequiresVendorResponse) throw new InvalidOperationException("This work order requires a vendor response.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         if (!isManager && wo.AssignedToUserId != userId) throw new InvalidOperationException("This work order isn't assigned to you.");
+        ValidateCost(cost);
 
         var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
             .ExecuteUpdateAsync(s => s
