@@ -55,14 +55,24 @@ public class ContractsController : Controller
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds); return View(vm); }
         var userId = _userManager.GetUserId(User)!;
-        await _contractService.CreateAsync(new Contract
+        try
         {
-            VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
-            StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
-            PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
-        }, vm.AssetIds ?? [], userId);
-        TempData["Success"] = "Contract created.";
-        return RedirectToAction(nameof(Index));
+            await _contractService.CreateAsync(new Contract
+            {
+                VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
+                StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
+                PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
+            }, vm.AssetIds ?? [], userId);
+            TempData["Success"] = "Contract created.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync();
+            ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds);
+            return View(vm);
+        }
     }
 
     [Authorize(Policy = PermissionCatalog.ContractManage)]
@@ -88,14 +98,24 @@ public class ContractsController : Controller
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds); return View(vm); }
         var userId = _userManager.GetUserId(User)!;
-        await _contractService.UpdateAsync(new Contract
+        try
         {
-            Id = vm.Id, VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
-            StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
-            PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
-        }, vm.AssetIds ?? [], userId);
-        TempData["Success"] = "Contract updated.";
-        return RedirectToAction(nameof(Index));
+            await _contractService.UpdateAsync(new Contract
+            {
+                Id = vm.Id, VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
+                StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
+                PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
+            }, vm.AssetIds ?? [], userId);
+            TempData["Success"] = "Contract updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync();
+            ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds);
+            return View(vm);
+        }
     }
 
     private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)

@@ -3,6 +3,7 @@ using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Services;
 
 namespace ShiftFlow.Application.Services;
 
@@ -113,7 +114,7 @@ public class InspectionOrderService : IInspectionOrderService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim();
+            var term = SearchQuery.Cap(search.Trim())!;
             query = query.Where(o => o.OrderNumber.Contains(term));
         }
 

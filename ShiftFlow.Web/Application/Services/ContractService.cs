@@ -10,8 +10,24 @@ public class ContractService : IContractService
     private readonly IAuditService _audit;
     public ContractService(ApplicationDbContext db, IAuditService audit) { _db = db; _audit = audit; }
 
+    // Cost is stored as decimal(12,2) - a value the client can't represent (e.g. a 27-digit
+    // string pasted into the field) used to reach an unhandled DbUpdateException/ArgumentException
+    // at SaveChangesAsync, leaking the raw EF/SQL error. Vendors similarly had no existence check,
+    // so a stale/tampered VendorId hit an unhandled FK-constraint violation instead of a clean
+    // message - confirmed live on both.
+    private const decimal MaxCost = 9_999_999_999.99m;
+
+    private async Task ValidateAsync(Contract contract)
+    {
+        if (contract.Cost is { } cost && (cost < 0 || cost > MaxCost))
+            throw new InvalidOperationException($"Cost must be between 0 and {MaxCost:N2}.");
+        if (!await _db.Vendors.AnyAsync(v => v.Id == contract.VendorId))
+            throw new InvalidOperationException("Selected vendor not found.");
+    }
+
     public async Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId)
     {
+        await ValidateAsync(contract);
         contract.CreatedDate = DateTime.UtcNow;
         contract.AssetLinks = assetIds.Select(id => new ContractAsset { AssetId = id }).ToList();
         _db.Contracts.Add(contract);
@@ -22,6 +38,7 @@ public class ContractService : IContractService
 
     public async Task UpdateAsync(Contract contract, List<int> assetIds, string userId)
     {
+        await ValidateAsync(contract);
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
         existing.VendorId = contract.VendorId; existing.ContractType = contract.ContractType; existing.ContractNumber = contract.ContractNumber;

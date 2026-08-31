@@ -3,6 +3,7 @@ using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Services;
 
 namespace ShiftFlow.Application.Services;
 
@@ -107,7 +108,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim();
+            var term = SearchQuery.Cap(search.Trim())!;
             query = query.Where(m => m.OrderNumber.Contains(term) || m.Asset!.AssetTag.Contains(term));
         }
 

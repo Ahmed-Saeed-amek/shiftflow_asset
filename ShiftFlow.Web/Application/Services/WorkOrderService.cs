@@ -233,6 +233,12 @@ public class WorkOrderService : IWorkOrderService
     {
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         var old = wo.AssignedToUserId;
+        // A non-existent employeeUserId (e.g. a stale/tampered picker value) used to reach an
+        // unhandled FK-constraint DbUpdateException at SaveChangesAsync, leaking the raw SQL
+        // error and database/table names to the client. Validate up front like vendor
+        // assignment already does via ValidateVendorAsync.
+        if (!string.IsNullOrWhiteSpace(employeeUserId) && !await _db.Users.AnyAsync(u => u.Id == employeeUserId))
+            throw new InvalidOperationException("Selected employee not found.");
         wo.AssignedToUserId = string.IsNullOrWhiteSpace(employeeUserId) ? null : employeeUserId;
         await _db.SaveChangesAsync();
 
