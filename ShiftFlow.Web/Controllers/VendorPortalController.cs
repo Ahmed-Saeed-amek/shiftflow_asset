@@ -31,13 +31,16 @@ public class VendorPortalController : Controller
         return await _db.Vendors.Where(v => v.UserId == userId).Select(v => (int?)v.Id).FirstOrDefaultAsync();
     }
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? stage, string? q)
     {
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var workOrders = await _db.WorkOrders.Include(w => w.Asset)
-            .Where(w => w.VendorId == vendorId)
-            .OrderByDescending(w => w.CreatedDate).ToListAsync();
+        var query = _db.WorkOrders.Include(w => w.Asset).Where(w => w.VendorId == vendorId);
+        if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
+        if (!string.IsNullOrWhiteSpace(q)) query = query.Where(w => w.WorkOrderNumber.Contains(q) || (w.Asset != null && w.Asset.AssetTag.Contains(q)));
+        ViewBag.Stage = stage;
+        ViewBag.Q = q;
+        var workOrders = await query.OrderByDescending(w => w.CreatedDate).ToListAsync();
         return View(workOrders);
     }
 
