@@ -75,7 +75,11 @@ public class VendorPortalController : Controller
             .Include(w => w.BlockReason).Include(w => w.Parts).Include(w => w.Attachments)
             .FirstOrDefaultAsync(w => w.Id == id);
         if (wo == null) return NotFound();
-        if (wo.VendorId != vendorId) return Forbid();
+        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
+        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
+        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
+        // tenants' record count/IDs), even though the actual content was already correctly blocked.
+        if (wo.VendorId != vendorId) return NotFound();
 
         ViewBag.BlockReasons = await _db.WorkOrderBlockReasons.Where(r => r.IsActive).OrderBy(r => r.Name).ToListAsync();
         return View(wo);
@@ -88,7 +92,11 @@ public class VendorPortalController : Controller
         if (vendorId == null) return Forbid();
         var wo = await _db.WorkOrders.FindAsync(id);
         if (wo == null) return NotFound();
-        if (wo.VendorId != vendorId) return Forbid();
+        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
+        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
+        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
+        // tenants' record count/IDs), even though the actual content was already correctly blocked.
+        if (wo.VendorId != vendorId) return NotFound();
 
         // Parsed directly off the raw form as a defensive belt-and-braces measure alongside
         // vm.CompletionDate — a custom-format DateTime.ToString (as this app's TempData retention
@@ -135,7 +143,11 @@ public class VendorPortalController : Controller
         if (vendorId == null) return Forbid();
         var wo = await _db.WorkOrders.FindAsync(id);
         if (wo == null) return NotFound();
-        if (wo.VendorId != vendorId) return Forbid();
+        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
+        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
+        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
+        // tenants' record count/IDs), even though the actual content was already correctly blocked.
+        if (wo.VendorId != vendorId) return NotFound();
 
         var userId = _userManager.GetUserId(User)!;
         try { await _workOrderService.VendorBlockAsync(id, blockReasonId, detail, userId); TempData["Success"] = "Reported as blocked."; }
