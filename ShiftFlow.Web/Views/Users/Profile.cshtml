@@ -9,6 +9,10 @@
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
     var canViewOrderDetails = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded
         || (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
+    // Inspection-order stats/tab and the audit log are field-operations data — a role that can
+    // only view the employee directory (e.g. HR) shouldn't see them on another user's profile.
+    var canViewOrders = canViewOrderDetails;
+    var canViewAudit = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AuditLogView)).Succeeded;
 }
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -74,6 +78,8 @@
     </div>
 </div>
 
+@if (canViewOrders)
+{
 <h6 class="fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.08em">@Loc.T("Inspection Orders")</h6>
 <div class="row g-3 mb-4">
     <div class="col-6 col-sm-4 col-lg-2">
@@ -107,18 +113,29 @@
         </div>
     </div>
 </div>
+}
 
+@if (canViewOrders || canViewAudit)
+{
 <ul class="nav nav-tabs mb-0 flex-nowrap overflow-x-auto" id="profileTabs" style="-webkit-overflow-scrolling:touch">
+    @if (canViewOrders)
+    {
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOrders">
         <i class="bi bi-clipboard-check me-1"></i>@Loc.T("Inspection Orders") <span class="badge bg-light text-dark ms-1">@Model.Orders.Count</span>
     </button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAudit">
+    }
+    @if (canViewAudit)
+    {
+    <li class="nav-item"><button class="nav-link @(!canViewOrders ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tabAudit">
         <i class="bi bi-journal-text me-1"></i>@Loc.T("Audit Log") <span class="badge bg-light text-dark ms-1">@Model.AuditLog.Count</span>
     </button></li>
+    }
 </ul>
 
 <div class="tab-content">
 
+    @if (canViewOrders)
+    {
     <div class="tab-pane fade show active" id="tabOrders">
         <div class="card border-0 shadow-sm border-top-0 rounded-top-0">
             @if (!Model.Orders.Any())
@@ -161,8 +178,11 @@
             }
         </div>
     </div>
+    }
 
-    <div class="tab-pane fade" id="tabAudit">
+    @if (canViewAudit)
+    {
+    <div class="tab-pane fade @(!canViewOrders ? "show active" : "")" id="tabAudit">
         <div class="card border-0 shadow-sm border-top-0 rounded-top-0">
             @if (!Model.AuditLog.Any())
             {
@@ -191,5 +211,7 @@
             }
         </div>
     </div>
+    }
 
 </div>
+}
