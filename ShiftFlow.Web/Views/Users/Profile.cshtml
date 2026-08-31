@@ -179,7 +179,7 @@
                             @foreach (var e in Model.AuditLog)
                             {
                                 <tr>
-                                    <td class="small text-nowrap text-muted">@Loc.TDate(e.When.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</td>
+                                    <td class="small text-nowrap text-muted">@Loc.TDate(e.When.ToString("dd/MM/yyyy")) @e.When.ToString("HH:mm")</td>
                                     <td><span class="badge bg-light text-dark border">@e.Action</span></td>
                                     <td class="small text-muted">@e.EntityType</td>
                                     <td class="small" style="max-width:400px;word-break:break-word">@e.Details</td>

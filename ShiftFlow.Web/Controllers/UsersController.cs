@@ -289,6 +289,21 @@ public class UsersController : Controller
             })
             .ToListAsync();
 
+        var auditLog = await _db.AuditLogs.AsNoTracking()
+            .Where(a => a.UserId == id)
+            .OrderByDescending(a => a.CreatedDate)
+            .Take(100)
+            .Select(a => new EmpAuditRow
+            {
+                When = a.CreatedDate,
+                Action = a.Action,
+                EntityType = a.EntityType,
+                Details = a.OldValue != null || a.NewValue != null
+                    ? $"{a.OldValue ?? "—"} → {a.NewValue ?? "—"}"
+                    : a.Details ?? "",
+            })
+            .ToListAsync();
+
         var vm = new EmployeeProfileViewModel
         {
             Id             = user.Id,
@@ -311,7 +326,7 @@ public class UsersController : Controller
             DefectsFound     = defectCount,
 
             Orders     = orders,
-            AuditLog   = [],
+            AuditLog   = auditLog,
         };
 
         return vm;
