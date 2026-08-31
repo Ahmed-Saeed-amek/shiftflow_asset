@@ -17,33 +17,56 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId)
     {
-        var year = DateTime.UtcNow.Year;
-        var seq = await _db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
-        workOrder.WorkOrderNumber = $"WO-{year}-{seq:D4}";
         workOrder.Stage = "New";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
         workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "New", ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
         _db.WorkOrders.Add(workOrder);
-        await _db.SaveChangesAsync();
+        await SaveWithUniqueNumberRetryAsync(workOrder);
         await _audit.LogAsync("Create", "WorkOrder", workOrder.Id.ToString(), userId, newValue: workOrder.WorkOrderNumber);
         return workOrder;
     }
 
     public async Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId)
     {
-        var year = DateTime.UtcNow.Year;
-        var seq = await _db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
-        workOrder.WorkOrderNumber = $"WO-{year}-{seq:D4}";
         workOrder.Stage = "Draft";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
         workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Draft", ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
         _db.WorkOrders.Add(workOrder);
         await SetAssetStatusAsync(workOrder.AssetId, "Defective");
-        await _db.SaveChangesAsync();
+        await SaveWithUniqueNumberRetryAsync(workOrder);
         await _audit.LogAsync("Report", "WorkOrder", workOrder.Id.ToString(), userId, newValue: workOrder.WorkOrderNumber);
         return workOrder;
+    }
+
+    /// <summary>The WorkOrderNumber "WO-{year}-{seq:D4}" was assigned from a plain COUNT-then-use
+    /// query with no atomic guard — two requests confirming a defect (or creating a work order)
+    /// concurrently could compute the same seq and both try to insert the same number, hitting
+    /// the unique index and raising a raw, unhandled DbUpdateException all the way to the client
+    /// (confirmed live: a concurrent InspectionOrders/UpdateItem pair produced exactly this SQL
+    /// exception leak). Retry with a freshly recomputed number on that specific failure instead of
+    /// trying to make the count itself atomic, since a handful of retries is far simpler than a
+    /// real sequence object and the collision is rare enough that a retry loop is plenty.</summary>
+    private async Task SaveWithUniqueNumberRetryAsync(WorkOrder workOrder)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var year = workOrder.CreatedDate.Year;
+            var seq = await _db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
+            workOrder.WorkOrderNumber = $"WO-{year}-{seq:D4}";
+            try
+            {
+                await _db.SaveChangesAsync();
+                return;
+            }
+            catch (DbUpdateException) when (attempt < 4)
+            {
+                // Duplicate WorkOrderNumber from a concurrent insert — recompute and retry.
+                // The entity stays tracked as Added after a failed SaveChanges, so the next
+                // attempt just retries the same insert with a new number.
+            }
+        }
     }
 
     /// <summary>Keeps Asset.Status in sync with the work order lifecycle so nobody has to flip it by
