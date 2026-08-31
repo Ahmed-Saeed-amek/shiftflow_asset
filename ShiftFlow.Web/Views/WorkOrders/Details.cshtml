@@ -492,3 +492,31 @@
         }
     </script>
 }
+
+<script>
+    // Restores what was already typed after a rejected submission (e.g. a bad attachment or a
+    // missing description) sent the page back to a fresh GET — otherwise the fix report the
+    // employee/manager had already filled in would silently vanish. Only one of the two forms
+    // below is ever rendered for a given work order stage, so restoring into "the Description
+    // field that exists" is unambiguous.
+    (function restoreFixForm() {
+        const description = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Description"] as string));
+        const cost = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Cost"] as string));
+        const completionDate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_CDate"] as string));
+        const partNames = @Html.Raw((string?)TempData["FixForm_PartNames"] ?? "[]");
+        const partQuantities = @Html.Raw((string?)TempData["FixForm_PartQuantities"] ?? "[]");
+
+        const descField = document.querySelector('textarea[name=Description]');
+        if (!descField) return;
+        if (description) descField.value = description;
+        if (cost) { const f = document.querySelector('input[name=Cost]'); if (f) f.value = cost; }
+        if (completionDate) { const f = document.querySelector('input[name=CompletionDate]'); if (f) f.value = completionDate; }
+        if (typeof addEmployeeFixPartRow === 'function') {
+            for (let i = 1; i < partNames.length; i++) addEmployeeFixPartRow();
+        }
+        const nameInputs = document.querySelectorAll('input[name=PartNames]');
+        const qtyInputs = document.querySelectorAll('input[name=PartQuantities]');
+        partNames.forEach((n, i) => { if (nameInputs[i]) nameInputs[i].value = n; });
+        partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
+    })();
+</script>

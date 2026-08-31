@@ -208,6 +208,29 @@
 
 @section Scripts {
     <script>
+        // Restores what was already typed after a rejected submission (e.g. a bad attachment)
+        // sent the page back to a fresh GET — otherwise the description/cost/date/parts the
+        // vendor had entered would silently vanish, and only the attachment picker actually
+        // needs re-selecting (browsers won't let script set a file input's value).
+        (function restoreFixForm() {
+            const description = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Description"] as string));
+            const cost = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Cost"] as string));
+            const completionDate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_CDate"] as string));
+            const partNames = @Html.Raw((string?)TempData["FixForm_PartNames"] ?? "[]");
+            const partQuantities = @Html.Raw((string?)TempData["FixForm_PartQuantities"] ?? "[]");
+
+            const descField = document.querySelector('textarea[name=Description]');
+            if (!descField) return;
+            if (description) descField.value = description;
+            if (cost) { const f = document.querySelector('input[name=Cost]'); if (f) f.value = cost; }
+            if (completionDate) { const f = document.querySelector('input[name=CompletionDate]'); if (f) f.value = completionDate; }
+            for (let i = 1; i < partNames.length; i++) addPartRow();
+            const nameInputs = document.querySelectorAll('input[name=PartNames]');
+            const qtyInputs = document.querySelectorAll('input[name=PartQuantities]');
+            partNames.forEach((n, i) => { if (nameInputs[i]) nameInputs[i].value = n; });
+            partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
+        })();
+
         function addPartRow() {
             var list = document.getElementById('partsList');
             var row = document.createElement('div');

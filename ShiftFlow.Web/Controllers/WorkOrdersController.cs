@@ -138,8 +138,13 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize, ValidateAntiForgeryToken]
     public async Task<IActionResult> EmployeeFix(int id, VendorFixViewModel vm)
     {
+        // Parsed off the raw form as a defensive alternative to vm.CompletionDate, anchored to
+        // InvariantCulture regardless of the request's locale.
+        var completionDate = ShiftFlow.Web.Services.FixFormRetainer.ParseCompletionDate(Request.Form);
+
         if (!ModelState.IsValid)
         {
+            ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate);
             TempData["Error"] = "Fix not submitted — a description is required.";
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -149,6 +154,7 @@ public class WorkOrdersController : Controller
             var (_, rejected) = await ShiftFlow.Web.Services.FileUploadValidator.ValidateAllAsync(vm.Files);
             if (rejected.Count > 0)
             {
+                ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate);
                 TempData["Error"] = "Fix not submitted — invalid attachment(s): " + string.Join("; ", rejected.Select(r => $"{r.FileName} — {r.Reason}"));
                 return RedirectToAction(nameof(Details), new { id });
             }
@@ -158,11 +164,11 @@ public class WorkOrdersController : Controller
         try
         {
             var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
-            await _workOrderService.EmployeeFixAsync(id, vm.Description ?? "", vm.Cost, vm.CompletionDate, parts, userId);
+            await _workOrderService.EmployeeFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
             await ShiftFlow.Web.Services.WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = "Fix report submitted.";
         }
-        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        catch (InvalidOperationException ex) { ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -171,8 +177,11 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize, ValidateAntiForgeryToken]
     public async Task<IActionResult> AdvanceWithoutVendor(int id, VendorFixViewModel vm)
     {
+        var completionDate = ShiftFlow.Web.Services.FixFormRetainer.ParseCompletionDate(Request.Form);
+
         if (!ModelState.IsValid)
         {
+            ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate);
             TempData["Error"] = "Not submitted — a description is required.";
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -183,10 +192,10 @@ public class WorkOrdersController : Controller
         try
         {
             var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
-            await _workOrderService.AdvanceWithoutVendorAsync(id, vm.Description ?? "", vm.Cost, vm.CompletionDate, parts, userId, isManager);
+            await _workOrderService.AdvanceWithoutVendorAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId, isManager);
             TempData["Success"] = "Work order advanced without waiting on the vendor.";
         }
-        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        catch (InvalidOperationException ex) { ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
     }
 

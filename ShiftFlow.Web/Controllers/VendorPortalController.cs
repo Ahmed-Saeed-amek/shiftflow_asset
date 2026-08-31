@@ -87,8 +87,15 @@ public class VendorPortalController : Controller
         if (wo == null) return NotFound();
         if (wo.VendorId != vendorId) return Forbid();
 
+        // Parsed directly off the raw form as a defensive belt-and-braces measure alongside
+        // vm.CompletionDate — a custom-format DateTime.ToString (as this app's TempData retention
+        // round-trip uses) is calendar-dependent on the current culture, so anchoring the value
+        // read here to InvariantCulture keeps it correct regardless of locale.
+        var completionDate = FixFormRetainer.ParseCompletionDate(Request.Form);
+
         if (!ModelState.IsValid)
         {
+            FixFormRetainer.Stash(TempData, vm, completionDate);
             TempData["Error"] = "Fix not submitted — a description is required.";
             return RedirectToAction(nameof(Details), new { id });
         }
@@ -100,6 +107,7 @@ public class VendorPortalController : Controller
             var (_, rejected) = await FileUploadValidator.ValidateAllAsync(vm.Files);
             if (rejected.Count > 0)
             {
+                FixFormRetainer.Stash(TempData, vm, completionDate);
                 TempData["Error"] = "Fix not submitted — invalid attachment(s): " + string.Join("; ", rejected.Select(r => $"{r.FileName} — {r.Reason}"));
                 return RedirectToAction(nameof(Details), new { id });
             }
@@ -109,11 +117,11 @@ public class VendorPortalController : Controller
         try
         {
             var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
-            await _workOrderService.VendorFixAsync(id, vm.Description ?? "", vm.Cost, vm.CompletionDate, parts, userId);
+            await _workOrderService.VendorFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
             await WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = "Fix report submitted.";
         }
-        catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+        catch (InvalidOperationException ex) { FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
     }
 
