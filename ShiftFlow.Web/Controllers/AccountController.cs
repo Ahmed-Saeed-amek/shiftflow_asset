@@ -81,7 +81,8 @@ public class AccountController : Controller
 
             var canViewDashboard = await _permissions.HasPermissionAsync(user!.Id, PermissionCatalog.InspectionOrderManage);
             var isVendor = await _um.IsInRoleAsync(user, "Vendor");
-            return LocalRedirect(BuildLandingPath(canViewDashboard, returnUrl, isVendor));
+            var isHR = await _um.IsInRoleAsync(user, "HR");
+            return LocalRedirect(BuildLandingPath(canViewDashboard, returnUrl, isVendor, isHR));
         }
 
         ModelState.AddModelError("", result.IsLockedOut
@@ -221,10 +222,14 @@ public class AccountController : Controller
     // to LocalRedirect() at every call site below — a crafted
     // POST /Account/Login?ReturnUrl=//evil.example.com/... otherwise crashes the login action
     // with a raw stack trace instead of just falling back to the default landing page.
-    private string BuildLandingPath(bool canViewDashboard, string? returnUrl = null, bool isVendor = false) =>
+    private string BuildLandingPath(bool canViewDashboard, string? returnUrl = null, bool isVendor = false, bool isHR = false) =>
         !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? returnUrl
-            : (isVendor ? "/VendorPortal" : canViewDashboard ? "/Dashboard" : "/MyHome");
+            // HR has no inspection-order permissions at all, so MyHome's "My Open Inspection
+            // Orders"/"Recent Inspection Orders" widgets would always render empty/zero for
+            // them — Users (the employee directory, HR's actual permission) is the meaningful
+            // landing page instead. Mirrors the sidebar's existing !IsInRole("HR") My Home hide.
+            : (isVendor ? "/VendorPortal" : isHR ? "/Users" : canViewDashboard ? "/Dashboard" : "/MyHome");
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -239,7 +244,7 @@ public class AccountController : Controller
     {
         var userId = _um.GetUserId(User);
         var canViewDashboard = userId != null && await _permissions.HasPermissionAsync(userId, PermissionCatalog.InspectionOrderManage);
-        return LocalRedirect(BuildLandingPath(canViewDashboard, isVendor: User.IsInRole("Vendor")));
+        return LocalRedirect(BuildLandingPath(canViewDashboard, isVendor: User.IsInRole("Vendor"), isHR: User.IsInRole("HR")));
     }
 
     // ── Change password (forced on first login) ────────────────────────────────
