@@ -40,9 +40,13 @@
                             <td>@m.MaintenanceCount</td>
                             <td>@m.WorkOrderCount</td>
                             <td class="text-end">
+                                @* toDate is the first day of the NEXT month, not the last day of this one at
+                                   midnight — CreatedAt/CreatedDate carry a time component, so a date-only
+                                   "last day at 00:00" bound silently dropped every record from later that
+                                   same day (in practice, most of the current, still-in-progress month). *@
                                 <a asp-controller="Users" asp-action="MyOrders" asp-route-showAll="true"
                                    asp-route-fromDate="@monthDate.ToString("yyyy-MM-dd")"
-                                   asp-route-toDate="@monthDate.AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd")"
+                                   asp-route-toDate="@monthDate.AddMonths(1).ToString("yyyy-MM-dd")"
                                    class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
                             </td>
                         </tr>
