@@ -62,6 +62,15 @@ public class ZoneOverviewController : Controller
             .Where(a => a.ZoneId == zoneId && (a.Status == "Defective" || a.Status == "Maintenance"))
             .OrderBy(a => a.AssetTag)
             .ToListAsync();
+
+        // The zone list's "Dispatched Orders" count comes from this same query (work orders on
+        // any asset in the zone) — show the actual orders here so clicking "View" delivers on
+        // what that column promises, instead of only ever showing the unrelated problem-assets list.
+        ViewBag.DispatchedOrders = await _db.WorkOrders.AsNoTracking()
+            .Include(w => w.Asset)
+            .Where(w => w.Asset!.ZoneId == zoneId)
+            .OrderByDescending(w => w.CreatedDate)
+            .ToListAsync();
         return View(zone);
     }
 

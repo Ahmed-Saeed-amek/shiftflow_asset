@@ -4,8 +4,40 @@
     ViewData["Title"] = localizedName;
     var categoryLocalized = Model.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null;
     var problemAssets = (List<Asset>)ViewBag.ProblemAssets;
+    var dispatchedOrders = (List<WorkOrder>)ViewBag.DispatchedOrders;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=localizedName,Subtitle=categoryLocalized})" />
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold border-0">@Loc.T("Dispatched Orders")</div>
+    @if (dispatchedOrders.Count == 0)
+    {
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+            @Loc.T("No work orders dispatched to this zone yet.")
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Stage")</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in dispatchedOrders)
+                    {
+                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "WorkOrders", new { id = w.Id })'">
+                            <td class="small font-monospace">@w.WorkOrderNumber</td>
+                            <td class="small">@w.Asset?.AssetTag</td>
+                            <td><partial name="_StatusBadge" model="@w.Stage" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white fw-semibold border-0">@Loc.T("Assets")</div>
