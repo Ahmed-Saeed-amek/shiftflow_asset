@@ -385,6 +385,8 @@ public static class Translations
         ["Assigned Employee"] = "الموظف المكلف",
         ["Assign Employee"] = "تعيين موظف",
         ["Report Fix"] = "تسجيل الإصلاح",
+        ["Save Maintenance Actions"] = "حفظ إجراءات الصيانة",
+        ["This just logs maintenance work performed — the asset still needs OK or Defective recorded separately."] = "هذا يسجل فقط أعمال الصيانة المنفذة — لا يزال يجب تسجيل حالة الأصل كـ \"جيد\" أو \"معطل\" بشكل منفصل.",
         ["Force Close"] = "إغلاق إجباري",
         ["Force-close reason (optional)"] = "سبب الإغلاق الإجباري (اختياري)",
         ["Defect Report"] = "تقرير العطل",
