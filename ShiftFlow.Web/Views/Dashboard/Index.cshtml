@@ -59,9 +59,8 @@
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+            <div class="card-header bg-white border-0">
                 <span class="fw-semibold">@Loc.T("Recent Orders")</span>
-                <a asp-controller="InspectionOrders" asp-action="Index" class="small text-decoration-none">@Loc.T("View all")</a>
             </div>
             <div class="list-group list-group-flush">
                 @if (recentOrders.Count == 0)
