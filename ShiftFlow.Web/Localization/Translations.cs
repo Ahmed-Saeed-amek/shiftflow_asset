@@ -151,7 +151,7 @@ public static class Translations
         ["Completed"] = "مكتمل",
         ["Cancelled"] = "ملغى",
         ["New"] = "جديد",
-        ["Open"] = "قائمة",
+        ["Open"] = "مفتوح",
         ["Closed"] = "مغلق",
         ["Critical"] = "حرج",
         ["High"] = "مرتفع",

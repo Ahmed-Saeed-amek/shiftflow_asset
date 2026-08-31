@@ -102,11 +102,12 @@
     };
 
     const orderLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusLabels));
+    const orderDisplayLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(((string[])ViewBag.OrderStatusLabels).Select(s => Loc.T(s))));
     const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusData));
     new Chart(document.getElementById('orderStatusChart'), {
         type: 'bar',
         data: {
-            labels: orderLabels,
+            labels: orderDisplayLabels,
             datasets: [{ data: orderData, backgroundColor: orderLabels.map(l => statusColors[l] || '#94a3b8'), borderRadius: 4 }]
         },
         options: {
