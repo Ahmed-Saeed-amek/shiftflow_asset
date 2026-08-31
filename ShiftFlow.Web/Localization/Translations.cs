@@ -2014,6 +2014,12 @@ public static class Translations
         Ar["Could not link Microsoft account."] = "تعذّر ربط حساب مايكروسوفت.";
         Ar["Password changed successfully."] = "تم تغيير كلمة المرور بنجاح.";
 
+        // Users controller — new-user creation flash message (was hardcoded English, so it showed
+        // untranslated even with the UI set to Arabic)
+        Ar["User {0} created."] = "تم إنشاء المستخدم {0}.";
+        Ar["Credentials emailed to {0}."] = "تم إرسال بيانات الدخول عبر البريد الإلكتروني إلى {0}.";
+        Ar["Credentials emailed to {0} and sent via WhatsApp to {1}."] = "تم إرسال بيانات الدخول عبر البريد الإلكتروني إلى {0} وعبر واتساب إلى {1}.";
+
         // Additional controller error/success messages
         Ar["End date must be after start date."] = "يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء.";
         Ar["This user already has a scope assigned — edit or remove it first."] = "لدى هذا المستخدم نطاق مُعيَّن بالفعل — يرجى تعديله أو حذفه أولاً.";

@@ -8,6 +8,7 @@ using OfficeOpenXml;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
@@ -23,6 +24,7 @@ public class UsersController : Controller
     private readonly IWhatsAppService _whatsApp;
     private readonly IEntraDirectoryService _directory;
     private readonly IAuthorizationService _authZ;
+    private readonly ILanguageService _loc;
 
     public UsersController(
         UserManager<ApplicationUser> um,
@@ -31,8 +33,9 @@ public class UsersController : Controller
         IEmailService email,
         IWhatsAppService whatsApp,
         IEntraDirectoryService directory,
-        IAuthorizationService authZ)
-    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; }
+        IAuthorizationService authZ,
+        ILanguageService loc)
+    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; _loc = loc; }
 
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> Index(string? role, string? search)
@@ -446,10 +449,10 @@ public class UsersController : Controller
             await _whatsApp.SendAsync(vm.Phone, credentialsMessage);
 
         var notifyNote = string.IsNullOrWhiteSpace(vm.Phone)
-            ? $"Credentials emailed to {vm.Email}."
-            : $"Credentials emailed to {vm.Email} and sent via WhatsApp to {vm.Phone}.";
+            ? string.Format(_loc.T("Credentials emailed to {0}."), vm.Email)
+            : string.Format(_loc.T("Credentials emailed to {0} and sent via WhatsApp to {1}."), vm.Email, vm.Phone);
 
-        TempData["Success"] = $"User {vm.FullName} created. {notifyNote}";
+        TempData["Success"] = string.Format(_loc.T("User {0} created."), vm.FullName) + " " + notifyNote;
         return RedirectToAction(nameof(Index));
     }
 
