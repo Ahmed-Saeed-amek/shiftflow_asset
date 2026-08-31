@@ -334,9 +334,10 @@ public class WorkOrderService : IWorkOrderService
             doc.Add(new Paragraph("Work Orders").SetBold().SetFontSize(16));
             // Equal-width columns (the old `new Table(7, true)`) squeezed "Work Order #" values
             // like "WO-2026-0020" into a column too narrow to fit on one line, wrapping mid-string
-            // at the hyphen. Give that column — and Vendor, the other long-text column — more
-            // relative width than the short fixed-vocabulary columns (Priority/Stage/dates).
-            var table = new Table(new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f }).UseAllAvailableWidth();
+            // at the hyphen. Widening that column alone wasn't enough — Document's default 12pt
+            // body font left even "AST-0001" (8 chars) wrapping in an 8-char-wide Asset column, so
+            // the whole table needed a smaller font, not just different column proportions.
+            var table = new Table(new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f }).UseAllAvailableWidth().SetFontSize(8);
             foreach (var h in new[] { "Work Order #", "Asset", "Priority", "Stage", "Vendor", "Created", "Closed" })
                 table.AddHeaderCell(h);
             foreach (var w in orders)
