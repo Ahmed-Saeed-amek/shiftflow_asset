@@ -332,7 +332,11 @@ public class WorkOrderService : IWorkOrderService
         {
             var doc = new Document(pdf);
             doc.Add(new Paragraph("Work Orders").SetBold().SetFontSize(16));
-            var table = new Table(7, true).UseAllAvailableWidth();
+            // Equal-width columns (the old `new Table(7, true)`) squeezed "Work Order #" values
+            // like "WO-2026-0020" into a column too narrow to fit on one line, wrapping mid-string
+            // at the hyphen. Give that column — and Vendor, the other long-text column — more
+            // relative width than the short fixed-vocabulary columns (Priority/Stage/dates).
+            var table = new Table(new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f }).UseAllAvailableWidth();
             foreach (var h in new[] { "Work Order #", "Asset", "Priority", "Stage", "Vendor", "Created", "Closed" })
                 table.AddHeaderCell(h);
             foreach (var w in orders)
