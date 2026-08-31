@@ -3,6 +3,7 @@
     ViewData["Title"] = Loc.T("Zone Overview");
     var zoneStatus = (Dictionary<int, (bool HasDefective, bool HasMaintenance)>)ViewBag.ZoneStatus;
     var dispatchedByZone = (Dictionary<int, int>)ViewBag.DispatchedByZone;
+    var lastVisitedByZone = (Dictionary<int, DateTime>)ViewBag.LastVisitedByZone;
     var categories = Model.Where(z => z.LocationCategory != null).Select(z => z.LocationCategory!)
         .GroupBy(c => c.Id).Select(g => g.First()).OrderBy(c => c.Id).ToList();
 
@@ -44,13 +45,14 @@
                             <th>@Loc.T("Location Category")</th>
                             <th>@Loc.T("Zone")</th>
                             <th>@Loc.T("Dispatched Orders")</th>
+                            <th class="d-none d-md-table-cell">@Loc.T("Last Visited")</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody id="zoneTableBody">
                         @if (Model.Count == 0)
                         {
-                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                         }
                         @foreach (var z in Model)
                         {
@@ -61,10 +63,11 @@
                                 <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
                                 <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
                                 <td>@dispatchedByZone.GetValueOrDefault(z.Id, 0)</td>
+                                <td class="small text-muted d-none d-md-table-cell">@(lastVisitedByZone.TryGetValue(z.Id, out var lastVisited) ? Loc.TDate(lastVisited.ToString("dd/MM/yyyy")) : "—")</td>
                                 <td class="text-end"><a asp-action="Details" asp-route-zoneId="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
                             </tr>
                         }
-                        <tr id="zoneNoMatchRow" class="d-none"><td colspan="4" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
+                        <tr id="zoneNoMatchRow" class="d-none"><td colspan="5" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
                     </tbody>
                 </table>
             </div>

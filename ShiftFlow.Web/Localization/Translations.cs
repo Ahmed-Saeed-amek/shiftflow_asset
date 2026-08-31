@@ -433,6 +433,7 @@ public static class Translations
         ["Zone Overview"] = "نظرة عامة على المواقع",
         ["Latest orders by zone"] = "أحدث الطلبات حسب الموقع",
         ["Dispatched Orders"] = "الطلبات الموجّهة",
+        ["Last Visited"] = "آخر زيارة",
         ["Asset Map"] = "خريطة الأصول",
         ["No zones match these filters."] = "لا توجد مواقع مطابقة لهذه الفلاتر.",
         ["No defective or under-maintenance assets in this zone."] = "لا توجد أصول معطلة أو قيد الصيانة في هذا الموقع.",

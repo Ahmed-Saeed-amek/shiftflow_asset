@@ -38,8 +38,17 @@ public class ZoneOverviewController : Controller
             .Select(g => new { ZoneId = g.Key, Count = g.SelectMany(a => a.WorkOrders).Count() })
             .ToDictionaryAsync(x => x.ZoneId, x => x.Count);
 
+        // Most recent work order dispatched to any asset in the zone — "last visited" for a
+        // quick-glance read of which zones haven't seen activity in a while.
+        var lastVisitedByZone = await _db.Assets.AsNoTracking()
+            .Where(a => a.WorkOrders.Any())
+            .GroupBy(a => a.ZoneId)
+            .Select(g => new { ZoneId = g.Key, LastVisited = g.SelectMany(a => a.WorkOrders).Max(w => w.CreatedDate) })
+            .ToDictionaryAsync(x => x.ZoneId, x => x.LastVisited);
+
         ViewBag.ZoneStatus = zoneStatus;
         ViewBag.DispatchedByZone = dispatchedByZone;
+        ViewBag.LastVisitedByZone = lastVisitedByZone;
         return View(zones);
     }
 
