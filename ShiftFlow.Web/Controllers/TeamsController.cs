@@ -77,7 +77,7 @@ public class TeamsController : Controller
     public async Task<IActionResult> Edit(int id, TeamEditVm vm)
     {
         if (id != vm.Id) return BadRequest();
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid) { await PopulateCurrentMembersAsync(vm); return View(vm); }
 
         try
         {
@@ -90,6 +90,7 @@ public class TeamsController : Controller
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError("", ex.Message);
+            await PopulateCurrentMembersAsync(vm);
             return View(vm);
         }
         catch (DbUpdateException)
@@ -97,7 +98,24 @@ public class TeamsController : Controller
             // A stale member id (e.g. the user was deleted mid-edit) fails at the FK level —
             // surface it the same friendly way as elsewhere rather than the generic 500 page.
             ModelState.AddModelError("", "Could not save membership — one of the selected users may no longer exist.");
+            await PopulateCurrentMembersAsync(vm);
             return View(vm);
         }
+    }
+
+    // Edit.cshtml's chip picker always reads ViewBag.CurrentMembers (@foreach with no null
+    // check) — every redisplay path above must populate it or the view throws a
+    // NullReferenceException instead of showing the validation error. Rebuilt from the
+    // submitted MemberUserIds (not re-fetched from the team) so the user's in-progress
+    // selection survives the redisplay, same as the rest of the form's fields already do.
+    private async Task PopulateCurrentMembersAsync(TeamEditVm vm)
+    {
+        var ids = vm.MemberUserIds ?? new();
+        var users = await _um.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
+        ViewBag.CurrentMembers = ids
+            .Select(id => users.FirstOrDefault(u => u.Id == id))
+            .Where(u => u != null)
+            .Select(u => new TeamMemberChip { UserId = u!.Id, Label = u.FullName })
+            .ToList();
     }
 }
