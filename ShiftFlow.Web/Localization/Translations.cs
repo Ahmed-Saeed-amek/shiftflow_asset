@@ -1105,6 +1105,9 @@ public static class Translations
         Ar["Filter by schedule:"] = "تصفية حسب الجدول الزمني:";
         Ar["first."] = "أولاً.";
         Ar["Go to Dashboard"] = "انتقل إلى لوحة التحكم";
+        Ar["Go to My Work Orders"] = "انتقل إلى أوامر عملي";
+        Ar["Go to Users"] = "انتقل إلى المستخدمين";
+        Ar["Go to My Home"] = "انتقل إلى الرئيسية";
         Ar["Go to Shift Planner"] = "الانتقال إلى مخطط النوبات";
         Ar["Grp"] = "مجموعة";
         Ar["Group(s)"] = "مجموعة (مجموعات)";
