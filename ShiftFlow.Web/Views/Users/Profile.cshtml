@@ -7,6 +7,11 @@
     var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
     var roleLabel = string.Join(", ", Model.Roles.Select(r => Loc.LocalizedName(r, roleNameArByName.GetValueOrDefault(r))));
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
+    // Profile itself is reachable by anyone viewing their own page (a self-view exception on an
+    // otherwise User.View-gated action), but the "Back to Users" button assumes the Users list is
+    // reachable — for a role without User.View (e.g. Engineer viewing their own profile) that link
+    // led to a dead-end Access Denied page. Only show it when the directory is actually reachable.
+    var canViewUsersList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     var canViewOrderDetails = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded
         || (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     // Inspection-order stats/tab and the audit log are field-operations data — a role that can
@@ -21,9 +26,12 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <div class="d-flex align-items-center gap-2">
-        <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Users")
-        </a>
+        @if (canViewUsersList)
+        {
+            <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>@Loc.T("Users")
+            </a>
+        }
         <h4 class="fw-bold mb-0">@Model.FullName</h4>
         @if (Model.IsActive)
         {
