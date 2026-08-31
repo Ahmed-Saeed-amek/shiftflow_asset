@@ -79,7 +79,7 @@
         @if (Model.Stage == "Blocked")
         {
             <div class="alert alert-warning small mb-3">
-                <div class="fw-semibold">@Loc.T("Block Reason"): @Model.BlockReason?.Name</div>
+                <div class="fw-semibold">@Loc.T("Block Reason"): @(Model.BlockReason != null ? Loc.LocalizedName(Model.BlockReason.Name, Model.BlockReason.NameAr) : null)</div>
                 @if (!string.IsNullOrWhiteSpace(Model.BlockDetail)) { <div>@Model.BlockDetail</div> }
                 <div class="mt-1">@Loc.T("Waiting on admin to resolve and resend.")</div>
             </div>
@@ -192,7 +192,7 @@
                             {
                                 @foreach (var r in blockReasons)
                                 {
-                                    <option value="@r.Id">@r.Name</option>
+                                    <option value="@r.Id">@Loc.LocalizedName(r.Name, r.NameAr)</option>
                                 }
                             }
                         </select>

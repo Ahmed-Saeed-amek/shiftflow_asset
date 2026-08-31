@@ -452,6 +452,7 @@ public static class Translations
         ["No login yet"] = "لا يوجد حساب بعد",
         ["Login active"] = "الحساب مفعّل",
         ["Waiting on Parts"] = "بانتظار القطع",
+        ["Awaiting Manager Approval"] = "بانتظار موافقة المدير",
         ["Access Denied"] = "تم رفض الوصول",
         ["Not Covered by Contract"] = "غير مشمول بالعقد",
         ["Needs Site Visit"] = "يحتاج زيارة ميدانية",

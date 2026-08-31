@@ -334,7 +334,7 @@
                 <div class="card-body">
                     <dl class="row small mb-2">
                         <dt class="col-4 text-muted fw-normal">@Loc.T("Block Reason")</dt>
-                        <dd class="col-8 mb-0">@Model.BlockReason?.Name</dd>
+                        <dd class="col-8 mb-0">@(Model.BlockReason != null ? Loc.LocalizedName(Model.BlockReason.Name, Model.BlockReason.NameAr) : null)</dd>
                     </dl>
                     @if (!string.IsNullOrWhiteSpace(Model.BlockDetail))
                     {

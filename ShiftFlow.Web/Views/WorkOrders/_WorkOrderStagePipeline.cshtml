@@ -21,7 +21,7 @@ else if (Model.Stage == "Blocked")
         <div>
             <partial name="_StatusBadge" model="@Model.Stage" />
             <span class="small ms-1">
-                @Loc.T("The vendor can't proceed")@(Model.BlockReason != null ? $" — {Model.BlockReason.Name}" : "")@(!string.IsNullOrWhiteSpace(Model.BlockDetail) ? $": {Model.BlockDetail}" : "").
+                @Loc.T("The vendor can't proceed")@(Model.BlockReason != null ? $" — {Loc.LocalizedName(Model.BlockReason.Name, Model.BlockReason.NameAr)}" : "")@(!string.IsNullOrWhiteSpace(Model.BlockDetail) ? $": {Model.BlockDetail}" : "").
             </span>
         </div>
     </div>
