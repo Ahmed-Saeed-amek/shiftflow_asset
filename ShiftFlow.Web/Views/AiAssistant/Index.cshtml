@@ -368,6 +368,13 @@
         .ai-avatar-spinner { width: 16px; height: 16px; }
 
         .ai-chat-wrap { width: 100%; height: calc(100dvh - 140px); min-height: 600px; }
+
+        /* The PiP avatar card above is position:absolute relative to .ai-layout, not the
+           scrolling .ai-messages list — so it stays pinned over the same top-right zone no
+           matter how far the conversation scrolls, permanently covering any bubble (left-
+           aligned assistant or right-aligned user) that renders underneath it. Reserve that
+           same width + gap as inline-end padding so no bubble ever extends under it. */
+        .ai-messages { padding-inline-end: calc(110px + 1.5rem + .5rem); }
     }
 </style>
 
