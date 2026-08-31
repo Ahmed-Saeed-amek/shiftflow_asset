@@ -27,10 +27,12 @@
                 <div class="col-12">
                     <label class="form-label small">@Loc.T("Description")</label>
                     <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
                 </div>
                 <div class="col-12">
                     <label class="form-label small">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small">@Loc.T("Assigned Employee")</label>

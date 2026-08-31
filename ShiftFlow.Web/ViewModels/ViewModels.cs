@@ -220,8 +220,8 @@ public class WorkOrderViewModel : IValidatableObject
     public int Id { get; set; }
     public int AssetId { get; set; }
     [Required] public string Priority { get; set; } = "Medium";
-    public string? Description { get; set; }
-    public string? Notes { get; set; }
+    [MaxLength(4000)] public string? Description { get; set; }
+    [MaxLength(4000)] public string? Notes { get; set; }
     public string? AssignedToUserId { get; set; }
     public bool RequiresVendorResponse { get; set; } = false;
 
