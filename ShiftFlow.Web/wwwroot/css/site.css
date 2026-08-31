@@ -608,4 +608,17 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   #floatingAvatar .avatar-bubble { width: 44px; height: 44px; }
   #floatingAvatar .avatar-bubble i { font-size: 1.1rem; }
   #floatingAvatar .avatar-card { bottom: 54px; width: 200px; }
+  /* Shrinking the bubble (above) only reduces how much of the corner it occupies — it's
+     still a fixed-position element sitting on top of whatever content scrolls under it,
+     which on narrow viewports kept landing on the last table row, a "View all" link, or a
+     card's bottom edge. Reserve real space at the bottom of the page content so the last
+     scrolled-to element always clears it instead of being covered. */
+  main { padding-bottom: 4rem !important; }
 }
+
+/* Bootstrap's .btn-close sizes its tappable box from font-size + padding — the chip "remove"
+   buttons in _AssetMultiPicker/_EmployeePicker-style chip lists set font-size:.6rem for a small
+   visual glyph, which also shrinks the tap target to ~14x14px, well under the ~32px a touch
+   target needs to be reliably tappable without also hitting the chip label next to it. Keep the
+   glyph's visual size (background-size is fixed at 1em, unaffected) but pad out the box. */
+[data-chip] .btn-close-sm { padding: .7rem; }
