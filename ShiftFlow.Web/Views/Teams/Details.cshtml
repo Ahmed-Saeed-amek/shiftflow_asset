@@ -39,14 +39,6 @@
             </div>
         }
     </div>
-    @if (canManage)
-    {
-        <div class="card-body border-top">
-            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-people me-1"></i>@Loc.T("Manage Members")
-            </a>
-        </div>
-    }
 </div>
 
 <a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
