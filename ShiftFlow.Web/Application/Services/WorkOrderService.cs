@@ -165,7 +165,14 @@ public class WorkOrderService : IWorkOrderService
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Fixed - Pending Confirmation") throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
 
-        wo.Stage = "Closed"; wo.ClosedDate = DateTime.UtcNow;
+        // Same race as ForceCloseAsync: two concurrent confirmations could both pass the in-memory
+        // check above before either commits. Claim the transition atomically first.
+        var closedDate = DateTime.UtcNow;
+        var rows = await _db.WorkOrders
+            .Where(w => w.Id == workOrderId && w.Stage == "Fixed - Pending Confirmation")
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Closed").SetProperty(w => w.ClosedDate, closedDate));
+        if (rows == 0) throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
+
         AddStageEvent(wo, "Closed", userId);
         // Only restore Working if no other work order or standalone maintenance order on this
         // asset is still open — a second, unrelated defect shouldn't get silently cleared just
@@ -199,12 +206,21 @@ public class WorkOrderService : IWorkOrderService
         if (wo.VendorId != null) throw new InvalidOperationException("A vendor is already handling this work order.");
         if (wo.Stage != "New") throw new InvalidOperationException("This work order isn't awaiting a fix.");
 
-        wo.FixDescription = description; wo.FixCost = cost; wo.FixCompletionDate = completionDate;
+        // Same race as ForceCloseAsync/ConfirmFixAsync: claim the transition atomically before
+        // touching Parts, so two concurrent submissions can't both pass the in-memory check above.
+        var rows = await _db.WorkOrders
+            .Where(w => w.Id == workOrderId && w.Stage == "New")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.FixDescription, description)
+                .SetProperty(w => w.FixCost, cost)
+                .SetProperty(w => w.FixCompletionDate, completionDate));
+        if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a fix.");
+
         _db.WorkOrderParts.RemoveRange(wo.Parts);
         foreach (var p in parts.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
             _db.WorkOrderParts.Add(new WorkOrderPart { WorkOrderId = wo.Id, Name = p.Name, Quantity = p.Quantity });
 
-        wo.Stage = "Fixed - Pending Confirmation";
         AddStageEvent(wo, "Fixed - Pending Confirmation", employeeUserId);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("EmployeeFix", "WorkOrder", wo.Id.ToString(), employeeUserId, oldValue: "New", newValue: "Fixed - Pending Confirmation");
