@@ -155,7 +155,7 @@
                     <form method="post" asp-action="Fix" asp-route-id="@Model.Id" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <label class="form-label small">@Loc.T("Fix Description")</label>
-                        <textarea name="Description" class="form-control form-control-sm mb-2" rows="3"></textarea>
+                        <textarea name="Description" class="form-control form-control-sm mb-2" rows="3" required></textarea>
                         <div class="row g-2 mb-2">
                             <div class="col-6">
                                 <label class="form-label small">@Loc.T("Fix Cost")</label>

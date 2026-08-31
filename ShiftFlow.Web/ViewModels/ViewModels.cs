@@ -285,6 +285,7 @@ public class OrderTypeViewModel
 
 public class VendorFixViewModel
 {
+    [Required(ErrorMessage = "Describe what was done before submitting the fix."), MaxLength(4000)]
     public string? Description { get; set; }
     public decimal? Cost { get; set; }
     public DateTime? CompletionDate { get; set; }

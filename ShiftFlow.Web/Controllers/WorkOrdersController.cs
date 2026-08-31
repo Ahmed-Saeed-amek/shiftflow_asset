@@ -136,6 +136,12 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize, ValidateAntiForgeryToken]
     public async Task<IActionResult> EmployeeFix(int id, VendorFixViewModel vm)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Fix not submitted — a description is required.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         if (vm.Files is { Count: > 0 })
         {
             var (_, rejected) = await ShiftFlow.Web.Services.FileUploadValidator.ValidateAllAsync(vm.Files);
@@ -163,6 +169,12 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize, ValidateAntiForgeryToken]
     public async Task<IActionResult> AdvanceWithoutVendor(int id, VendorFixViewModel vm)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Not submitted — a description is required.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         var userId = _userManager.GetUserId(User)!;
         var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
             .AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;

@@ -87,6 +87,12 @@ public class VendorPortalController : Controller
         if (wo == null) return NotFound();
         if (wo.VendorId != vendorId) return Forbid();
 
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Fix not submitted — a description is required.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         // Validate attachments before touching any work order state — a bad file must block the
         // whole submission, not silently go through with the fix report saved and the file dropped.
         if (vm.Files is { Count: > 0 })
