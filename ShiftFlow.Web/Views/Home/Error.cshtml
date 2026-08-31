@@ -5,20 +5,26 @@
     {
         404 => "Page not found",
         403 => "Access denied",
+        405 => "Action not available this way",
         _ => "Something went wrong",
     };
     string message = statusCode switch
     {
         404 => "The page you're looking for doesn't exist or may have been moved.",
         403 => "You don't have permission to view this page.",
+        // A bookmarked/typed link to a POST-only action (e.g. /Account/Logout) hits this via a
+        // plain GET — that's a routine navigation mistake, not a server error, so it shouldn't
+        // read like one.
+        405 => "That action can't be reached by visiting its link directly. Please use the button in the app instead.",
         _ => "An unexpected error occurred. Please try again, and contact support if the problem continues.",
     };
     string icon = statusCode switch
     {
         404 => "bi-signpost-split",
         403 => "bi-shield-lock",
+        405 => "bi-signpost-2",
         _ => "bi-exclamation-triangle",
     };
     ViewData["Title"] = title;
 }
-<!DOCTYPE html><html><head><meta charset="utf-8"/><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"/></head><body class="bg-light"><div class="min-vh-100 d-flex align-items-center justify-content-center"><div class="text-center"><i class="bi @icon text-warning" style="font-size:5rem"></i><h3 class="fw-bold mt-3">@title</h3><p class="text-muted">@message</p><a href="/" class="btn btn-primary">Go to Home</a></div></div></body></html>
+<!DOCTYPE html><html><head><meta charset="utf-8"/><title>@title - STEP</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"/></head><body class="bg-light"><div class="min-vh-100 d-flex align-items-center justify-content-center"><div class="text-center"><i class="bi @icon text-warning" style="font-size:5rem"></i><h3 class="fw-bold mt-3">@title</h3><p class="text-muted">@message</p><a href="/" class="btn btn-primary">Go to Home</a></div></div></body></html>
