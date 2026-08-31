@@ -15,9 +15,11 @@
     var canViewProfile = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     var canSeedData = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded;
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
-    string actionsHtml = canManageUsers
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm me-2'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New User") + "</a>"
-        : "";
+    var exportUrl = Url.Action("ExportExcel", new { role = (string)ViewBag.RoleFilter, search = (string)ViewBag.SearchFilter });
+    string actionsHtml = "<a href='" + exportUrl + "' class='btn btn-outline-success btn-sm me-2'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a>"
+        + (canManageUsers
+            ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm me-2'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New User") + "</a>"
+            : "");
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Users"),Subtitle=Loc.T("All system accounts"),ActionsHtml=actionsHtml})" />
 

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
@@ -36,6 +37,20 @@ public class UsersController : Controller
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> Index(string? role, string? search)
     {
+        var (users, rolesByUser) = await GetFilteredUsersAsync(role, search);
+
+        ViewBag.RolesByUser = rolesByUser;
+        ViewBag.RoleFilter = role;
+        ViewBag.SearchFilter = search;
+        ViewBag.RoleOptions = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+        ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
+        return View(users);
+    }
+
+    // Shared by Index and ExportExcel so the exported rows always match whatever the caller was
+    // currently looking at (respecting the same role/search filters), not the full unfiltered list.
+    private async Task<(List<ApplicationUser> Users, Dictionary<string, IList<string>> RolesByUser)> GetFilteredUsersAsync(string? role, string? search)
+    {
         var users = await _db.Users.AsNoTracking().Include(u => u.Location).OrderBy(u => u.FullName).ToListAsync();
 
         // Build userId→roles map in one query instead of N per-user GetRolesAsync calls
@@ -58,12 +73,36 @@ public class UsersController : Controller
                 (u.FullName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 (u.Email?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
 
-        ViewBag.RolesByUser = rolesByUser;
-        ViewBag.RoleFilter = role;
-        ViewBag.SearchFilter = search;
-        ViewBag.RoleOptions = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
-        ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
-        return View(users);
+        return (users, rolesByUser);
+    }
+
+    [Authorize(Policy = PermissionCatalog.UserView)]
+    public async Task<IActionResult> ExportExcel(string? role, string? search)
+    {
+        var (users, rolesByUser) = await GetFilteredUsersAsync(role, search);
+
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var pkg = new ExcelPackage();
+        var ws = pkg.Workbook.Worksheets.Add("Users");
+        string[] headers = ["Name", "Email", "Role", "Employee #", "Department", "Phone", "Status"];
+        for (var i = 0; i < headers.Length; i++) ws.Cells[1, i + 1].Value = headers[i];
+        using (var range = ws.Cells[1, 1, 1, headers.Length]) { range.Style.Font.Bold = true; }
+
+        var row = 2;
+        foreach (var u in users)
+        {
+            ws.Cells[row, 1].Value = u.FullName;
+            ws.Cells[row, 2].Value = u.Email;
+            ws.Cells[row, 3].Value = string.Join(", ", rolesByUser[u.Id]);
+            ws.Cells[row, 4].Value = u.EmployeeNumber;
+            ws.Cells[row, 5].Value = u.Department;
+            ws.Cells[row, 6].Value = u.Phone;
+            ws.Cells[row, 7].Value = u.IsActive ? "Active" : "Inactive";
+            row++;
+        }
+        ws.Cells.AutoFitColumns();
+        var bytes = await pkg.GetAsByteArrayAsync();
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Users_{DateTime.Today:yyyyMMdd}.xlsx");
     }
 
     // Re-runs the same idempotent seeder used at first startup (DbSeeder.SeedAsync only adds
