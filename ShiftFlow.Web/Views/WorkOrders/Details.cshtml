@@ -170,11 +170,11 @@
                 <div class="card-body">
                     @if (!string.IsNullOrWhiteSpace(Model.Description))
                     {
-                        <div class="mb-2"><div class="text-muted small mb-1">@Loc.T("Description")</div><div class="small">@Model.Description</div></div>
+                        <div class="mb-2"><div class="text-muted small mb-1">@Loc.T("Description")</div><div class="small long-text-field">@Model.Description</div></div>
                     }
                     @if (!string.IsNullOrWhiteSpace(Model.Notes))
                     {
-                        <div><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small" style="white-space:pre-line">@Model.Notes</div></div>
+                        <div><div class="text-muted small mb-1">@Loc.T("Notes")</div><div class="small long-text-field" style="white-space:pre-line">@Model.Notes</div></div>
                     }
                 </div>
             </div>
@@ -400,7 +400,7 @@
                     }
                     @if (!string.IsNullOrWhiteSpace(Model.FixDescription))
                     {
-                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Fix Description")</div><div class="small">@Model.FixDescription</div></div>
+                        <div class="mt-2 pt-2 border-top"><div class="text-muted small mb-1">@Loc.T("Fix Description")</div><div class="small long-text-field">@Model.FixDescription</div></div>
                     }
                     @if (Model.Parts.Count > 0)
                     {

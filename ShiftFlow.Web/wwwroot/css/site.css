@@ -6,6 +6,12 @@
    default arrow everywhere, giving no visual hint those rows were interactive. */
 .cursor-pointer { cursor: pointer; }
 
+/* Free-text fields (Description/Notes/Fix Description) are user-entered with no max length —
+   a long unbroken run of characters (or just a lot of text) otherwise overflows its container
+   and pushes every other section of the page far down, since browsers don't wrap a single
+   unbroken "word" by default. Caps height with a scrollbar instead of growing the page. */
+.long-text-field { word-break: break-word; max-height: 12rem; overflow-y: auto; }
+
 :root {
   /* MEW (Ministry of Electricity, Water and Renewable Energy) design system tokens
      — palette inspired by the UrbanHub admin template, primary retinted to light blue */
