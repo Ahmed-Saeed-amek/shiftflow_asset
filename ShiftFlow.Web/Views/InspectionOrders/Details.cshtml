@@ -183,6 +183,17 @@ else
         sel.disabled = items.length === 0;
     }
 
+    // Popper's default "flip" behavior opens this dropdown upward when there isn't enough
+    // room below the toggle in the viewport — on a phone that means it renders directly over
+    // the Action Type/Cause fields sitting above it in the same inline form, instead of just
+    // scrolling the page. The menu already scrolls internally (max-height above), so forcing
+    // it to always open downward is strictly better here than letting it cover sibling fields.
+    document.querySelectorAll('.maintenance-action-dropdown [data-bs-toggle="dropdown"]').forEach(toggle => {
+        bootstrap.Dropdown.getOrCreateInstance(toggle, {
+            popperConfig: base => ({ ...base, modifiers: [...base.modifiers, { name: 'flip', enabled: false }] }),
+        });
+    });
+
     // Updates the dropdown toggle button's label to reflect the current selection — this is
     // the only thing that needs to change as checkboxes are toggled, since the dropdown itself
     // (fixed-size button + internally-scrolling menu) never changes shape or width regardless
