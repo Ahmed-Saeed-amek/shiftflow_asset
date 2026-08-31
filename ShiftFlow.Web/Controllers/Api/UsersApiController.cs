@@ -24,10 +24,12 @@ public sealed class UsersApiController : ControllerBase
 
         // This endpoint backs employee-facing pickers used to assign field/maintenance work
         // (inspection orders, maintenance orders, work orders) app-wide — vendor portal accounts
-        // (a separate account type) and HR (no field-work role) must never appear here. Without
-        // this, e.g. a Work Order's "Reassign Employee" picker could bind an HR account to a
-        // maintenance task with no warning.
-        var excludedRoles = new[] { "Vendor", "HR" };
+        // (a separate account type), HR, and Admin (IT Administration, no field-work role) must
+        // never appear here. Without this, e.g. a Work Order's "Reassign Employee" picker could
+        // bind an HR or System Administrator account to a maintenance task with no warning, and
+        // any authenticated caller (this endpoint has no role restriction beyond [Authorize]) could
+        // enumerate admin accounts and their emails via the search.
+        var excludedRoles = new[] { "Vendor", "HR", "Admin" };
         users = users.Where(u => !_db.UserRoles.Any(ur => ur.UserId == u.Id &&
             _db.Roles.Any(r => r.Id == ur.RoleId && excludedRoles.Contains(r.Name))));
 
