@@ -242,6 +242,18 @@
             </div>
         }
 
+        @if (isNew && Model.VendorId == null && Model.AssignedToUserId != null && Model.AssignedToUserId != currentUserId)
+        {
+            // The "Report Fix" form only ever shows to the assigned employee themselves
+            // (canReportFixMyself) — a manager or anyone else viewing this same work order
+            // otherwise saw no fix-report section at all and no explanation, reading as a dead
+            // end rather than the designed handoff it actually is.
+            <div class="alert alert-light border small mb-3">
+                <i class="bi bi-hourglass-split me-1"></i>
+                @Loc.T("Waiting on the assigned employee to report the fix.")
+            </div>
+        }
+
         @if (canReportFixMyself)
         {
             <div class="card border-0 shadow-sm mb-3 border-start border-4 border-primary">
