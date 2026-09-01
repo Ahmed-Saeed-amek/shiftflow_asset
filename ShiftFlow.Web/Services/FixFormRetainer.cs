@@ -24,7 +24,7 @@ public static class FixFormRetainer
         tempData["FixForm_Description"] = vm.Description;
         tempData["FixForm_Cost"] = vm.Cost?.ToString(System.Globalization.CultureInfo.InvariantCulture);
         tempData["FixForm_CDate"] = completionDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        tempData["FixForm_PartNames"] = System.Text.Json.JsonSerializer.Serialize(vm.PartNames ?? []);
+        tempData["FixForm_SparePartIds"] = System.Text.Json.JsonSerializer.Serialize(vm.SparePartIds ?? []);
         tempData["FixForm_PartQuantities"] = System.Text.Json.JsonSerializer.Serialize(vm.PartQuantities ?? []);
     }
 }

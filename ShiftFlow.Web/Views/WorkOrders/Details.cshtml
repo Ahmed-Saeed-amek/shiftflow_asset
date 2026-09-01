@@ -277,16 +277,7 @@
                                 <input type="date" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
-                        <label class="form-label small d-block mt-2">@Loc.T("Parts Used")</label>
-                        <div id="employeeFixPartsList">
-                            <div class="row g-2 mb-1">
-                                <div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>
-                                <div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addEmployeeFixPartRow()">
-                            <i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Part")
-                        </button>
+                        <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="employeeFixPartsList"})" />
                         <label class="form-label small d-block mt-3">@Loc.T("Attachments")</label>
                         <input type="file" name="Files" class="form-control form-control-sm" multiple />
                         <button type="submit" class="btn btn-sm btn-primary w-100 mt-3">
@@ -329,6 +320,7 @@
                                 <input type="date" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
+                        <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="advanceWithoutVendorPartsList"})" />
                         <button type="submit" class="btn btn-sm btn-info w-100 mt-3 text-white">
                             <i class="bi bi-check-lg me-1"></i>@Loc.T("Advance Without Vendor")
                         </button>
@@ -491,31 +483,19 @@
     }
 </style>
 
-@if (canReportFixMyself)
-{
-    <script>
-        function addEmployeeFixPartRow() {
-            var list = document.getElementById('employeeFixPartsList');
-            var row = document.createElement('div');
-            row.className = 'row g-2 mb-1';
-            row.innerHTML = '<div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>'
-                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
-            list.appendChild(row);
-        }
-    </script>
-}
-
 <script>
     // Restores what was already typed after a rejected submission (e.g. a bad attachment or a
     // missing description) sent the page back to a fresh GET — otherwise the fix report the
     // employee/manager had already filled in would silently vanish. Only one of the two forms
     // below is ever rendered for a given work order stage, so restoring into "the Description
-    // field that exists" is unambiguous.
+    // field that exists" is unambiguous. The parts picker loads its <select> options
+    // asynchronously (SpareParts/CompatibleForAsset), so restoring the selected SparePartId per
+    // row has to wait for that fetch via window.__sparePartsReady before the rows even exist.
     (function restoreFixForm() {
         const description = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Description"] as string));
         const cost = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Cost"] as string));
         const completionDate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_CDate"] as string));
-        const partNames = @Html.Raw((string?)TempData["FixForm_PartNames"] ?? "[]");
+        const sparePartIds = @Html.Raw((string?)TempData["FixForm_SparePartIds"] ?? "[]");
         const partQuantities = @Html.Raw((string?)TempData["FixForm_PartQuantities"] ?? "[]");
 
         const descField = document.querySelector('textarea[name=Description]');
@@ -523,12 +503,18 @@
         if (description) descField.value = description;
         if (cost) { const f = document.querySelector('input[name=Cost]'); if (f) f.value = cost; }
         if (completionDate) { const f = document.querySelector('input[name=CompletionDate]'); if (f) f.value = completionDate; }
-        if (typeof addEmployeeFixPartRow === 'function') {
-            for (let i = 1; i < partNames.length; i++) addEmployeeFixPartRow();
-        }
-        const nameInputs = document.querySelectorAll('input[name=PartNames]');
-        const qtyInputs = document.querySelectorAll('input[name=PartQuantities]');
-        partNames.forEach((n, i) => { if (nameInputs[i]) nameInputs[i].value = n; });
-        partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
+
+        if (sparePartIds.length === 0) return;
+        const containerId = document.getElementById('employeeFixPartsList') ? 'employeeFixPartsList'
+            : (document.getElementById('advanceWithoutVendorPartsList') ? 'advanceWithoutVendorPartsList' : null);
+        if (!containerId || !window.__sparePartsReady || !window.__sparePartsReady[containerId]) return;
+        window.__sparePartsReady[containerId].then(function () {
+            for (let i = 1; i < sparePartIds.length; i++) addSparePartRow(containerId);
+            const container = document.getElementById(containerId);
+            const selects = container.querySelectorAll('select[name=SparePartIds]');
+            const qtyInputs = container.querySelectorAll('input[name=PartQuantities]');
+            sparePartIds.forEach((id, i) => { if (selects[i]) selects[i].value = id; });
+            partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
+        });
     })();
 </script>

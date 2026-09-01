@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = Loc.T("Spare Parts Analytics");
+    var mostUsed = (List<SparePartUsageSummary>)ViewBag.MostUsed;
+    var byAsset = (List<AssetUsageSummary>)ViewBag.ByAsset;
+    var byCategory = (List<CategoryUsageSummary>)ViewBag.ByCategory;
+    var costByMonth = (List<MonthlyCostRow>)ViewBag.CostByMonth;
+    var totalCost = (decimal)ViewBag.TotalCost;
+    var hasUncostedRows = (bool)ViewBag.HasUncostedRows;
+    var categories = (List<AssetCategory>)ViewBag.Categories;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts Analytics")})" />
+
+<form method="get" class="row g-2 mb-3 align-items-end">
+    <div class="col-6 col-md-3">
+        <label class="form-label small">@Loc.T("From")</label>
+        <input type="date" name="from" value="@(((DateTime?)ViewBag.From)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label small">@Loc.T("To")</label>
+        <input type="date" name="to" value="@(((DateTime?)ViewBag.To)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label small">@Loc.T("Category")</label>
+        <select name="categoryId" class="form-select form-select-sm">
+            <option value="">@Loc.T("All Categories")</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c.Id" selected="@(((int?)ViewBag.CategoryId) == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">@Loc.T("Filter")</button>
+    </div>
+</form>
+
+@if (hasUncostedRows)
+{
+    <div class="alert alert-light border small mb-3">
+        <i class="bi bi-info-circle me-1"></i>@Loc.T("Cost totals only include parts with a recorded unit cost. Usage recorded before the spare parts catalog existed isn't reflected here.")
+    </div>
+}
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#mostUsedTab" type="button">@Loc.T("Most Used")</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#byAssetTab" type="button">@Loc.T("By Asset")</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#byCategoryTab" type="button">@Loc.T("By Category")</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#costTab" type="button">@Loc.T("Cost")</button></li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="mostUsedTab">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Spare Part")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Times Used")</th><th class="d-none d-md-table-cell">@Loc.T("Total Cost")</th></tr></thead>
+                    <tbody>
+                        @if (mostUsed.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
+                        }
+                        @foreach (var m in mostUsed)
+                        {
+                            <tr onclick="location.href='@Url.Action("Details", "SpareParts", new { id = m.SparePartId })'" class="cursor-pointer">
+                                <td class="small">@m.Name</td>
+                                <td class="small">@m.TotalQuantity</td>
+                                <td class="d-none d-sm-table-cell small">@m.UsageCount</td>
+                                <td class="d-none d-md-table-cell small">@m.TotalCost.ToString("0.00")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="byAssetTab">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Asset")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Distinct Parts")</th><th class="d-none d-md-table-cell">@Loc.T("Total Cost")</th></tr></thead>
+                    <tbody>
+                        @if (byAsset.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
+                        }
+                        @foreach (var a in byAsset)
+                        {
+                            <tr onclick="location.href='@Url.Action("Details", "Assets", new { id = a.AssetId })'" class="cursor-pointer">
+                                <td class="small">@a.AssetLabel</td>
+                                <td class="small">@a.TotalQuantity</td>
+                                <td class="d-none d-sm-table-cell small">@a.DistinctParts</td>
+                                <td class="d-none d-md-table-cell small">@a.TotalCost.ToString("0.00")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="byCategoryTab">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>@Loc.T("Category")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Total Cost")</th></tr></thead>
+                    <tbody>
+                        @if (byCategory.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
+                        }
+                        @foreach (var c in byCategory)
+                        {
+                            <tr>
+                                <td class="small">@c.CategoryLabel</td>
+                                <td class="small">@c.TotalQuantity</td>
+                                <td class="d-none d-sm-table-cell small">@c.TotalCost.ToString("0.00")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="costTab">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Total Parts Cost"),Value=totalCost.ToString("0.00"),Icon="bi-cash-stack",Color="amber"})" />
+            </div>
+            <div class="col-md-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white fw-semibold border-0">@Loc.T("Monthly Cost Trend")</div>
+                    <div class="card-body"><div class="chart-wrap"><canvas id="costTrendChart"></canvas></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const costMonths = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(costByMonth.Select(m => $"{m.Year}-{m.Month:D2}")));
+        const costValues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(costByMonth.Select(m => m.Cost)));
+        new Chart(document.getElementById('costTrendChart'), {
+            type: 'line',
+            data: {
+                labels: costMonths,
+                datasets: [{ data: costValues, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,.15)', fill: true, tension: 0.3 }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    </script>
+}

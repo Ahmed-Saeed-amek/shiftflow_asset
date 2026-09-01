@@ -165,6 +165,7 @@ builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IWorkOrderService, WorkOrderService>();
 builder.Services.AddScoped<IMaintenanceOrderService, MaintenanceOrderService>();
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<ISparePartService, SparePartService>();
 builder.Services.AddScoped<IAssetScopeService, AssetScopeService>();
 builder.Services.AddHostedService<PreventiveMaintenanceSchedulerService>();
 

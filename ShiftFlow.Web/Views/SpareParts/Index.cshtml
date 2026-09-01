@@ -1,0 +1,54 @@
+@using Microsoft.AspNetCore.Authorization
+@model List<SparePart>
+@inject IAuthorizationService AuthZ
+@{
+    ViewData["Title"] = Loc.T("Spare Parts");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.SparePartManage)).Succeeded;
+    string actionsHtml = canManage
+        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Spare Part") + "</a>"
+        : "";
+    var lowStockOnly = (bool)ViewBag.LowStockOnly;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts"),ActionsHtml=actionsHtml})" />
+
+<div class="mb-3">
+    <div class="btn-group btn-group-sm" role="group">
+        <a href="@Url.Action("Index")" class="btn @(lowStockOnly ? "btn-outline-secondary" : "btn-secondary")">@Loc.T("All")</a>
+        <a href="@Url.Action("Index", new { lowStockOnly = true })" class="btn @(lowStockOnly ? "btn-danger" : "btn-outline-danger")">@Loc.T("Low Stock Only")</a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>@Loc.T("Name")</th>
+                    <th class="d-none d-sm-table-cell">@Loc.T("SKU")</th>
+                    <th>@Loc.T("Stock")</th>
+                    <th class="d-none d-md-table-cell">@Loc.T("Reorder Threshold")</th>
+                    <th>@Loc.T("Status")</th>
+                    <th class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var p in Model)
+                {
+                    var isLow = p.ReorderThreshold != null && p.StockQuantity <= p.ReorderThreshold;
+                    <tr class="cursor-pointer @(isLow ? "table-danger" : "")" onclick="location.href='@Url.Action("Details", new { id = p.Id })'">
+                        <td class="small">@Loc.LocalizedName(p.Name, p.NameAr)</td>
+                        <td class="d-none d-sm-table-cell small font-monospace">@p.Sku</td>
+                        <td class="small">@p.StockQuantity</td>
+                        <td class="d-none d-md-table-cell small">@(p.ReorderThreshold?.ToString() ?? "—")</td>
+                        <td><partial name="_StatusBadge" model="@(p.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

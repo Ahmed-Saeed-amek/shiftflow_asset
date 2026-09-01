@@ -165,7 +165,7 @@ public class WorkOrdersController : Controller
         var userId = _userManager.GetUserId(User)!;
         try
         {
-            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
             await _workOrderService.EmployeeFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
             await ShiftFlow.Web.Services.WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = "Fix report submitted.";
@@ -193,7 +193,7 @@ public class WorkOrdersController : Controller
             .AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
         try
         {
-            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
             await _workOrderService.AdvanceWithoutVendorAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId, isManager);
             TempData["Success"] = "Work order advanced without waiting on the vendor.";
         }

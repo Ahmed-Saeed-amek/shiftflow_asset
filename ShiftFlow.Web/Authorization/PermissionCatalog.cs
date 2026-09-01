@@ -53,6 +53,10 @@ public static class PermissionCatalog
     // ── Order Types (shared catalog: Inspection Orders + Maintenance Orders) ──────
     public const string OrderTypeManage               = "OrderType.Manage";
 
+    // ── Spare Parts ────────────────────────────────────────────────────────────
+    public const string SparePartView                 = "SparePart.View";
+    public const string SparePartManage               = "SparePart.Manage";
+
     // ── Super Permission ───────────────────────────────────────────────────────
     /// <summary>Grants every permission and every hardcoded Admin role-check, everywhere (see AdminClaimsTransformation and PermissionService).</summary>
     public const string IsAdmin                     = "System.IsAdmin";
@@ -72,6 +76,7 @@ public static class PermissionCatalog
         ContractView, ContractManage, AssetReportAction, AssetScopeManage,
         MaintenanceOrderView, MaintenanceOrderManage, MaintenanceOrderReport, MaintenanceOrderExport,
         OrderTypeManage,
+        SparePartView, SparePartManage,
         IsAdmin,
     ];
 }

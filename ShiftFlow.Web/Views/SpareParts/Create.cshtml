@@ -1,0 +1,4 @@
+@model SparePartViewModel
+@{ ViewData["Title"] = Loc.T("New Spare Part"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Spare Part")})" />
+<partial name="_Form" model="Model" />

@@ -63,8 +63,13 @@ public class WorkOrderPart
 {
     public int Id{get;set;}
     public int WorkOrderId{get;set;} public virtual WorkOrder? WorkOrder{get;set;}
+    /// <summary>Null only for pre-catalog legacy rows. Every new submission must set this.</summary>
+    public int? SparePartId{get;set;} public virtual SparePart? SparePart{get;set;}
     public string Name{get;set;}=string.Empty;
     public int Quantity{get;set;}=1;
+    /// <summary>Snapshot of SparePart.UnitCost at submission time, so cost analytics on past usage
+    /// don't shift when the catalog price changes later.</summary>
+    public decimal? UnitCostAtUsage{get;set;}
 }
 
 /// <summary>Admin-manageable reason list a vendor picks from when blocking a work order (e.g. "Waiting on Parts"). Same shape as AssetActionCause.</summary>

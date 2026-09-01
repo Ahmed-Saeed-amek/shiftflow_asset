@@ -166,15 +166,8 @@
                                 <input type="date" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
-                        <label class="form-label small">@Loc.T("Parts Used")</label>
-                        <div id="partsList">
-                            <div class="row g-2 mb-1">
-                                <div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>
-                                <div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mb-2" onclick="addPartRow()">@Loc.T("Add Part")</button>
-                        <label class="form-label small d-block">@Loc.T("Attachments")</label>
+                        <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="partsList"})" />
+                        <label class="form-label small d-block mt-2">@Loc.T("Attachments")</label>
                         <input type="file" name="Files" class="form-control form-control-sm mb-2" multiple />
                         <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Submit Fix")</button>
                     </form>
@@ -216,7 +209,7 @@
             const description = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Description"] as string));
             const cost = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Cost"] as string));
             const completionDate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_CDate"] as string));
-            const partNames = @Html.Raw((string?)TempData["FixForm_PartNames"] ?? "[]");
+            const sparePartIds = @Html.Raw((string?)TempData["FixForm_SparePartIds"] ?? "[]");
             const partQuantities = @Html.Raw((string?)TempData["FixForm_PartQuantities"] ?? "[]");
 
             const descField = document.querySelector('textarea[name=Description]');
@@ -224,20 +217,17 @@
             if (description) descField.value = description;
             if (cost) { const f = document.querySelector('input[name=Cost]'); if (f) f.value = cost; }
             if (completionDate) { const f = document.querySelector('input[name=CompletionDate]'); if (f) f.value = completionDate; }
-            for (let i = 1; i < partNames.length; i++) addPartRow();
-            const nameInputs = document.querySelectorAll('input[name=PartNames]');
-            const qtyInputs = document.querySelectorAll('input[name=PartQuantities]');
-            partNames.forEach((n, i) => { if (nameInputs[i]) nameInputs[i].value = n; });
-            partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
-        })();
 
-        function addPartRow() {
-            var list = document.getElementById('partsList');
-            var row = document.createElement('div');
-            row.className = 'row g-2 mb-1';
-            row.innerHTML = '<div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>'
-                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
-            list.appendChild(row);
-        }
+            if (sparePartIds.length === 0) return;
+            if (!window.__sparePartsReady || !window.__sparePartsReady['partsList']) return;
+            window.__sparePartsReady['partsList'].then(function () {
+                for (let i = 1; i < sparePartIds.length; i++) addSparePartRow('partsList');
+                const container = document.getElementById('partsList');
+                const selects = container.querySelectorAll('select[name=SparePartIds]');
+                const qtyInputs = container.querySelectorAll('input[name=PartQuantities]');
+                sparePartIds.forEach((id, i) => { if (selects[i]) selects[i].value = id; });
+                partQuantities.forEach((q, i) => { if (qtyInputs[i]) qtyInputs[i].value = q; });
+            });
+        })();
     </script>
 }

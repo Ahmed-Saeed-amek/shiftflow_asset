@@ -20,6 +20,7 @@
     var canManageWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
     var canViewMaintenanceOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderView)).Succeeded;
     var canViewContracts = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractView)).Succeeded;
+    var canViewSpareParts = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.SparePartView)).Succeeded;
     var canReportAssetAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
     var canManageAssetScope = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetScopeManage)).Succeeded;
     var canManageOrderTypes = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.OrderTypeManage)).Succeeded;
@@ -99,7 +100,7 @@
                 <li><a class="nav-link" asp-controller="Teams" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Teams")</a></li>
             }
 
-            @if (canViewAssets || canViewWorkOrders || canViewMaintenanceOrders || canViewVendors || canViewContracts)
+            @if (canViewAssets || canViewWorkOrders || canViewMaintenanceOrders || canViewVendors || canViewContracts || canViewSpareParts)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Asset Management")</li>
                 if (canViewAssets)
@@ -121,6 +122,11 @@
                 if (canViewContracts)
                 {
                     <li><a class="nav-link" asp-controller="Contracts" asp-action="Index"><i class="bi bi-file-earmark-text me-2"></i>@Loc.T("Contracts")</a></li>
+                }
+                if (canViewSpareParts)
+                {
+                    <li><a class="nav-link" asp-controller="SpareParts" asp-action="Index"><i class="bi bi-boxes me-2"></i>@Loc.T("Spare Parts")</a></li>
+                    <li><a class="nav-link" asp-controller="SparePartsAnalytics" asp-action="Index"><i class="bi bi-graph-up me-2"></i>@Loc.T("Spare Parts Analytics")</a></li>
                 }
 
                 // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one

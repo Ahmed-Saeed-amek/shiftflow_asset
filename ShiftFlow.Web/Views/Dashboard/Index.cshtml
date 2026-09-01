@@ -21,6 +21,7 @@
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Total Engineers"),Value=Model.TotalEngineers.ToString(),Icon="bi-person-badge",Color="blue"})" /></div>
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{Model.DefectiveAssets}/{Model.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=Model.OpenWorkOrders.ToString(),Subtitle=Model.CriticalOpenWorkOrders>0?$"{Model.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Low Stock Parts"),Value=Model.LowStockPartsCount.ToString(),Icon="bi-boxes",Color="amber"})" /></div>
 </div>
 
 <div class="row g-3 mb-4">

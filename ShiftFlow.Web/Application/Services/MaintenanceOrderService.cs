@@ -11,7 +11,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
 {
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
-    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit) { _db = db; _audit = audit; }
+    private readonly ISparePartService _spareParts;
+    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts) { _db = db; _audit = audit; _spareParts = spareParts; }
 
     // Stages/statuses (across both entities) that mean "this asset still has open work" —
     // checked before restoring Asset.Status to "Working" so a second, unrelated issue on the
@@ -54,7 +55,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         return order;
     }
 
-    public async Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(string Name, int Quantity)> parts, string employeeUserId)
+    public async Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
         var order = await _db.MaintenanceOrders.Include(m => m.Parts).FirstOrDefaultAsync(m => m.Id == orderId)
             ?? throw new InvalidOperationException("Maintenance order not found.");
@@ -64,14 +65,40 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         order.FixDescription = fixDescription;
         order.Cost = cost;
         order.CompletedDate = completedDate;
+
+        // Same pattern as WorkOrderService.ApplyPartsAsync: validate compatibility, decrement stock
+        // atomically per part, snapshot Name/UnitCost from the catalog, all inside one transaction
+        // so a mid-loop stock-insufficiency failure rolls back any parts already decremented.
+        var validParts = parts.Where(p => p.Quantity > 0).ToList();
+        await using var tx = await _db.Database.BeginTransactionAsync();
         _db.MaintenanceOrderParts.RemoveRange(order.Parts);
-        foreach (var p in parts.Where(p => !string.IsNullOrWhiteSpace(p.Name)))
-            _db.MaintenanceOrderParts.Add(new MaintenanceOrderPart { MaintenanceOrderId = order.Id, Name = p.Name, Quantity = p.Quantity });
+        if (validParts.Count > 0)
+        {
+            var compatibleIds = await _db.SparePartAssets.Where(sa => sa.AssetId == order.AssetId)
+                .Select(sa => sa.SparePartId).ToListAsync();
+            if (validParts.Select(p => p.SparePartId).Except(compatibleIds).Any())
+                throw new InvalidOperationException("One or more selected parts are not compatible with this asset.");
+
+            var partsCatalog = await _db.SpareParts.Where(p => validParts.Select(vp => vp.SparePartId).Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id);
+            foreach (var p in validParts)
+            {
+                var catalogPart = partsCatalog[p.SparePartId];
+                if (!await _spareParts.TryDecrementStockAsync(p.SparePartId, p.Quantity))
+                    throw new InvalidOperationException($"Not enough stock of '{catalogPart.Name}' to complete this fix (requested {p.Quantity}).");
+                _db.MaintenanceOrderParts.Add(new MaintenanceOrderPart
+                {
+                    MaintenanceOrderId = order.Id, SparePartId = p.SparePartId,
+                    Name = catalogPart.Name, Quantity = p.Quantity, UnitCostAtUsage = catalogPart.UnitCost,
+                });
+            }
+        }
 
         order.Status = "Done";
         order.ClosedDate = DateTime.UtcNow;
         if (!await HasOtherOpenWorkAsync(order.AssetId, order.Id)) await SetAssetStatusAsync(order.AssetId, "Working");
         await _db.SaveChangesAsync();
+        await tx.CommitAsync();
         await _audit.LogAsync("Complete", "MaintenanceOrder", order.Id.ToString(), employeeUserId, oldValue: "Open", newValue: "Done");
         return order;
     }

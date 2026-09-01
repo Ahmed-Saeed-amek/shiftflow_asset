@@ -29,7 +29,7 @@ public interface IPermissionService
 public interface IAuditService{Task LogAsync(string action,string entityType,string? entityId,string userId,string? oldValue=null,string? newValue=null,string? details=null);}
 
 public interface IDashboardService{Task<DashboardKpis> GetKpisAsync(string? userId=null,string? userRole=null);}
-public class DashboardKpis{public int TotalEngineers{get;set;}public int OpenInspectionOrders{get;set;}public int InspectionOrdersOverdue{get;set;}public int ActiveTeams{get;set;}public int TotalAssets{get;set;}public int DefectiveAssets{get;set;}public int OpenWorkOrders{get;set;}public int CriticalOpenWorkOrders{get;set;}}
+public class DashboardKpis{public int TotalEngineers{get;set;}public int OpenInspectionOrders{get;set;}public int InspectionOrdersOverdue{get;set;}public int ActiveTeams{get;set;}public int TotalAssets{get;set;}public int DefectiveAssets{get;set;}public int OpenWorkOrders{get;set;}public int CriticalOpenWorkOrders{get;set;}public int LowStockPartsCount{get;set;}}
 
 // ── Inspection Orders / Teams ────────────────────────────────────────────────
 public interface IInspectionOrderService
@@ -112,6 +112,19 @@ public class PmScheduleRow
     public string? WorkOrderNumber { get; set; }
 }
 
+public interface ISparePartService
+{
+    Task<SparePart> CreateAsync(SparePart part, List<int> assetIds, string userId);
+    Task UpdateAsync(SparePart part, List<int> assetIds, string userId);
+    Task AdjustStockAsync(int sparePartId, int newQuantity, string? reason, string userId);
+    /// <summary>Spare parts linked to this specific asset, active only — backs the fix-report pickers.</summary>
+    Task<List<SparePart>> GetCompatiblePartsAsync(int assetId);
+    /// <summary>Atomic, race-safe decrement guarded by StockQuantity >= quantity — same TOCTOU-safe
+    /// ExecuteUpdateAsync-with-WHERE-guard pattern WorkOrderService uses for stage transitions.
+    /// Returns false (0 rows affected) if stock is insufficient.</summary>
+    Task<bool> TryDecrementStockAsync(int sparePartId, int quantity);
+}
+
 public interface IWorkOrderService
 {
     Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId);
@@ -126,13 +139,13 @@ public interface IWorkOrderService
     /// <summary>Admin assigns/reassigns/clears the internal employee on a work order — independent of and combinable with VendorId, usable at any stage.</summary>
     Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId);
     /// <summary>The assigned employee's own equivalent of VendorFixAsync — only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely).</summary>
-    Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string employeeUserId);
+    Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false — usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
-    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string userId, bool isManager = false);
+    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false);
     /// <summary>Admin override — force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
     Task ForceCloseAsync(int workOrderId, string? reason, string userId);
     /// <summary>Vendor submits a fix — Stage="Fixed - Pending Confirmation".</summary>
-    Task VendorFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(string Name, int Quantity)> parts, string vendorUserId);
+    Task VendorFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId);
     /// <summary>Vendor reports they can't proceed — Stage="Blocked".</summary>
     Task VendorBlockAsync(int workOrderId, int blockReasonId, string? detail, string vendorUserId);
     /// <summary>Admin resolves whatever blocked the vendor and sends it back to the same vendor — Stage="Sent to Vendor", block fields cleared.</summary>
@@ -156,7 +169,7 @@ public interface IMaintenanceOrderService
     Task<MaintenanceOrder> CreateAsync(int assetId, string assignedToUserId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
     /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
-    Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(string Name, int Quantity)> parts, string employeeUserId);
+    Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
     Task<MaintenanceOrder?> GetByIdAsync(int id);

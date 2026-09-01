@@ -120,16 +120,7 @@
                                 <input type="date" name="CompletedDate" class="form-control form-control-sm" />
                             </div>
                         </div>
-                        <label class="form-label small d-block mt-2">@Loc.T("Parts Used")</label>
-                        <div id="maintenanceFixPartsList">
-                            <div class="row g-2 mb-1">
-                                <div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>
-                                <div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="addMaintenanceFixPartRow()">
-                            <i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Part")
-                        </button>
+                        <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="maintenanceFixPartsList"})" />
                         <button type="submit" class="btn btn-sm btn-primary w-100 mt-3">
                             <i class="bi bi-check-lg me-1"></i>@Loc.T("Report Fix")
                         </button>
@@ -209,16 +200,3 @@
     </div>
 </div>
 
-@if (canReportFix)
-{
-    <script>
-        function addMaintenanceFixPartRow() {
-            var list = document.getElementById('maintenanceFixPartsList');
-            var row = document.createElement('div');
-            row.className = 'row g-2 mb-1';
-            row.innerHTML = '<div class="col-7"><input type="text" name="PartNames" class="form-control form-control-sm" placeholder="@Loc.T("Part Name")" /></div>'
-                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
-            list.appendChild(row);
-        }
-    </script>
-}

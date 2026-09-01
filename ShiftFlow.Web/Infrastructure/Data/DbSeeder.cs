@@ -480,6 +480,9 @@ public static class DbSeeder
             new Permission { Name = "MaintenanceOrder.Manage",       Category = "Asset Management", Description = "Assign an employee to fix an asset in-house, and cancel maintenance orders" },
             new Permission { Name = "MaintenanceOrder.Report",       Category = "Asset Management", Description = "Complete a fix on a maintenance order assigned to you" },
             new Permission { Name = "MaintenanceOrder.Export",       Category = "Asset Management", Description = "Export the maintenance order list to Excel" },
+            // Spare Parts
+            new Permission { Name = "SparePart.View",                Category = "Asset Management", Description = "See the spare parts catalog, stock levels, and which assets each part fits" },
+            new Permission { Name = "SparePart.Manage",              Category = "Asset Management", Description = "Add or edit spare parts, link them to assets, and adjust stock quantities" },
         };
 
         var existing = await db.Permissions.ToListAsync();
@@ -519,6 +522,7 @@ public static class DbSeeder
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
                 "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
+                "SparePart.View", "SparePart.Manage",
             ],
             ["OperationsManager"] =
             [
@@ -538,6 +542,7 @@ public static class DbSeeder
                 "Contract.View", "Contract.Manage",
                 "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
                 "OrderType.Manage",
+                "SparePart.View", "SparePart.Manage",
             ],
             ["Supervisor"] =
             [
@@ -548,36 +553,42 @@ public static class DbSeeder
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View",
                 "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report",
+                "SparePart.View", "SparePart.Manage",
             ],
             ["Section Head"] =
             [
                 "InspectionOrder.View", "Team.View",
                 "Asset.View", "Vendor.View", "WorkOrder.View",
                 "MaintenanceOrder.View",
+                "SparePart.View",
             ],
             ["Senior Engineer"] =
             [
                 "InspectionOrder.View", "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
+                "SparePart.View",
             ],
             ["Engineer"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
+                "SparePart.View",
             ],
             ["Operation Engineer"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
+                "SparePart.View",
             ],
             ["Technician"] =
             [
                 "InspectionOrder.Report",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
+                "SparePart.View",
             ],
             ["HR"] =
             [

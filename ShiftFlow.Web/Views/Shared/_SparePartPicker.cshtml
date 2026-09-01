@@ -1,0 +1,55 @@
+@model SparePartPickerModel
+@* Shared "Parts Used" picker for the 3 fix-report forms (WorkOrders EmployeeFix/AdvanceWithoutVendor,
+   VendorPortal Fix, MaintenanceOrders Complete) - replaces the old free-text Name input with a
+   <select> of spare parts actually linked to this asset (SpareParts/CompatibleForAsset), so a fix
+   report can only reference real catalog parts and their stock gets decremented on save. *@
+<div>
+    <label class="form-label small d-block mt-2">@Loc.T("Parts Used")</label>
+    <div id="@Model.ContainerId"></div>
+    <div id="@(Model.ContainerId)Empty" class="small text-muted d-none">
+        @Loc.T("No spare parts linked to this asset yet — ask a manager to add compatibility links.")
+    </div>
+    <button type="button" id="@(Model.ContainerId)AddBtn" class="btn btn-sm btn-outline-secondary mt-1" onclick="addSparePartRow('@Model.ContainerId')">
+        <i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Part")
+    </button>
+</div>
+
+<script>
+    (function () {
+        if (window.__sparePartPickerInit) return; // only wire the shared helpers once per page
+        window.__sparePartPickerInit = true;
+        window.__sparePartCache = {};   // containerId -> [{id, fullName, sku}]
+        window.__sparePartsReady = {};  // containerId -> Promise, so a restore-on-failure script can wait for the row(s) to exist
+
+        window.initSparePartPicker = function (containerId, assetId) {
+            window.__sparePartsReady[containerId] = fetch('/SpareParts/CompatibleForAsset?assetId=' + encodeURIComponent(assetId))
+                .then(function (r) { return r.json(); })
+                .then(function (parts) {
+                    window.__sparePartCache[containerId] = parts;
+                    if (parts.length === 0) {
+                        var emptyMsg = document.getElementById(containerId + 'Empty');
+                        if (emptyMsg) emptyMsg.classList.remove('d-none');
+                        var addBtn = document.getElementById(containerId + 'AddBtn');
+                        if (addBtn) addBtn.disabled = true;
+                        return parts;
+                    }
+                    addSparePartRow(containerId);
+                    return parts;
+                });
+        };
+
+        window.addSparePartRow = function (containerId) {
+            var parts = window.__sparePartCache[containerId] || [];
+            var container = document.getElementById(containerId);
+            if (!container || parts.length === 0) return;
+            var row = document.createElement('div');
+            row.className = 'row g-2 mb-1';
+            var esc = function (s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+            var options = parts.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('');
+            row.innerHTML = '<div class="col-7"><select name="SparePartIds" class="form-select form-select-sm">' + options + '</select></div>'
+                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
+            container.appendChild(row);
+        };
+    })();
+    initSparePartPicker('@Model.ContainerId', @Model.AssetId);
+</script>

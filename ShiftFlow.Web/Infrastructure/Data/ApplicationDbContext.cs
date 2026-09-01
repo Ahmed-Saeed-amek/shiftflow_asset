@@ -45,6 +45,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
     public DbSet<MaintenanceOrderPart> MaintenanceOrderParts => Set<MaintenanceOrderPart>();
     public DbSet<OrderType> OrderTypes => Set<OrderType>();
+    public DbSet<SparePart> SpareParts => Set<SparePart>();
+    public DbSet<SparePartAsset> SparePartAssets => Set<SparePartAsset>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -273,8 +275,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasKey(p => p.Id);
             e.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            e.Property(p => p.UnitCostAtUsage).HasColumnType("decimal(12,2)");
             e.HasOne(p => p.WorkOrder).WithMany(w => w.Parts)
                 .HasForeignKey(p => p.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(p => p.SparePart).WithMany()
+                .HasForeignKey(p => p.SparePartId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<WorkOrderBlockReason>(e =>
         {
@@ -323,8 +328,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasKey(p => p.Id);
             e.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            e.Property(p => p.UnitCostAtUsage).HasColumnType("decimal(12,2)");
             e.HasOne(p => p.MaintenanceOrder).WithMany(m => m.Parts)
                 .HasForeignKey(p => p.MaintenanceOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(p => p.SparePart).WithMany()
+                .HasForeignKey(p => p.SparePartId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<AssetActionType>(e =>
         {
@@ -360,6 +368,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(ca => ca.ContractId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(ca => ca.Asset).WithMany(a => a.ContractLinks)
                 .HasForeignKey(ca => ca.AssetId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<SparePart>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            e.Property(p => p.NameAr).HasMaxLength(200);
+            e.Property(p => p.Sku).HasMaxLength(100);
+            e.Property(p => p.UnitCost).HasColumnType("decimal(12,2)");
+            e.HasIndex(p => p.Name);
+        });
+        b.Entity<SparePartAsset>(e =>
+        {
+            e.HasKey(sa => sa.Id);
+            e.HasIndex(sa => new { sa.SparePartId, sa.AssetId }).IsUnique();
+            e.HasOne(sa => sa.SparePart).WithMany(p => p.AssetLinks)
+                .HasForeignKey(sa => sa.SparePartId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(sa => sa.Asset).WithMany(a => a.SparePartLinks)
+                .HasForeignKey(sa => sa.AssetId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<UserAssetScope>(e =>
         {

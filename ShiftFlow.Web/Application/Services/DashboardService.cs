@@ -32,6 +32,8 @@ public class DashboardService : IDashboardService
         var defectiveAssets = await _db.Assets.AsNoTracking().CountAsync(a => a.Status == "Defective");
         var openWorkOrders = await _db.WorkOrders.AsNoTracking().CountAsync(w => w.Stage != "Closed");
         var criticalOpenWorkOrders = await _db.WorkOrders.AsNoTracking().CountAsync(w => w.Stage != "Closed" && w.Priority == "Critical");
+        var lowStockPartsCount = await _db.SpareParts.AsNoTracking()
+            .CountAsync(p => p.IsActive && p.ReorderThreshold != null && p.StockQuantity <= p.ReorderThreshold);
 
         var kpis = new DashboardKpis
         {
@@ -43,6 +45,7 @@ public class DashboardService : IDashboardService
             DefectiveAssets         = defectiveAssets,
             OpenWorkOrders          = openWorkOrders,
             CriticalOpenWorkOrders  = criticalOpenWorkOrders,
+            LowStockPartsCount      = lowStockPartsCount,
         };
 
         _cache.Set(cacheKey, kpis, TimeSpan.FromMinutes(2));

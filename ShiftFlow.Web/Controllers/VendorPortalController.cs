@@ -130,7 +130,7 @@ public class VendorPortalController : Controller
         var userId = _userManager.GetUserId(User)!;
         try
         {
-            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
             await _workOrderService.VendorFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
             await WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = _loc.T("Fix report submitted.");

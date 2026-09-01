@@ -39,6 +39,8 @@ public static class PermissionDisplay
         [PermissionCatalog.AuditLogView]             = "View Audit Log",
         [PermissionCatalog.RbacManage]                = "Manage Roles & Permissions",
         [PermissionCatalog.OrderTypeManage]          = "Manage Order Types",
+        [PermissionCatalog.SparePartView]            = "View Spare Parts",
+        [PermissionCatalog.SparePartManage]          = "Manage Spare Parts",
         [PermissionCatalog.IsAdmin]                  = "Full Administrator Access",
     };
 

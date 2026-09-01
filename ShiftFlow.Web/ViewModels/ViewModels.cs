@@ -113,6 +113,83 @@ public class AssetMultiPickerModel
     public List<LocationCategory>? LocationCategories { get; set; }
 }
 
+public class SparePartViewModel
+{
+    public int Id { get; set; }
+    [Required, MaxLength(200)] public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    [MaxLength(100)] public string? Sku { get; set; }
+    [Range(0, 9_999_999_999.99)] public decimal? UnitCost { get; set; }
+    // Create only - Edit's form doesn't expose this field; stock changes go through AdjustStock instead.
+    [Range(0, int.MaxValue)] public int StockQuantity { get; set; }
+    [Range(0, int.MaxValue)] public int? ReorderThreshold { get; set; }
+    public bool IsActive { get; set; } = true;
+    public List<int>? AssetIds { get; set; }
+}
+
+/// <summary>Renders the shared spare-part picker (compatible-parts <select> + quantity, replacing
+/// free-text part entry) on a fix-report form for a specific asset.</summary>
+public class SparePartPickerModel
+{
+    public int AssetId { get; set; }
+    /// <summary>DOM id for the rows container — must be unique per form on a page (e.g. "employeeFixPartsList").</summary>
+    public string ContainerId { get; set; } = string.Empty;
+}
+
+/// <summary>One row of a spare part's recent-usage history on its Details page, combining
+/// WorkOrderParts and MaintenanceOrderParts into one common shape.</summary>
+public class SparePartUsageRow
+{
+    public string WorkOrderNumber { get; set; } = string.Empty;
+    public int Quantity { get; set; }
+    public DateTime UsedDate { get; set; }
+}
+
+/// <summary>One raw usage record (WorkOrderPart or MaintenanceOrderPart with a SparePartId set),
+/// projected to a common shape so both entities can be combined in-memory for analytics grouping —
+/// EF can't UNION two different entity types in one LINQ query.</summary>
+public class PartUsageRow
+{
+    public int SparePartId { get; set; }
+    public int AssetId { get; set; }
+    public int Quantity { get; set; }
+    public decimal? UnitCostAtUsage { get; set; }
+    public DateTime UsedDate { get; set; }
+}
+
+public class SparePartUsageSummary
+{
+    public int SparePartId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int TotalQuantity { get; set; }
+    public int UsageCount { get; set; }
+    public decimal TotalCost { get; set; }
+}
+
+public class AssetUsageSummary
+{
+    public int AssetId { get; set; }
+    public string AssetLabel { get; set; } = string.Empty;
+    public int TotalQuantity { get; set; }
+    public decimal TotalCost { get; set; }
+    public int DistinctParts { get; set; }
+}
+
+public class CategoryUsageSummary
+{
+    public int CategoryId { get; set; }
+    public string CategoryLabel { get; set; } = string.Empty;
+    public int TotalQuantity { get; set; }
+    public decimal TotalCost { get; set; }
+}
+
+public class MonthlyCostRow
+{
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public decimal Cost { get; set; }
+}
+
 public class UserAssetScopeViewModel : IValidatableObject
 {
     public int Id { get; set; }
@@ -251,7 +328,7 @@ public class MaintenanceOrderCompleteVm
     public string? FixDescription { get; set; }
     public decimal? Cost { get; set; }
     public DateTime? CompletedDate { get; set; }
-    public List<string>? PartNames { get; set; }
+    public List<int>? SparePartIds { get; set; }
     public List<int>? PartQuantities { get; set; }
 }
 
@@ -289,7 +366,7 @@ public class VendorFixViewModel
     public string? Description { get; set; }
     public decimal? Cost { get; set; }
     public DateTime? CompletionDate { get; set; }
-    public List<string>? PartNames { get; set; }
+    public List<int>? SparePartIds { get; set; }
     public List<int>? PartQuantities { get; set; }
     public List<IFormFile>? Files { get; set; }
 }

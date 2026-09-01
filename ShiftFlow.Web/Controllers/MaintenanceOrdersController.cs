@@ -134,7 +134,7 @@ public class MaintenanceOrdersController : Controller
     {
         try
         {
-            var parts = (vm.PartNames ?? []).Zip(vm.PartQuantities ?? [], (n, q) => (Name: n, Quantity: q)).ToList();
+            var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
             await _orders.CompleteAsync(id, vm.FixDescription ?? "", vm.Cost, vm.CompletedDate, parts, CurrentUserId);
             TempData["Success"] = "Fix reported — maintenance order closed.";
         }
