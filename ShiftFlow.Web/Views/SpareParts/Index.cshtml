@@ -42,7 +42,15 @@
                     <tr class="cursor-pointer @(isLow ? "table-danger" : "")" onclick="location.href='@Url.Action("Details", new { id = p.Id })'">
                         <td class="small">@Loc.LocalizedName(p.Name, p.NameAr)</td>
                         <td class="d-none d-sm-table-cell small font-monospace">@p.Sku</td>
-                        <td class="small">@p.StockQuantity</td>
+                        <td class="small">
+                            @p.StockQuantity
+                            @if (isLow)
+                            {
+                                <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-1">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>@Loc.T("Low")
+                                </span>
+                            }
+                        </td>
                         <td class="d-none d-md-table-cell small">@(p.ReorderThreshold?.ToString() ?? "—")</td>
                         <td><partial name="_StatusBadge" model="@(p.IsActive ? "Active" : "Inactive")" /></td>
                         <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>

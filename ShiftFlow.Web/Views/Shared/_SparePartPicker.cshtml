@@ -4,7 +4,8 @@
    <select> of spare parts actually linked to this asset (SpareParts/CompatibleForAsset), so a fix
    report can only reference real catalog parts and their stock gets decremented on save. *@
 <div>
-    <label class="form-label small d-block mt-2">@Loc.T("Parts Used")</label>
+    <label class="form-label small d-block mt-2 mb-0">@Loc.T("Parts Used")</label>
+    <div class="form-text mt-0 mb-1">@Loc.T("Only spare parts linked to this asset are shown — using one here reduces its stock.")</div>
     <div id="@Model.ContainerId"></div>
     <div id="@(Model.ContainerId)Empty" class="small text-muted d-none">
         @Loc.T("No spare parts linked to this asset yet — ask a manager to add compatibility links.")
@@ -49,6 +50,16 @@
             row.innerHTML = '<div class="col-7"><select name="SparePartIds" class="form-select form-select-sm">' + options + '</select></div>'
                 + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
             container.appendChild(row);
+
+            // Default a newly-added row to a part not already picked in an earlier row - clicking
+            // "Add Part" without touching the dropdown otherwise silently offered to record the same
+            // part twice in one submission (each row is submitted independently, so nothing else
+            // stops that). Still fully editable/overridable, just avoids the accidental default.
+            var alreadyPicked = [].slice.call(container.querySelectorAll('select[name=SparePartIds]'))
+                .slice(0, -1).map(function (s) { return s.value; });
+            var newSelect = row.querySelector('select[name=SparePartIds]');
+            var firstUnused = parts.find(function (p) { return alreadyPicked.indexOf(String(p.id)) === -1; });
+            if (firstUnused) newSelect.value = String(firstUnused.id);
         };
     })();
     initSparePartPicker('@Model.ContainerId', @Model.AssetId);
