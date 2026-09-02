@@ -42,60 +42,7 @@ public class InspectionOrdersController : Controller
     // with Maintenance Orders and Work Orders) — see UsersController.MyOrders. GetMyOrdersAsync
     // stays on the service since the AI assistant tool functions still call it directly.
 
-    [Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
-    public async Task<IActionResult> Create()
-    {
-        await LoadCreateViewBagAsync();
-        return View(new InspectionOrderCreateVm());
-    }
-
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
-    public async Task<IActionResult> Create(InspectionOrderCreateVm vm)
-    {
-        if (!ModelState.IsValid)
-        {
-            await LoadCreateViewBagAsync(vm);
-            return View(vm);
-        }
-
-        try
-        {
-            var order = await _orders.CreateAsync(
-                vm.OrderTypeId, vm.Description,
-                vm.AssigneeType == "User" ? vm.AssignedToUserId : null,
-                vm.AssigneeType == "Team" ? vm.AssignedToTeamId : null,
-                vm.AssetIds, vm.DueDate, CurrentUserId);
-
-            TempData["Success"] = $"Inspection order {order.OrderNumber} created.";
-            return RedirectToAction(nameof(Details), new { id = order.Id });
-        }
-        catch (InvalidOperationException ex)
-        {
-            ModelState.AddModelError("", ex.Message);
-            await LoadCreateViewBagAsync(vm);
-            return View(vm);
-        }
-    }
-
-    // On a failed re-render (e.g. no assets selected), rehydrate the asset chips and employee label
-    // from what was actually posted so the admin doesn't lose their in-progress selection.
-    private async Task LoadCreateViewBagAsync(InspectionOrderCreateVm? vm = null)
-    {
-        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
-        ViewBag.Teams = await _teams.GetAllAsync();
-        ViewBag.OrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
-
-        ViewBag.SelectedAssetChips = vm?.AssetIds is { Count: > 0 }
-            ? await _db.Assets.Where(a => vm.AssetIds.Contains(a.Id))
-                .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name })
-                .ToListAsync()
-            : new List<AssetChip>();
-
-        ViewBag.SelectedEmployeeLabel = !string.IsNullOrEmpty(vm?.AssignedToUserId)
-            ? await _db.Users.Where(u => u.Id == vm.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
-            : null;
-    }
+    // Create moved to the unified OrdersController (Orders/Create) — see that controller.
 
     // No policy attribute here — access is decided below by manager/assignee/team-member
     // status instead, since InspectionOrder.Report is a role-level permission that doesn't

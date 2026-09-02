@@ -43,7 +43,7 @@ public class OrderTypesController : Controller
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,
             TracksDefectOutcome = vm.TracksDefectOutcome, RequiresVendor = vm.RequiresVendor,
-            IsActive = vm.IsActive, SortOrder = vm.SortOrder,
+            IsDirectFix = vm.IsDirectFix, IsActive = vm.IsActive, SortOrder = vm.SortOrder,
         });
         await _db.SaveChangesAsync();
         TempData["Success"] = "Order type created.";
@@ -67,7 +67,7 @@ public class OrderTypesController : Controller
         }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;
         type.TracksDefectOutcome = vm.TracksDefectOutcome; type.RequiresVendor = vm.RequiresVendor;
-        type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
+        type.IsDirectFix = vm.IsDirectFix; type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));

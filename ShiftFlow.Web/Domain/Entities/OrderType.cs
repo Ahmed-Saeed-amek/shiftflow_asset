@@ -17,6 +17,13 @@ public class OrderType
     public bool TracksDefectOutcome { get; set; }
     /// <summary>Whether a request of this type must route through the WorkOrder vendor pipeline rather than resolve as a simple in-house fix.</summary>
     public bool RequiresVendor { get; set; }
+    /// <summary>True = maintenance-style: assign one employee to fix one specific asset directly,
+    /// no survey, straight to a cost/parts/completion-date fix report (today's Maintenance Order
+    /// behavior). False = inspection-style: survey one or more assets, record a per-asset
+    /// Pending/OK/Defective outcome, Defective spawns a Work Order (today's Inspection Order
+    /// behavior). Drives which field-set - and which of IInspectionOrderService/
+    /// IMaintenanceOrderService - the unified Orders/Create screen uses.</summary>
+    public bool IsDirectFix { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
 }

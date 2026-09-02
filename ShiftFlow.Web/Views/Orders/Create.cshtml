@@ -1,0 +1,155 @@
+@model ShiftFlow.Web.ViewModels.OrderCreateVm
+@using ShiftFlow.Domain.Entities
+@using ShiftFlow.Web.ViewModels
+@{
+    ViewData["Title"] = Loc.T("New Order");
+    var teams = (List<Team>)ViewBag.Teams;
+    var categories = (List<AssetCategory>)ViewBag.Categories;
+    var locationCategories = (List<LocationCategory>)ViewBag.LocationCategories;
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
+    var orderTypeMetaJson = (string)ViewBag.OrderTypeMetaJson;
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Order"),Subtitle=Loc.T("Create an inspection survey or a direct-fix maintenance order")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger py-2 small">
+                    @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>@e.ErrorMessage</div>
+                    }
+                </div>
+            }
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label d-block">@Loc.T("Order Type")</label>
+                    <div class="btn-group btn-group-sm mb-2" role="group">
+                        @foreach (var t in orderTypes)
+                        {
+                            <input type="radio" class="btn-check" name="OrderTypeId" id="orderType@(t.Id)" value="@t.Id"
+                                   data-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-requires-vendor="@(t.RequiresVendor ? "true" : "false")"
+                                   checked="@(Model.OrderTypeId == t.Id || (Model.OrderTypeId == 0 && t == orderTypes.First()))" />
+                            <label class="btn btn-outline-secondary" for="orderType@(t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</label>
+                        }
+                    </div>
+                    @if (orderTypes.Count == 0)
+                    {
+                        <div class="form-text text-danger">@Loc.T("No order types available for your permissions — ask an admin to check the Order Types catalog.")</div>
+                    }
+                    <div class="form-text" id="vendorHint" style="display:none">@Loc.T("This order type requires a vendor — it will become a Work Order instead.")</div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">@Loc.T("Due Date")</label>
+                    <input asp-for="DueDate" type="date" class="form-control" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">@Loc.T("Details")</label>
+                    <textarea asp-for="Description" class="form-control" rows="2" placeholder="@Loc.T("Optional description")"></textarea>
+                </div>
+
+                <div class="col-12" id="inspectionFields">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label d-block">@Loc.T("Assign To")</label>
+                            <div class="btn-group btn-group-sm mb-2" role="group">
+                                <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
+                                <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
+                                <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked="@(Model.AssigneeType != "User")" />
+                                <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 @(Model.AssigneeType == "User" ? "" : "d-none")" id="assigneeUserRow">
+                            <label class="form-label">@Loc.T("Employee")</label>
+                            <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=ViewBag.SelectedEmployeeLabel as string,Placeholder=Loc.T("Search by name or email…")})" />
+                        </div>
+                        <div class="col-md-6 @(Model.AssigneeType == "User" ? "d-none" : "")" id="assigneeTeamRow">
+                            <label class="form-label">@Loc.T("Team")</label>
+                            <select asp-for="AssignedToTeamId" class="form-select">
+                                <option value="">@Loc.T("Select a team")</option>
+                                @foreach (var t in teams)
+                                {
+                                    <option value="@t.Id">@t.Name (@t.Members.Count)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12"><hr /></div>
+                        <div class="col-12">
+                            <label class="form-label">@Loc.T("Assets")</label>
+                            <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 d-none" id="maintenanceFields">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">@Loc.T("Asset")</label>
+                            <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
+                                Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
+                                SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">@Loc.T("Assigned Employee")</label>
+                            <partial name="_EmployeePicker" model='new EmployeePickerModel {
+                                Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
+                                SelectedLabel = ViewBag.SelectedEmployeeLabel as string,
+                                Placeholder = Loc.T("Search by name or email…") }' />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary" @(orderTypes.Count == 0 ? "disabled" : "")><i class="bi bi-check-lg me-1"></i>@Loc.T("Create Order")</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const meta = @Html.Raw(orderTypeMetaJson); // { [orderTypeId]: { isDirectFix, requiresVendor } }
+    const inspectionFields = document.getElementById('inspectionFields');
+    const maintenanceFields = document.getElementById('maintenanceFields');
+    const vendorHint = document.getElementById('vendorHint');
+    // _EmployeePicker's hidden input is data-attribute-scoped, not id-based, so two instances on
+    // this page don't collide in the DOM/JS — but both would post under the same "AssignedToUserId"
+    // name if both were enabled. A disabled input is excluded from form submission entirely, so
+    // toggling `disabled` alongside visibility guarantees exactly one value ever posts.
+    const inspectionEmployeeHidden = inspectionFields.querySelector('[data-ep-value]');
+    const maintenanceEmployeeHidden = maintenanceFields.querySelector('[data-ep-value]');
+
+    function applyType(radio) {
+        const meta2 = meta[radio.value] || {};
+        const isDirectFix = radio.dataset.directFix === 'true';
+        inspectionFields.classList.toggle('d-none', isDirectFix);
+        maintenanceFields.classList.toggle('d-none', !isDirectFix);
+        if (inspectionEmployeeHidden) inspectionEmployeeHidden.disabled = isDirectFix;
+        if (maintenanceEmployeeHidden) maintenanceEmployeeHidden.disabled = !isDirectFix;
+        vendorHint.style.display = radio.dataset.requiresVendor === 'true' ? '' : 'none';
+    }
+
+    document.querySelectorAll('input[name="OrderTypeId"]').forEach(r => r.addEventListener('change', () => applyType(r)));
+    const initiallyChecked = document.querySelector('input[name="OrderTypeId"]:checked');
+    if (initiallyChecked) applyType(initiallyChecked);
+
+    const userRow = document.getElementById('assigneeUserRow');
+    const teamRow = document.getElementById('assigneeTeamRow');
+    document.querySelectorAll('input[name="AssigneeType"]').forEach(r => {
+        r.addEventListener('change', () => {
+            if (!r.checked) return;
+            const isTeam = r.value === 'Team';
+            userRow.classList.toggle('d-none', isTeam);
+            teamRow.classList.toggle('d-none', !isTeam);
+        });
+    });
+})();
+</script>
+}

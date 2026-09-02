@@ -356,6 +356,7 @@ public class OrderTypeViewModel
     [Required, MaxLength(10)] public string Prefix { get; set; } = "INS";
     public bool TracksDefectOutcome { get; set; }
     public bool RequiresVendor { get; set; }
+    public bool IsDirectFix { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
 }

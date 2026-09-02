@@ -13,6 +13,8 @@
     var displayName = (await UserManager.GetUserAsync(User))?.FullName ?? User.Identity?.Name;
     var canUseAi = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AiAssistantUse)).Succeeded;
     var canManageInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
+    var canViewInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
+    var canManageMaintenanceOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
     var canViewTeams = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamView)).Succeeded;
     var canViewAssets = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetView)).Succeeded;
     var canViewVendors = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
@@ -87,11 +89,14 @@
                 <li><a class="nav-link" asp-controller="ZoneOverview" asp-action="Index"><i class="bi bi-geo me-2"></i>@Loc.T("Zone Overview")</a></li>
             }
 
-            @if (canManageInspectionOrders)
+            @if (canViewInspectionOrders || canViewMaintenanceOrders)
             {
-                <li class="nav-section-label mt-3">@Loc.T("Inspection Orders")</li>
-                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
-                <li><a class="nav-link" asp-controller="InspectionOrders" asp-action="Create"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Order")</a></li>
+                <li class="nav-section-label mt-3">@Loc.T("Orders")</li>
+                <li><a class="nav-link" asp-controller="Orders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
+                @if (canManageInspectionOrders || canManageMaintenanceOrders)
+                {
+                    <li><a class="nav-link" asp-controller="Orders" asp-action="Create"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Order")</a></li>
+                }
             }
 
             @if (canViewTeams)
@@ -100,7 +105,7 @@
                 <li><a class="nav-link" asp-controller="Teams" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Teams")</a></li>
             }
 
-            @if (canViewAssets || canViewWorkOrders || canViewMaintenanceOrders || canViewVendors || canViewContracts || canViewSpareParts)
+            @if (canViewAssets || canViewWorkOrders || canViewVendors || canViewContracts || canViewSpareParts)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Asset Management")</li>
                 if (canViewAssets)
@@ -110,10 +115,6 @@
                 if (canViewWorkOrders)
                 {
                     <li><a class="nav-link" asp-controller="WorkOrders" asp-action="Index"><i class="bi bi-tools me-2"></i>@Loc.T("Work Orders")</a></li>
-                }
-                if (canViewMaintenanceOrders)
-                {
-                    <li><a class="nav-link" asp-controller="MaintenanceOrders" asp-action="Index"><i class="bi bi-wrench-adjustable me-2"></i>@Loc.T("Maintenance Orders")</a></li>
                 }
                 if (canViewVendors)
                 {

@@ -36,6 +36,32 @@ public class InspectionOrderCreateVm : IValidatableObject
     }
 }
 
+/// <summary>Union of InspectionOrderCreateVm's and MaintenanceOrderCreateVm's fields, bound by the
+/// unified Views/Orders/Create.cshtml form. Only the subset relevant to the selected OrderTypeId's
+/// IsDirectFix flag is actually used at submit time — OrdersController.Create (POST) projects this
+/// into whichever of the two existing VMs matches and re-validates that one; this VM itself carries
+/// no IValidatableObject logic of its own. Property names are kept identical to both source VMs so
+/// the re-validated ModelState keys line up with this view's asp-validation-for attributes.</summary>
+public class OrderCreateVm
+{
+    [Required] public int OrderTypeId { get; set; }
+    public string? Description { get; set; }
+    public DateTime? DueDate { get; set; }
+
+    // Inspection-style fields
+    public string AssigneeType { get; set; } = "Team";
+    public int? AssignedToTeamId { get; set; }
+    public List<int>? AssetIds { get; set; }
+
+    // Maintenance-style fields
+    public int AssetId { get; set; }
+
+    // Shared - the SAME hidden input name is used by both _EmployeePicker instances on the Create
+    // page; only the active one is enabled at submit time, so exactly one value ever posts here
+    // regardless of which field-set was showing.
+    public string? AssignedToUserId { get; set; }
+}
+
 /// <summary>Row shape for the Profile / My Metrics "recent orders" list — unrelated to the
 /// unified My Orders page (MyWorkOrderRow below); this one is Inspection-Orders-only, scoped to
 /// whichever employee's profile is being viewed.</summary>
