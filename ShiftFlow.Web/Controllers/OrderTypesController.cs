@@ -19,7 +19,7 @@ public class OrderTypesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var types = await _db.OrderTypes.OrderBy(t => t.SortOrder).ToListAsync();
+        var types = await _db.OrderTypes.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
         return View(types);
     }
 

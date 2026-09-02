@@ -49,7 +49,7 @@ public class OrdersController : Controller
             rows.AddRange(orders.Select(o => new MyWorkOrderRow
             {
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
-                AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} assets",
+                AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? "asset" : "assets"),
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
                 AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
             }));
@@ -205,7 +205,11 @@ public class OrdersController : Controller
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.Teams = await _teams.GetAllAsync();
 
-        var allTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
+        // ThenBy(Id) breaks ties deterministically - SortOrder alone isn't unique (e.g. the seeded
+        // Inspection and Standard rows both default to 0), and without a tiebreaker the picker's
+        // order could silently shuffle whenever a new same-SortOrder type is added or the query
+        // just re-runs, which is exactly what a fresh-eyes test caught.
+        var allTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
         var offered = allTypes.Where(t => (t.IsDirectFix && canManageMaintenance) || (!t.IsDirectFix && canManageInspection)).ToList();
         ViewBag.OrderTypes = offered;
         ViewBag.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
