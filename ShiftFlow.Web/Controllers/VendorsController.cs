@@ -92,6 +92,11 @@ public class VendorsController : Controller
             TempData["Error"] = "Name and status are required, and email must be valid.";
             return RedirectToAction(nameof(Index));
         }
+        if (await _db.Vendors.AnyAsync(v => v.Name == vm.Name))
+        {
+            TempData["Error"] = $"A vendor named '{vm.Name}' already exists.";
+            return RedirectToAction(nameof(Index));
+        }
         var userId = _userManager.GetUserId(User)!;
         await _vendorService.CreateAsync(new Vendor
         {
@@ -108,6 +113,11 @@ public class VendorsController : Controller
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Name and status are required, and email must be valid.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (await _db.Vendors.AnyAsync(v => v.Id != vm.Id && v.Name == vm.Name))
+        {
+            TempData["Error"] = $"A vendor named '{vm.Name}' already exists.";
             return RedirectToAction(nameof(Index));
         }
         var userId = _userManager.GetUserId(User)!;

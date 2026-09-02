@@ -81,12 +81,13 @@ public class ContractViewModel : IValidatableObject
 
         foreach (var r in ValidationHelper.CheckSelected(VendorId, nameof(VendorId), "Vendor", T)) yield return r;
 
+        if (EndDate != null && EndDate <= StartDate)
+            yield return new ValidationResult(T("End Date must be after Start Date."), new[] { nameof(EndDate) });
+
         if (ContractType == "Preventive Maintenance")
         {
             if (EndDate == null)
                 yield return new ValidationResult(T("End Date is required for Preventive Maintenance contracts."), new[] { nameof(EndDate) });
-            else if (EndDate <= StartDate)
-                yield return new ValidationResult(T("End Date must be after Start Date."), new[] { nameof(EndDate) });
 
             if (string.IsNullOrWhiteSpace(PmCadence) || !Contract.PmCadences.Contains(PmCadence))
                 yield return new ValidationResult(T("A cadence must be selected for Preventive Maintenance contracts."), new[] { nameof(PmCadence) });
