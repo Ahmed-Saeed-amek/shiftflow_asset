@@ -163,7 +163,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
 
     public async Task<object> CancelInspectionOrderAsync(int orderId, string userId, CancellationToken ct)
     {
-        await _orders.CancelAsync(orderId, userId);
+        await _orders.CancelAsync(orderId, null, userId);
         return new { success = true };
     }
 

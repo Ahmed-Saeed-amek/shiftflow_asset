@@ -93,7 +93,7 @@ public class InspectionOrderService : IInspectionOrderService
             .Where(o => o.AssignedToUserId == userId || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
 
         if (!includeDone)
-            query = query.Where(o => o.Status != "Done");
+            query = query.Where(o => o.Status != "Done" && o.Status != "Cancelled");
         if (from.HasValue) query = query.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) query = query.Where(o => o.CreatedAt <= to.Value);
 
@@ -123,7 +123,7 @@ public class InspectionOrderService : IInspectionOrderService
         if (overdue)
         {
             var today = DateTime.UtcNow.Date;
-            query = query.Where(o => o.Status != "Done" && o.DueDate != null && o.DueDate < today);
+            query = query.Where(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < today);
         }
 
         return await query.OrderByDescending(o => o.CreatedAt).Take(500).ToListAsync();
@@ -196,16 +196,18 @@ public class InspectionOrderService : IInspectionOrderService
         await _audit.LogAsync("UpdateMaintenanceActions", "InspectionRunAsset", itemId.ToString(), updatedByUserId);
     }
 
-    public async Task CancelAsync(int orderId, string userId)
+    public async Task CancelAsync(int orderId, string? reason, string userId)
     {
         var order = await _db.InspectionOrders.FindAsync(orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
-        if (order.Status == "Done")
-            throw new InvalidOperationException("A completed inspection order cannot be cancelled.");
+        if (order.Status is "Done" or "Cancelled")
+            throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
 
-        _db.InspectionOrders.Remove(order);
+        var oldStatus = order.Status;
+        order.Status = "Cancelled";
+        order.ClosedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: order.OrderNumber);
+        await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: oldStatus, newValue: "Cancelled", details: reason);
     }
 
     public async Task<byte[]> ExportToExcelAsync()

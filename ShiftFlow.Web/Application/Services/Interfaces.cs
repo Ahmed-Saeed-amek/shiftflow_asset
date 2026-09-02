@@ -46,7 +46,7 @@ public interface IInspectionOrderService
     /// after its outcome is already recorded, since it never touches Outcome/WorkOrderId or the
     /// order's completion status.</summary>
     Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
-    Task CancelAsync(int orderId, string userId);
+    Task CancelAsync(int orderId, string? reason, string userId);
     Task<byte[]> ExportToExcelAsync();
 }
 

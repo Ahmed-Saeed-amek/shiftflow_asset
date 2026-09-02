@@ -9,6 +9,8 @@
         ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
     var tracksDefectOutcome = Model.OrderType!.TracksDefectOutcome;
     var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
+    var isManager = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
+    var isOpen = Model.Status is "Open" or "InProgress";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
 
@@ -137,6 +139,36 @@
         </table>
     </div>
 </div>
+
+@if (Model.Status == "Cancelled")
+{
+    <div class="alert alert-secondary d-flex align-items-center gap-2 mb-3 mt-3">
+        <i class="bi bi-x-circle fs-5"></i>
+        <span class="small">@Loc.T("This inspection order was cancelled.")</span>
+    </div>
+}
+
+@if (isOpen && isManager)
+{
+    <div class="text-end mb-3">
+        <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#cancelCollapse">
+            <i class="bi bi-x-octagon me-1"></i>@Loc.T("Cancel Inspection Order")
+        </button>
+        <div class="collapse mt-2" id="cancelCollapse">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-start">
+                    <form method="post" asp-action="Cancel" asp-route-id="@Model.Id"
+                          onsubmit="return confirm('@Loc.T("Cancel this inspection order?")')"
+                          class="d-flex gap-2">
+                        @Html.AntiForgeryToken()
+                        <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Cancel Inspection Order")</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @if (canViewOrderList)
 {

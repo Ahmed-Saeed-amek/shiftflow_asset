@@ -18,9 +18,9 @@ public class InspectionOrder
     public DateTime? DueDate { get; set; }
     public DateTime? ClosedAt { get; set; }
 
-    /// <summary>Open (nothing reported) -> InProgress (first item reported) -> Done (every item non-Pending)</summary>
+    /// <summary>Open (nothing reported) -> InProgress (first item reported) -> Done (every item non-Pending). Cancelled is a terminal state set by CancelAsync instead of the normal progression.</summary>
     public string Status { get; set; } = "Open";
-    public static readonly string[] Statuses = ["Open", "InProgress", "Done"];
+    public static readonly string[] Statuses = ["Open", "InProgress", "Done", "Cancelled"];
 
     /// <summary>The admin-managed order type this order was created as — decides whether items require Action Type/Cause on Defective (OrderType.TracksDefectOutcome) and whether a defect routes to a vendor-required WorkOrder (OrderType.RequiresVendor).</summary>
     public int OrderTypeId { get; set; } public virtual OrderType? OrderType { get; set; }

@@ -195,7 +195,7 @@ public class UsersController : Controller
 
         var inspectionQuery = _db.InspectionOrders.AsNoTracking()
             .Where(o => o.AssignedToUserId == userId || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
-        if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done");
+        if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done" && o.Status != "Cancelled");
         if (from.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt <= to.Value);
         var inspectionRows = await inspectionQuery

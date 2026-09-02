@@ -24,9 +24,9 @@ public class DashboardService : IDashboardService
         var today = DateTime.UtcNow.Date;
         // Sequential — a scoped DbContext cannot run these counts concurrently.
         var totalEngineers = await _db.Users.AsNoTracking().CountAsync(u => u.IsActive);
-        var openInspectionOrders = await _db.InspectionOrders.AsNoTracking().CountAsync(o => o.Status != "Done");
+        var openInspectionOrders = await _db.InspectionOrders.AsNoTracking().CountAsync(o => o.Status != "Done" && o.Status != "Cancelled");
         var inspectionOrdersOverdue = await _db.InspectionOrders.AsNoTracking()
-            .CountAsync(o => o.Status != "Done" && o.DueDate != null && o.DueDate < today);
+            .CountAsync(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < today);
         var activeTeams = await _db.Teams.AsNoTracking().CountAsync(t => t.IsActive);
         var totalAssets = await _db.Assets.AsNoTracking().CountAsync();
         var defectiveAssets = await _db.Assets.AsNoTracking().CountAsync(a => a.Status == "Defective");
