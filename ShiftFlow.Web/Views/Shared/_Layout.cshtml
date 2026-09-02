@@ -91,7 +91,7 @@
 
             @if (canViewInspectionOrders || canViewMaintenanceOrders)
             {
-                <li class="nav-section-label mt-3">@Loc.T("Orders")</li>
+                <li class="nav-section-label mt-3">@Loc.T("Inspection & Maintenance")</li>
                 <li><a class="nav-link" asp-controller="Orders" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("All Orders")</a></li>
                 @if (canManageInspectionOrders || canManageMaintenanceOrders)
                 {
