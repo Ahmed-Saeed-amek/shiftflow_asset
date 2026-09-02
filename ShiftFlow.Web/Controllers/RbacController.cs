@@ -16,18 +16,23 @@ public class RbacController : Controller
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _db;
+    private readonly IAuditService _audit;
 
     public RbacController(
         IPermissionService permissions,
         RoleManager<ApplicationRole> roleManager,
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext db)
+        ApplicationDbContext db,
+        IAuditService audit)
     {
         _permissions = permissions;
         _roleManager = roleManager;
         _userManager = userManager;
         _db = db;
+        _audit = audit;
     }
+
+    private string CurrentUserId => _userManager.GetUserId(User)!;
 
     // -------------------------------------------------------------------------
     // Role CRUD
@@ -50,9 +55,13 @@ public class RbacController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var result = await _roleManager.CreateAsync(new ApplicationRole(roleName) { NameAr = roleNameAr });
+        var role = new ApplicationRole(roleName) { NameAr = roleNameAr };
+        var result = await _roleManager.CreateAsync(role);
         if (result.Succeeded)
+        {
+            await _audit.LogAsync("Create", "Role", role.Id, CurrentUserId, newValue: roleName);
             TempData["Success"] = $"Role '{roleName}' created.";
+        }
         else
             TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
 
@@ -86,7 +95,10 @@ public class RbacController : Controller
 
         var result = await _roleManager.DeleteAsync(role);
         if (result.Succeeded)
+        {
+            await _audit.LogAsync("Delete", "Role", roleId, CurrentUserId, oldValue: role.Name);
             TempData["Success"] = $"Role '{role.Name}' deleted.";
+        }
         else
             TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
 
@@ -126,7 +138,11 @@ public class RbacController : Controller
                 if (!await _userManager.IsInRoleAsync(user, role))
                 {
                     var r = await _userManager.AddToRoleAsync(user, role);
-                    if (r.Succeeded) changed++;
+                    if (r.Succeeded)
+                    {
+                        changed++;
+                        await _audit.LogAsync("AddRole", "User", userId, CurrentUserId, newValue: role);
+                    }
                     else errors.AddRange(r.Errors.Select(e => e.Description));
                 }
             }
@@ -136,7 +152,11 @@ public class RbacController : Controller
                 if (await _userManager.IsInRoleAsync(user, role))
                 {
                     var r = await _userManager.RemoveFromRoleAsync(user, role);
-                    if (r.Succeeded) changed++;
+                    if (r.Succeeded)
+                    {
+                        changed++;
+                        await _audit.LogAsync("RemoveRole", "User", userId, CurrentUserId, oldValue: role);
+                    }
                     else errors.AddRange(r.Errors.Select(e => e.Description));
                 }
             }
@@ -210,12 +230,19 @@ public class RbacController : Controller
         granted ??= [];
 
         // Add newly checked
-        foreach (var perm in granted.Where(p => !currentlyGranted.Contains(p)))
+        var added = granted.Where(p => !currentlyGranted.Contains(p)).ToList();
+        foreach (var perm in added)
             await _permissions.AssignRolePermissionAsync(roleId, perm);
 
         // Remove unchecked
-        foreach (var perm in currentlyGranted.Where(p => !granted.Contains(p)))
+        var removed = currentlyGranted.Where(p => !granted.Contains(p)).ToList();
+        foreach (var perm in removed)
             await _permissions.RemoveRolePermissionAsync(roleId, perm);
+
+        if (added.Count > 0 || removed.Count > 0)
+            await _audit.LogAsync("SavePermissions", "Role", roleId, CurrentUserId,
+                oldValue: removed.Count > 0 ? $"-{string.Join(",", removed)}" : null,
+                newValue: added.Count > 0 ? $"+{string.Join(",", added)}" : null);
 
         TempData["Success"] = $"Permissions saved for role '{role.Name}'.";
         return RedirectToAction(nameof(RolePermissions), new { roleId });
@@ -271,6 +298,7 @@ public class RbacController : Controller
 
         var allPerms = PermissionCatalog.All;
         var existingOverrides = await _permissions.GetUserPermissionOverridesAsync(userId);
+        var changes = new List<string>();
 
         foreach (var perm in allPerms)
         {
@@ -279,12 +307,24 @@ public class RbacController : Controller
             var existing = existingOverrides.FirstOrDefault(o => o.PermissionName == perm);
 
             if (wantDeny)
+            {
                 await _permissions.SetUserPermissionOverrideAsync(userId, perm, isGranted: false);
+                changes.Add($"{perm}=Deny");
+            }
             else if (wantAllow)
+            {
                 await _permissions.SetUserPermissionOverrideAsync(userId, perm, isGranted: true);
+                changes.Add($"{perm}=Allow");
+            }
             else if (existing is not null)
+            {
                 await _permissions.RemoveUserPermissionOverrideAsync(userId, perm);
+                changes.Add($"{perm}=Removed");
+            }
         }
+
+        if (changes.Count > 0)
+            await _audit.LogAsync("SavePermissionOverrides", "User", userId, CurrentUserId, newValue: string.Join(",", changes));
 
         TempData["Success"] = $"Permission overrides saved for '{user.FullName}'.";
         return RedirectToAction(nameof(UserPermissions), new { userId });

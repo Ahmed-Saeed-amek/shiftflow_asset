@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
@@ -25,6 +26,7 @@ public class UsersController : Controller
     private readonly IEntraDirectoryService _directory;
     private readonly IAuthorizationService _authZ;
     private readonly ILanguageService _loc;
+    private readonly IAuditService _audit;
 
     public UsersController(
         UserManager<ApplicationUser> um,
@@ -34,8 +36,9 @@ public class UsersController : Controller
         IWhatsAppService whatsApp,
         IEntraDirectoryService directory,
         IAuthorizationService authZ,
-        ILanguageService loc)
-    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; _loc = loc; }
+        ILanguageService loc,
+        IAuditService audit)
+    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; _loc = loc; _audit = audit; }
 
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> Index(string? role, string? search)
@@ -452,6 +455,7 @@ public class UsersController : Controller
             ? string.Format(_loc.T("Credentials emailed to {0}."), vm.Email)
             : string.Format(_loc.T("Credentials emailed to {0} and sent via WhatsApp to {1}."), vm.Email, vm.Phone);
 
+        await _audit.LogAsync("Create", "User", user.Id, _um.GetUserId(User)!, newValue: $"{vm.FullName} ({vm.Role})");
         TempData["Success"] = string.Format(_loc.T("User {0} created."), vm.FullName) + " " + notifyNote;
         return RedirectToAction(nameof(Index));
     }
@@ -521,7 +525,10 @@ public class UsersController : Controller
         {
             var result = await _um.DeleteAsync(user);
             if (result.Succeeded)
+            {
+                await _audit.LogAsync("Delete", "User", id, currentUserId!, oldValue: user.FullName);
                 TempData["Success"] = $"User '{user.FullName}' deleted.";
+            }
             else
                 TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
         }
@@ -556,8 +563,11 @@ public class UsersController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        var wasActive = user.IsActive;
         user.IsActive = !user.IsActive;
         await _um.UpdateAsync(user);
+        await _audit.LogAsync(user.IsActive ? "Activate" : "Deactivate", "User", id, currentUserId!,
+            oldValue: wasActive ? "Active" : "Inactive", newValue: user.IsActive ? "Active" : "Inactive");
         TempData["Success"] = $"User '{user.FullName}' {(user.IsActive ? "activated" : "deactivated")}.";
 
         return RedirectToAction(nameof(Index));
