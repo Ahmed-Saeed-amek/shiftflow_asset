@@ -133,7 +133,11 @@
         maintenanceFields.classList.toggle('d-none', !isDirectFix);
         if (inspectionEmployeeHidden) inspectionEmployeeHidden.disabled = isDirectFix;
         if (maintenanceEmployeeHidden) maintenanceEmployeeHidden.disabled = !isDirectFix;
-        vendorHint.style.display = radio.dataset.requiresVendor === 'true' ? '' : 'none';
+        // Vendor-at-creation conversion only actually happens for direct-fix (maintenance-style)
+        // types — see OrdersController.Create's POST handler. For inspection-style types,
+        // RequiresVendor instead flags any Work Order later spawned from a Defective outcome, not
+        // this submission, so showing the hint here would be a false alarm.
+        vendorHint.style.display = (isDirectFix && radio.dataset.requiresVendor === 'true') ? '' : 'none';
     }
 
     document.querySelectorAll('input[name="OrderTypeId"]').forEach(r => r.addEventListener('change', () => applyType(r)));

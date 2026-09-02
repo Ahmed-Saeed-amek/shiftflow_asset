@@ -37,8 +37,15 @@
         <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status" asp-route-category="Inspection">@Loc.T("Inspection")</a>
         <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
     </div>
+    <div class="btn-group btn-group-sm" role="group">
+        <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category">@Loc.T("All Statuses")</a>
+        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="Open">@Loc.T("Open")</a>
+        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="Done">@Loc.T("Done")</a>
+    </div>
     <form method="get" class="d-flex gap-2">
         <input type="hidden" name="category" value="@category" />
+        <input type="hidden" name="status" value="@status" />
         <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:220px" />
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
     </form>
