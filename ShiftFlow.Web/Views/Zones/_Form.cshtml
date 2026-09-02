@@ -38,11 +38,13 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">@Loc.T("Latitude")</label>
-                            <input asp-for="Latitude" id="latInput" type="number" step="any" class="form-control" />
+                            <input asp-for="Latitude" id="latInput" type="number" step="any" min="-90" max="90" class="form-control" />
+                            <span asp-validation-for="Latitude" class="text-danger small"></span>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small">@Loc.T("Longitude")</label>
-                            <input asp-for="Longitude" id="lngInput" type="number" step="any" class="form-control" />
+                            <input asp-for="Longitude" id="lngInput" type="number" step="any" min="-180" max="180" class="form-control" />
+                            <span asp-validation-for="Longitude" class="text-danger small"></span>
                         </div>
                         <div class="col-12">
                             <div class="form-text">@Loc.T("Click the map to set exact coordinates (optional)")</div>

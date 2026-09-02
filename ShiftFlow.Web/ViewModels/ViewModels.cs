@@ -51,8 +51,8 @@ public class ZoneViewModel : IValidatableObject
     public string? NameAr { get; set; }
     public int LocationCategoryId { get; set; }
     public string? Address { get; set; }
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
+    [Range(-90, 90)] public double? Latitude { get; set; }
+    [Range(-180, 180)] public double? Longitude { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

@@ -48,6 +48,12 @@ public class ZonesController : Controller
     public async Task<IActionResult> Create(ZoneViewModel vm)
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
+        if (await _db.Zones.AnyAsync(z => z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
+        {
+            ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");
+            await PopulateLookupsAsync();
+            return View(vm);
+        }
         _db.Zones.Add(new Zone
         {
             Name = vm.Name, NameAr = vm.NameAr, LocationCategoryId = vm.LocationCategoryId, Address = vm.Address,
@@ -79,6 +85,12 @@ public class ZonesController : Controller
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         var zone = await _db.Zones.FindAsync(vm.Id);
         if (zone == null) return NotFound();
+        if (await _db.Zones.AnyAsync(z => z.Id != vm.Id && z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
+        {
+            ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");
+            await PopulateLookupsAsync();
+            return View(vm);
+        }
         zone.Name = vm.Name; zone.NameAr = vm.NameAr; zone.LocationCategoryId = vm.LocationCategoryId; zone.Address = vm.Address;
         zone.Latitude = vm.Latitude; zone.Longitude = vm.Longitude;
         await _db.SaveChangesAsync();
