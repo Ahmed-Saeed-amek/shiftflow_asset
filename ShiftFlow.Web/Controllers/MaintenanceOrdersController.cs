@@ -49,6 +49,11 @@ public class MaintenanceOrdersController : Controller
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderReport)]
     public async Task<IActionResult> Complete(int id, MaintenanceOrderCompleteVm vm)
     {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return RedirectToAction(nameof(Details), new { id });
+        }
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();

@@ -1,7 +1,13 @@
+@using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Web.Authorization
+@inject IAuthorizationService AuthZ
 @model MaintenanceOrder
 @{
     ViewData["Title"] = Model.OrderNumber;
     var isManager = (bool)ViewBag.IsManager;
+    // MaintenanceOrdersController.Index was removed when Create/Index moved to the unified
+    // OrdersController — this "Back" link used to 404 by pointing at the now-gone local Index.
+    var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderView)).Succeeded;
     var isAssignee = (bool)ViewBag.IsAssignee;
     var isOpen = Model.Status == "Open";
     var canReportFix = isOpen && isAssignee;
@@ -28,9 +34,18 @@
             <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedDate.ToString("yyyy-MM-dd")</span>
         </div>
     </div>
-    <a asp-action="Index" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
-        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
-    </a>
+    @if (canViewOrderList)
+    {
+        <a asp-controller="Orders" asp-action="Index" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
+        </a>
+    }
+    else
+    {
+        <a asp-controller="Users" asp-action="MyOrders" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
+            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
+        </a>
+    }
 </div>
 
 @if (TempData["Error"] != null)

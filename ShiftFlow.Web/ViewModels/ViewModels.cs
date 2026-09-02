@@ -325,7 +325,9 @@ public class MaintenanceOrderCreateVm : IValidatableObject
 
 public class MaintenanceOrderCompleteVm
 {
+    [Required(ErrorMessage = "Describe the fix before closing this order.")]
     public string? FixDescription { get; set; }
+    [Range(0, 9999999999.99, ErrorMessage = "Cost can't be negative.")]
     public decimal? Cost { get; set; }
     public DateTime? CompletedDate { get; set; }
     public List<int>? SparePartIds { get; set; }
