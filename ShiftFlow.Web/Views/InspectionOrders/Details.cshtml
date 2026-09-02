@@ -8,7 +8,6 @@
     var assignedTo = Model.AssignedToUser?.FullName
         ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
     var tracksDefectOutcome = Model.OrderType!.TracksDefectOutcome;
-    var maintenanceActionTypes = (List<MaintenanceActionType>)ViewBag.MaintenanceActionTypes;
     var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
@@ -98,7 +97,9 @@
                             }
                         </td>
                     </tr>
-                    <tr class="d-none inline-form-row" data-form-for="@item.Id" data-tracks-defect="@tracksDefectOutcome.ToString().ToLowerInvariant()">
+                    <tr class="d-none inline-form-row" data-form-for="@item.Id" data-tracks-defect="@tracksDefectOutcome.ToString().ToLowerInvariant()"
+                        data-category-id="@item.Asset.CategoryId"
+                        data-selected-action-ids="@System.Text.Json.JsonSerializer.Serialize(item.MaintenanceActions.Select(x => x.MaintenanceActionTypeId))">
                         <td colspan="5">
                             <div class="row g-2 align-items-end p-2 bg-light rounded">
                                 @if (tracksDefectOutcome)
@@ -119,16 +120,7 @@
                                                 data-bs-toggle="dropdown" data-bs-auto-close="outside">
                                             <span class="maintenance-action-summary">@Loc.T("Select actions")</span>
                                         </button>
-                                        <div class="dropdown-menu p-2" style="max-height:240px;overflow-y:auto;min-width:220px">
-                                            @foreach (var m in maintenanceActionTypes)
-                                            {
-                                                <div class="form-check">
-                                                    <input class="form-check-input maintenance-action-check" type="checkbox" value="@m.Id" id="ma-@item.Id-@m.Id"
-                                                           checked="@(item.MaintenanceActions.Any(x => x.MaintenanceActionTypeId == m.Id))">
-                                                    <label class="form-check-label small" for="ma-@item.Id-@m.Id">@Loc.LocalizedName(m.Name, m.NameAr)</label>
-                                                </div>
-                                            }
-                                        </div>
+                                        <div class="dropdown-menu p-2 maintenance-action-menu" style="max-height:240px;overflow-y:auto;min-width:220px"></div>
                                     </div>
                                 </div>
                                 <div class="col-md-2">
@@ -183,6 +175,35 @@ else
         sel.disabled = items.length === 0;
     }
 
+    // Maintenance action types are optionally scoped per asset category (see
+    // MaintenanceActionTypesController.ByCategory) — fetched once per row, same cascading-dropdown
+    // pattern as the Action Type/Cause selects below, so each asset only offers actions relevant
+    // to its own category plus its parent category's and any category-agnostic ones.
+    async function loadMaintenanceActionChecklist(formRow) {
+        if (formRow.dataset.maintenanceLoaded === '1') return;
+        const menu = formRow.querySelector('.maintenance-action-menu');
+        const itemId = formRow.dataset.formFor;
+        const selectedIds = new Set(JSON.parse(formRow.dataset.selectedActionIds || '[]').map(String));
+        try {
+            const resp = await fetch(`/MaintenanceActionTypes/ByCategory?categoryId=${formRow.dataset.categoryId}`);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const types = await resp.json();
+            menu.innerHTML = '';
+            types.forEach(t => {
+                const id = `ma-${itemId}-${t.id}`;
+                const div = document.createElement('div');
+                div.className = 'form-check';
+                div.innerHTML = `<input class="form-check-input maintenance-action-check" type="checkbox" value="${t.id}" id="${id}"><label class="form-check-label small" for="${id}"></label>`;
+                div.querySelector('input').checked = selectedIds.has(String(t.id));
+                div.querySelector('label').textContent = localName(t);
+                menu.appendChild(div);
+            });
+            formRow.dataset.maintenanceLoaded = '1';
+        } catch {
+            alertBox.innerHTML = `<div class="alert alert-danger small">${jsFailed}</div>`;
+        }
+    }
+
     // Popper's default "flip" behavior opens this dropdown upward when there isn't enough
     // room below the toggle in the viewport — on a phone that means it renders directly over
     // the Action Type/Cause fields sitting above it in the same inline form, instead of just
@@ -222,17 +243,18 @@ else
     // regardless of order kind, and Save posts to UpdateMaintenanceActions instead of UpdateItem,
     // touching only the maintenance-action join rows — never the outcome, Work Order, or the
     // order's completion status.
-    function openMaintenanceOnly(itemId, stillPending) {
+    async function openMaintenanceOnly(itemId, stillPending) {
         const formRow = document.querySelector(`tr.inline-form-row[data-form-for="${itemId}"]`);
         formRow.classList.remove('d-none');
         formRow.dataset.mode = 'maintenance';
         delete formRow.dataset.outcome;
         formRow.querySelectorAll('.defect-only').forEach(el => el.classList.add('d-none'));
-        updateMaintenanceCount(formRow);
         const saveBtn = formRow.querySelector('.save-outcome-btn');
         if (saveBtn) saveBtn.textContent = jsSaveMaintenance;
         const hint = formRow.querySelector('.maintenance-only-hint');
         if (hint) hint.classList.toggle('d-none', !stillPending);
+        await loadMaintenanceActionChecklist(formRow);
+        updateMaintenanceCount(formRow);
     }
 
     document.querySelectorAll('.maintenance-only-btn').forEach(btn => {
@@ -256,6 +278,7 @@ else
             formRow.classList.remove('d-none');
             formRow.dataset.mode = 'outcome';
             formRow.dataset.outcome = outcome;
+            await loadMaintenanceActionChecklist(formRow);
             updateMaintenanceCount(formRow);
 
             const isDefect = outcome === 'Defective';

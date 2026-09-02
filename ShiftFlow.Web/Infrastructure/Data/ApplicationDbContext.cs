@@ -145,6 +145,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasKey(m => m.Id);
             e.Property(m => m.Name).HasMaxLength(150).IsRequired();
             e.HasIndex(m => m.Name).IsUnique();
+            e.HasOne(m => m.Category).WithMany()
+                .HasForeignKey(m => m.CategoryId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<InspectionItemMaintenanceAction>(e =>
         {

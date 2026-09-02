@@ -343,6 +343,8 @@ public class WorkOrderBlockReasonViewModel
 public class MaintenanceActionTypeViewModel
 {
     public int Id { get; set; }
+    /// <summary>Null = applies to every asset category.</summary>
+    public int? CategoryId { get; set; }
     [Required, MaxLength(150)] public string Name { get; set; } = string.Empty;
     public string? NameAr { get; set; }
     public bool IsActive { get; set; } = true;

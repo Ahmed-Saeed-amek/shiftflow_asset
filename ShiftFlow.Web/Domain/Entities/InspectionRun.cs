@@ -28,12 +28,15 @@ public class InspectionRunAsset
     public static readonly string[] Outcomes = ["Pending", "OK", "Defective"];
 }
 
-/// <summary>Fixed, admin-manageable catalog of maintenance actions an employee can log against an
+/// <summary>Admin-manageable catalog of maintenance actions an employee can log against an
 /// inspected asset (e.g. "Cleaned Outer Unit", "Replaced Filter") — a log entry only, never gates
-/// the OK/Defective outcome. Flat, not category-scoped (unlike AssetActionType).</summary>
+/// the OK/Defective outcome. Optionally scoped to an AssetCategory or subcategory (null = applies
+/// everywhere) — a subcategory-scoped asset also offers its parent category's types, same
+/// inheritance rule as AssetActionType.</summary>
 public class MaintenanceActionType
 {
     public int Id { get; set; }
+    public int? CategoryId { get; set; } public virtual AssetCategory? Category { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? NameAr { get; set; }
     public bool IsActive { get; set; } = true;

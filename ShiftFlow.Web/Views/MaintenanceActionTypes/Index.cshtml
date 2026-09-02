@@ -1,27 +1,38 @@
 @model List<MaintenanceActionType>
 @{
     ViewData["Title"] = Loc.T("Maintenance Action Types");
+    var categories = (List<AssetCategory>)ViewBag.Categories;
     string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#actionTypeModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</button>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),Subtitle=Loc.T("Optionally scope an action to a category or subcategory — unscoped actions apply everywhere"),ActionsHtml=actionsHtml})" />
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
-                    <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                 }
                 @foreach (var m in Model)
                 {
                     <tr>
                         <td>@Loc.LocalizedName(m.Name, m.NameAr)</td>
+                        <td>
+                            @if (m.Category != null)
+                            {
+                                <span class="small">@Loc.LocalizedName(m.Category.Name, m.Category.NameAr)</span>
+                            }
+                            else
+                            {
+                                <span class="small text-muted">@Loc.T("All Categories")</span>
+                            }
+                        </td>
                         <td><partial name="_StatusBadge" model="@(m.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeModal"
-                                    onclick='openEdit(@m.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.NameAr)), @(m.IsActive ? "true" : "false"))'>
+                                    onclick='openEdit(@m.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.NameAr)), @(m.IsActive ? "true" : "false"), @(m.CategoryId?.ToString() ?? "null"))'>
                                 @Loc.T("Edit")
                             </button>
                         </td>
@@ -53,6 +64,20 @@
                             <input name="NameAr" id="actionTypeNameAr" class="form-control" dir="rtl" />
                         </div>
                         <div class="col-12">
+                            <label class="form-label small">@Loc.T("Category")</label>
+                            <select name="CategoryId" id="actionTypeCategoryId" class="form-select">
+                                <option value="">@Loc.T("All Categories")</option>
+                                @foreach (var c in categories)
+                                {
+                                    <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+                                    @foreach (var sub in c.Subcategories.OrderBy(s => s.Name))
+                                    {
+                                        <option value="@sub.Id">↳ @Loc.LocalizedName(sub.Name, sub.NameAr)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
                             <div class="form-check">
                                 <input type="checkbox" name="IsActive" id="actionTypeIsActive" class="form-check-input" value="true" checked />
                                 <input type="hidden" name="IsActive" value="false" />
@@ -82,15 +107,17 @@
         document.getElementById('actionTypeName').value = '';
         document.getElementById('actionTypeNameAr').value = '';
         document.getElementById('actionTypeIsActive').checked = true;
+        document.getElementById('actionTypeCategoryId').value = '';
     }
 
-    function openEdit(id, name, nameAr, isActive) {
+    function openEdit(id, name, nameAr, isActive, categoryId) {
         document.getElementById('actionTypeModalTitle').textContent = jsEditActionType;
         document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Edit")');
         document.getElementById('actionTypeId').value = id;
         document.getElementById('actionTypeName').value = name || '';
         document.getElementById('actionTypeNameAr').value = nameAr || '';
         document.getElementById('actionTypeIsActive').checked = isActive;
+        document.getElementById('actionTypeCategoryId').value = categoryId ?? '';
     }
 </script>
 }

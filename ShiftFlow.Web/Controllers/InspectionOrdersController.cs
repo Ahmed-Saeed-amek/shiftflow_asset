@@ -60,7 +60,6 @@ public class InspectionOrdersController : Controller
         if (!isManager && !isAssignee && !isTeamMember)
             return Forbid();
 
-        ViewBag.MaintenanceActionTypes = await _db.MaintenanceActionTypes.Where(m => m.IsActive).OrderBy(m => m.Name).ToListAsync();
         return View(order);
     }
 
