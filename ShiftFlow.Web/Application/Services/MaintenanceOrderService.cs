@@ -34,11 +34,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         if (string.IsNullOrWhiteSpace(assignedToUserId))
             throw new InvalidOperationException("Select an employee to assign this maintenance order to.");
 
-        var year = DateTime.UtcNow.Year;
-        var seq = await _db.MaintenanceOrders.CountAsync(m => m.CreatedDate.Year == year) + 1;
         var order = new MaintenanceOrder
         {
-            OrderNumber = $"MO-{year}-{seq:D4}",
             AssetId = assetId,
             AssignedToUserId = assignedToUserId,
             Description = description,
@@ -50,9 +47,32 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         };
         _db.MaintenanceOrders.Add(order);
         await SetAssetStatusAsync(assetId, "Maintenance");
-        await _db.SaveChangesAsync();
+        await SaveWithUniqueNumberRetryAsync(order);
         await _audit.LogAsync("Create", "MaintenanceOrder", order.Id.ToString(), createdByUserId, newValue: order.OrderNumber);
         return order;
+    }
+
+    /// <summary>Same fix as WorkOrderService/InspectionOrderService's identically-named helper —
+    /// OrderNumber "MO-{year}-{seq:D4}" was a plain COUNT-then-use query with no atomic guard,
+    /// which can collide with a still-existing row's number and raise a raw unhandled
+    /// DbUpdateException. Retry with a freshly recomputed number on that specific failure.</summary>
+    private async Task SaveWithUniqueNumberRetryAsync(MaintenanceOrder order)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var year = order.CreatedDate.Year;
+            var seq = await _db.MaintenanceOrders.CountAsync(m => m.CreatedDate.Year == year) + 1;
+            order.OrderNumber = $"MO-{year}-{seq:D4}";
+            try
+            {
+                await _db.SaveChangesAsync();
+                return;
+            }
+            catch (DbUpdateException) when (attempt < 4)
+            {
+                // Duplicate OrderNumber from a stale count or a concurrent insert — recompute and retry.
+            }
+        }
     }
 
     public async Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)

@@ -41,12 +41,8 @@ public class InspectionOrderService : IInspectionOrderService
             .Select(a => a.ZoneId).Distinct().ToListAsync();
         int? singleZoneId = distinctZoneIds.Count == 1 ? distinctZoneIds[0] : null;
 
-        var year = DateTime.UtcNow.Year;
-        var seq = await _db.InspectionOrders.CountAsync(o => o.CreatedAt.Year == year) + 1;
-
         var order = new InspectionOrder
         {
-            OrderNumber = $"{orderType.Prefix}-{year}-{seq:D4}",
             Description = description,
             OrderTypeId = orderType.Id,
             AssignedToUserId = hasUser ? assignedToUserId : null,
@@ -62,9 +58,35 @@ public class InspectionOrderService : IInspectionOrderService
             },
         };
         _db.InspectionOrders.Add(order);
-        await _db.SaveChangesAsync();
+        await SaveWithUniqueNumberRetryAsync(order, orderType.Prefix);
         await _audit.LogAsync("Create", "InspectionOrder", order.Id.ToString(), createdByUserId, newValue: order.OrderNumber);
         return order;
+    }
+
+    /// <summary>OrderNumber "{Prefix}-{year}-{seq:D4}" was assigned from a plain COUNT-then-use
+    /// query with no atomic guard — a stale/leftover count (e.g. after older rows were hard-deleted
+    /// by the pre-fix Cancel behavior, or two concurrent creates) can compute a seq that collides
+    /// with a still-existing row's number, hitting the unique index and raising a raw, unhandled
+    /// DbUpdateException all the way to the client (confirmed live). Same fix as
+    /// WorkOrderService.SaveWithUniqueNumberRetryAsync: retry with a freshly recomputed number on
+    /// that specific failure instead of making the count itself atomic.</summary>
+    private async Task SaveWithUniqueNumberRetryAsync(InspectionOrder order, string prefix)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var year = order.CreatedAt.Year;
+            var seq = await _db.InspectionOrders.CountAsync(o => o.CreatedAt.Year == year) + 1;
+            order.OrderNumber = $"{prefix}-{year}-{seq:D4}";
+            try
+            {
+                await _db.SaveChangesAsync();
+                return;
+            }
+            catch (DbUpdateException) when (attempt < 4)
+            {
+                // Duplicate OrderNumber from a stale count or a concurrent insert — recompute and retry.
+            }
+        }
     }
 
     public async Task<InspectionOrder?> GetByIdAsync(int id) =>

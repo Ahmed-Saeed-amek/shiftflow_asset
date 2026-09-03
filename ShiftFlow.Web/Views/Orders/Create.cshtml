@@ -49,7 +49,12 @@
                 </div>
                 <div class="col-12">
                     <label class="form-label">@Loc.T("Details")</label>
-                    <textarea asp-for="Description" class="form-control" rows="2" placeholder="@Loc.T("Optional description")"></textarea>
+                    <select id="descriptionPreset" class="form-select mb-2">
+                        <option value="">@Loc.T("— Select —")</option>
+                        <option value="__other__">@Loc.T("Other…")</option>
+                    </select>
+                    <textarea id="descriptionOther" class="form-control d-none" rows="2" placeholder="@Loc.T("Describe…")"></textarea>
+                    <input type="hidden" asp-for="Description" id="descriptionHidden" />
                 </div>
 
                 <div class="col-12" id="inspectionFields">
@@ -126,6 +131,55 @@
     const inspectionEmployeeHidden = inspectionFields.querySelector('[data-ep-value]');
     const maintenanceEmployeeHidden = maintenanceFields.querySelector('[data-ep-value]');
 
+    // Description preset dropdown — admin-managed canned text scoped per Order Type (plus every
+    // scope-agnostic one), with an "Other…" escape hatch for anything not covered yet.
+    const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
+    const descPresetSel = document.getElementById('descriptionPreset');
+    const descOther = document.getElementById('descriptionOther');
+    const descHidden = document.getElementById('descriptionHidden');
+    const jsSelectOne = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("— Select —")));
+    const jsOther = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Other…")));
+    let descPresets = [];
+
+    async function loadDescriptionPresets(orderTypeId) {
+        const resp = await fetch(`/TextPresets/ByField?fieldKey=OrderDescription&orderTypeId=${orderTypeId}`);
+        descPresets = resp.ok ? await resp.json() : [];
+        const priorValue = descHidden.value;
+        descPresetSel.innerHTML = '';
+        const blankOpt = document.createElement('option'); blankOpt.value = ''; blankOpt.textContent = jsSelectOne;
+        descPresetSel.appendChild(blankOpt);
+        descPresets.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = String(p.id); opt.textContent = (isRTL && p.textAr) ? p.textAr : p.text;
+            descPresetSel.appendChild(opt);
+        });
+        const otherOpt = document.createElement('option'); otherOpt.value = '__other__'; otherOpt.textContent = jsOther;
+        descPresetSel.appendChild(otherOpt);
+
+        // Preserve whatever was already typed/selected (e.g. a validation-failure round trip) —
+        // match it to a preset if one has that exact text, otherwise fall back to "Other…".
+        if (priorValue) {
+            const match = descPresets.find(p => p.text === priorValue || p.textAr === priorValue);
+            if (match) { descPresetSel.value = String(match.id); descOther.classList.add('d-none'); }
+            else { descPresetSel.value = '__other__'; descOther.value = priorValue; descOther.classList.remove('d-none'); }
+        }
+    }
+
+    descPresetSel.addEventListener('change', () => {
+        if (descPresetSel.value === '__other__') {
+            descOther.classList.remove('d-none');
+            descHidden.value = descOther.value;
+        } else if (descPresetSel.value === '') {
+            descOther.classList.add('d-none');
+            descHidden.value = '';
+        } else {
+            descOther.classList.add('d-none');
+            const chosen = descPresets.find(p => String(p.id) === descPresetSel.value);
+            descHidden.value = chosen ? ((isRTL && chosen.textAr) ? chosen.textAr : chosen.text) : '';
+        }
+    });
+    descOther.addEventListener('input', () => { descHidden.value = descOther.value; });
+
     function applyType(radio) {
         const meta2 = meta[radio.value] || {};
         const isDirectFix = radio.dataset.directFix === 'true';
@@ -138,6 +192,7 @@
         // RequiresVendor instead flags any Work Order later spawned from a Defective outcome, not
         // this submission, so showing the hint here would be a false alarm.
         vendorHint.style.display = (isDirectFix && radio.dataset.requiresVendor === 'true') ? '' : 'none';
+        loadDescriptionPresets(radio.value);
     }
 
     document.querySelectorAll('input[name="OrderTypeId"]').forEach(r => r.addEventListener('change', () => applyType(r)));

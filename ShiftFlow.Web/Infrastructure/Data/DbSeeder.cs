@@ -437,6 +437,20 @@ public static class DbSeeder
                 new MaintenanceActionType { Name = "Calibration Check", NameAr = "فحص المعايرة" });
             await db.SaveChangesAsync();
         }
+
+        if (!await db.TextPresets.AnyAsync())
+        {
+            db.TextPresets.AddRange(
+                new TextPreset { FieldKey = TextPreset.Fields.OrderDescription, Text = "Routine scheduled inspection", TextAr = "فحص دوري مجدول", SortOrder = 0 },
+                new TextPreset { FieldKey = TextPreset.Fields.OrderDescription, Text = "Follow-up on reported issue", TextAr = "متابعة لمشكلة تم الإبلاغ عنها", SortOrder = 1 },
+                new TextPreset { FieldKey = TextPreset.Fields.OrderDescription, Text = "Preventive maintenance check", TextAr = "فحص صيانة وقائية", SortOrder = 2 },
+                new TextPreset { FieldKey = TextPreset.Fields.OrderDescription, Text = "Post-repair verification", TextAr = "التحقق بعد الإصلاح", SortOrder = 3 },
+                new TextPreset { FieldKey = TextPreset.Fields.ReportActionNotes, Text = "No visible external damage", TextAr = "لا يوجد ضرر خارجي ملحوظ", SortOrder = 0 },
+                new TextPreset { FieldKey = TextPreset.Fields.ReportActionNotes, Text = "Unusual noise during operation", TextAr = "صوت غير معتاد أثناء التشغيل", SortOrder = 1 },
+                new TextPreset { FieldKey = TextPreset.Fields.ReportActionNotes, Text = "Leak observed", TextAr = "تم رصد تسرب", SortOrder = 2 },
+                new TextPreset { FieldKey = TextPreset.Fields.ReportActionNotes, Text = "Requires replacement part", TextAr = "يتطلب قطعة بديلة", SortOrder = 3 });
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task SeedPermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> rm)

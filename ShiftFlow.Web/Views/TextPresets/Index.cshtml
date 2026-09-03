@@ -1,0 +1,165 @@
+@model List<TextPreset>
+@{
+    ViewData["Title"] = Loc.T("Text Presets");
+    var field = (string)ViewBag.Field;
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
+    var categories = (List<AssetCategory>)ViewBag.Categories;
+    var isOrderScoped = field == TextPreset.Fields.OrderDescription;
+    string FieldLabel(string f) => f switch
+    {
+        TextPreset.Fields.OrderDescription => Loc.T("Order Details (New Order form)"),
+        TextPreset.Fields.ReportActionNotes => Loc.T("Report Action Notes"),
+        _ => f,
+    };
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#presetModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Preset") + "</button>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Text Presets"),Subtitle=Loc.T("Canned text employees pick from instead of typing — reduces free-text fields to a dropdown"),ActionsHtml=actionsHtml})" />
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var f in TextPreset.Fields.All)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(f == field ? "active" : "")" asp-action="Index" asp-route-field="@f">@FieldLabel(f)</a>
+        </li>
+    }
+</ul>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Text")</th><th>@Loc.T("Scope")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td>@Loc.LocalizedName(p.Text, p.TextAr)</td>
+                        <td>
+                            @if (isOrderScoped)
+                            {
+                                <span class="small">@(p.OrderType != null ? Loc.LocalizedName(p.OrderType.Name, p.OrderType.NameAr) : Loc.T("All Order Types"))</span>
+                            }
+                            else
+                            {
+                                <span class="small">@(p.Category != null ? Loc.LocalizedName(p.Category.Name, p.Category.NameAr) : Loc.T("All Categories"))</span>
+                            }
+                        </td>
+                        <td><partial name="_StatusBadge" model="@(p.IsActive ? "Active" : "Inactive")" /></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#presetModal"
+                                    onclick='openEdit(@p.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.Text)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.TextAr)), @(p.IsActive ? "true" : "false"), @(p.OrderTypeId?.ToString() ?? "null"), @(p.CategoryId?.ToString() ?? "null"), @p.SortOrder)'>
+                                @Loc.T("Edit")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="presetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="presetForm" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="presetId" value="0" />
+                <input type="hidden" name="FieldKey" value="@field" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="presetModalTitle">@Loc.T("New Preset")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Text")</label>
+                            <input name="Text" id="presetText" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Text (Arabic)")</label>
+                            <input name="TextAr" id="presetTextAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-12">
+                            @if (isOrderScoped)
+                            {
+                                <label class="form-label small">@Loc.T("Order Type")</label>
+                                <select name="OrderTypeId" id="presetOrderTypeId" class="form-select">
+                                    <option value="">@Loc.T("All Order Types")</option>
+                                    @foreach (var t in orderTypes)
+                                    {
+                                        <option value="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <label class="form-label small">@Loc.T("Category")</label>
+                                <select name="CategoryId" id="presetCategoryId" class="form-select">
+                                    <option value="">@Loc.T("All Categories")</option>
+                                    @foreach (var c in categories)
+                                    {
+                                        <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+                                        @foreach (var sub in c.Subcategories.OrderBy(s => s.Name))
+                                        {
+                                            <option value="@sub.Id">↳ @Loc.LocalizedName(sub.Name, sub.NameAr)</option>
+                                        }
+                                    }
+                                </select>
+                            }
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">@Loc.T("Order")</label>
+                            <input type="number" name="SortOrder" id="presetSortOrder" class="form-control" value="0" />
+                        </div>
+                        <div class="col-6 d-flex align-items-end">
+                            <div class="form-check">
+                                <input type="checkbox" name="IsActive" id="presetIsActive" class="form-check-input" value="true" checked />
+                                <input type="hidden" name="IsActive" value="false" />
+                                <label class="form-check-label small" for="presetIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const isOrderScoped = @(isOrderScoped ? "true" : "false");
+    const jsNewPreset = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Preset")));
+    const jsEditPreset = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Preset")));
+
+    function openCreate() {
+        document.getElementById('presetModalTitle').textContent = jsNewPreset;
+        document.getElementById('presetForm').setAttribute('action', '@Url.Action("Create")');
+        document.getElementById('presetId').value = 0;
+        document.getElementById('presetText').value = '';
+        document.getElementById('presetTextAr').value = '';
+        document.getElementById('presetIsActive').checked = true;
+        document.getElementById('presetSortOrder').value = 0;
+        const scopeSel = document.getElementById(isOrderScoped ? 'presetOrderTypeId' : 'presetCategoryId');
+        if (scopeSel) scopeSel.value = '';
+    }
+
+    function openEdit(id, text, textAr, isActive, orderTypeId, categoryId, sortOrder) {
+        document.getElementById('presetModalTitle').textContent = jsEditPreset;
+        document.getElementById('presetForm').setAttribute('action', '@Url.Action("Edit")');
+        document.getElementById('presetId').value = id;
+        document.getElementById('presetText').value = text || '';
+        document.getElementById('presetTextAr').value = textAr || '';
+        document.getElementById('presetIsActive').checked = isActive;
+        document.getElementById('presetSortOrder').value = sortOrder ?? 0;
+        const scopeSel = document.getElementById(isOrderScoped ? 'presetOrderTypeId' : 'presetCategoryId');
+        if (scopeSel) scopeSel.value = (isOrderScoped ? orderTypeId : categoryId) ?? '';
+    }
+</script>
+}

@@ -356,6 +356,19 @@ public class MaintenanceActionTypeViewModel
     public bool IsActive { get; set; } = true;
 }
 
+public class TextPresetViewModel
+{
+    public int Id { get; set; }
+    [Required] public string FieldKey { get; set; } = string.Empty;
+    /// <summary>Null = applies to every value of whichever scope this FieldKey uses.</summary>
+    public int? OrderTypeId { get; set; }
+    public int? CategoryId { get; set; }
+    [Required, MaxLength(500)] public string Text { get; set; } = string.Empty;
+    public string? TextAr { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
 public class OrderTypeViewModel
 {
     public int Id { get; set; }
