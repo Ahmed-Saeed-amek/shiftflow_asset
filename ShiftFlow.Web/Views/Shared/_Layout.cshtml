@@ -208,6 +208,9 @@
                     <span class="text-white-50"><i class="bi bi-person-circle me-1"></i>@displayName</span>
                 }
             </div>
+            <a asp-controller="Account" asp-action="ChangePassword" class="d-block small text-white-50 text-decoration-none mb-1">
+                <i class="bi bi-key me-1"></i>@Loc.T("Change Password")
+            </a>
             <div class="d-flex gap-1">
                 <form asp-controller="Language" asp-action="SetLanguage" method="post" class="flex-fill">
                     <input type="hidden" name="returnUrl" value="@currentPath" />

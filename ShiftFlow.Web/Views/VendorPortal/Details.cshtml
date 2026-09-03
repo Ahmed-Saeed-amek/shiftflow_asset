@@ -181,6 +181,7 @@
                         @Html.AntiForgeryToken()
                         <label class="form-label small">@Loc.T("Block Reason")</label>
                         <select name="blockReasonId" class="form-select form-select-sm mb-2" required>
+                            <option value="" selected disabled>@Loc.T("Select a reason…")</option>
                             @if (blockReasons != null)
                             {
                                 @foreach (var r in blockReasons)

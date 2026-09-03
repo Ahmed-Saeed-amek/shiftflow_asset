@@ -32,6 +32,11 @@ public class WorkOrderBlockReasonsController : Controller
             TempData["Error"] = "Name is required.";
             return RedirectToAction(nameof(Index));
         }
+        if (await _db.WorkOrderBlockReasons.AnyAsync(r => r.Name == vm.Name))
+        {
+            TempData["Error"] = $"A block reason named '{vm.Name}' already exists.";
+            return RedirectToAction(nameof(Index));
+        }
         _db.WorkOrderBlockReasons.Add(new WorkOrderBlockReason { Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
         await _db.SaveChangesAsync();
         TempData["Success"] = "Block reason created.";
@@ -48,6 +53,11 @@ public class WorkOrderBlockReasonsController : Controller
         }
         var reason = await _db.WorkOrderBlockReasons.FindAsync(vm.Id);
         if (reason == null) return NotFound();
+        if (await _db.WorkOrderBlockReasons.AnyAsync(r => r.Id != vm.Id && r.Name == vm.Name))
+        {
+            TempData["Error"] = $"A block reason named '{vm.Name}' already exists.";
+            return RedirectToAction(nameof(Index));
+        }
         reason.Name = vm.Name; reason.NameAr = vm.NameAr; reason.IsActive = vm.IsActive;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Block reason updated.";
