@@ -27,14 +27,20 @@
             <div class="row g-3">
                 <div class="col-12">
                     <label class="form-label d-block">@Loc.T("Order Type")</label>
-                    <div class="btn-group btn-group-sm mb-2" role="group">
-                        @foreach (var t in orderTypes)
-                        {
-                            <input type="radio" class="btn-check" name="OrderTypeId" id="orderType@(t.Id)" value="@t.Id"
-                                   data-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-requires-vendor="@(t.RequiresVendor ? "true" : "false")"
-                                   checked="@(Model.OrderTypeId == t.Id || (Model.OrderTypeId == 0 && t == orderTypes.First()))" />
-                            <label class="btn btn-outline-secondary" for="orderType@(t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</label>
-                        }
+                    @* A btn-group doesn't wrap (Bootstrap joins its buttons into one row with
+                       connected borders) — with 6-8 order types that overflowed past a narrow
+                       viewport and dragged the WHOLE page into horizontal scroll. Scope the
+                       scroll to just this control instead. *@
+                    <div class="overflow-x-auto mb-2">
+                        <div class="btn-group btn-group-sm text-nowrap" role="group">
+                            @foreach (var t in orderTypes)
+                            {
+                                <input type="radio" class="btn-check" name="OrderTypeId" id="orderType@(t.Id)" value="@t.Id"
+                                       data-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-requires-vendor="@(t.RequiresVendor ? "true" : "false")"
+                                       checked="@(Model.OrderTypeId == t.Id || (Model.OrderTypeId == 0 && t == orderTypes.First()))" />
+                                <label class="btn btn-outline-secondary" for="orderType@(t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</label>
+                            }
+                        </div>
                     </div>
                     @if (orderTypes.Count == 0)
                     {
