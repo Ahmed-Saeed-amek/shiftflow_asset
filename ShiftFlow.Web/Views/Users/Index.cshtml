@@ -85,6 +85,13 @@
                                         <i class="bi bi-person-lines-fill"></i>
                                     </a>
                                 }
+                                @if (canManageUsers && !rolesByUser[u.Id].Contains("Vendor"))
+                                {
+                                    <a href="@Url.Action("Edit", new { id = u.Id })"
+                                       class="btn btn-sm btn-outline-secondary" title="@Loc.T("Edit")">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                }
                                 @if (canManagePermissions)
                                 {
                                     <a href="@Url.Action("UserPermissions","Rbac", new { userId = u.Id })"

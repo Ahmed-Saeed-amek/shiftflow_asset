@@ -1,0 +1,53 @@
+@model UserEditViewModel
+@{
+    ViewData["Title"] = Loc.T("Edit User");
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Edit User")})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Full Name")</label>
+                    <input asp-for="FullName" class="form-control" />
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Full Name (Arabic)")</label>
+                    <input asp-for="FullNameAr" class="form-control" dir="rtl" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Email")</label>
+                    <input asp-for="Email" class="form-control" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Phone")</label>
+                    <input asp-for="Phone" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Employee Number")</label>
+                    <input asp-for="EmployeeNumber" class="form-control" />
+                    <span asp-validation-for="EmployeeNumber" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Department")</label>
+                    <input asp-for="Department" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Specialization")</label>
+                    <input asp-for="Specialization" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save Changes")</button>
+                <a href="@Url.Action("Profile", new { id = Model.Id })" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>

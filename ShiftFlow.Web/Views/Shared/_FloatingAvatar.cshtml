@@ -17,10 +17,16 @@
     if (!window.matchMedia('(max-width: 575.98px)').matches) return;
     var el = document.getElementById('floatingAvatar');
     var hideTimer;
-    window.addEventListener('scroll', function () {
+    function hideThenSettle(delayMs) {
         el.classList.add('scroll-hide');
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(function () { el.classList.remove('scroll-hide'); }, 500);
-    }, { passive: true });
+        hideTimer = setTimeout(function () { el.classList.remove('scroll-hide'); }, delayMs);
+    }
+    window.addEventListener('scroll', function () { hideThenSettle(500); }, { passive: true });
+    // Whatever row/button happens to land under the bubble's fixed corner on a freshly loaded
+    // page (no scroll needed to reproduce it — e.g. a short list on /Rbac or /Users) is just as
+    // covered as it would be mid-scroll. Give the page a beat to be seen and tapped before the
+    // bubble fades in.
+    hideThenSettle(1200);
 })();
 </script>

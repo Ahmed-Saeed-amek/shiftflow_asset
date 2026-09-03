@@ -430,11 +430,27 @@ public class ZoneComboboxModel
 
 public class UserCreateViewModel
 {
-    [Required, EmailAddress] public string Email { get; set; } = string.Empty;
-    [Required, MaxLength(200)] public string FullName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Email is required."), EmailAddress] public string Email { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Full name is required."), MaxLength(200)] public string FullName { get; set; } = string.Empty;
     [Required] public string Role { get; set; } = "Engineer";
-    [Required, MaxLength(50)] public string EmployeeNumber { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Employee number is required."), MaxLength(50)] public string EmployeeNumber { get; set; } = string.Empty;
     public string? Department { get; set; }
+    public string? Phone { get; set; }
+}
+
+/// <summary>Editing an existing account's own profile fields — deliberately excludes Role (a
+/// separate, higher-stakes change handled via Rbac/UserPermissions) and password (via Reset
+/// Password). Fixes the gap where a typo in Name/Email/Department/Phone at Create time had no
+/// way to be corrected short of deleting and recreating the account.</summary>
+public class UserEditViewModel
+{
+    public string Id { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Full name is required."), MaxLength(200)] public string FullName { get; set; } = string.Empty;
+    public string? FullNameAr { get; set; }
+    [Required(ErrorMessage = "Email is required."), EmailAddress] public string Email { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Employee number is required."), MaxLength(50)] public string EmployeeNumber { get; set; } = string.Empty;
+    public string? Department { get; set; }
+    public string? Specialization { get; set; }
     public string? Phone { get; set; }
 }
 

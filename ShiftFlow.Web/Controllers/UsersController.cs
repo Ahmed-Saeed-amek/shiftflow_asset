@@ -468,6 +468,63 @@ public class UsersController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = PermissionCatalog.UserManage)]
+    public async Task<IActionResult> Edit(string id)
+    {
+        var user = await _um.FindByIdAsync(id);
+        if (user == null) return NotFound();
+
+        return View(new UserEditViewModel
+        {
+            Id = user.Id, FullName = user.FullName, FullNameAr = user.FullNameAr, Email = user.Email!,
+            EmployeeNumber = user.EmployeeNumber ?? "", Department = user.Department,
+            Specialization = user.Specialization, Phone = user.Phone,
+        });
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.UserManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(UserEditViewModel vm)
+    {
+        var user = await _um.FindByIdAsync(vm.Id);
+        if (user == null) return NotFound();
+
+        if (!ModelState.IsValid) return View(vm);
+
+        var oldValue = $"{user.FullName} ({user.Email})";
+
+        if (!string.Equals(user.Email, vm.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            // UserName mirrors Email throughout this app (see Create above) — both must move
+            // together, and SetEmailAsync/SetUserNameAsync run through Identity's own uniqueness
+            // validation so a duplicate address fails cleanly instead of corrupting the login.
+            var emailResult = await _um.SetEmailAsync(user, vm.Email);
+            if (emailResult.Succeeded) emailResult = await _um.SetUserNameAsync(user, vm.Email);
+            if (!emailResult.Succeeded)
+            {
+                foreach (var e in emailResult.Errors) ModelState.AddModelError("", e.Description);
+                return View(vm);
+            }
+        }
+
+        user.FullName = vm.FullName;
+        user.FullNameAr = vm.FullNameAr;
+        user.EmployeeNumber = vm.EmployeeNumber;
+        user.Department = vm.Department;
+        user.Specialization = vm.Specialization;
+        user.Phone = vm.Phone;
+
+        var result = await _um.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
+            return View(vm);
+        }
+
+        await _audit.LogAsync("Edit", "User", user.Id, _um.GetUserId(User)!, oldValue: oldValue, newValue: $"{vm.FullName} ({vm.Email})");
+        TempData["Success"] = string.Format(_loc.T("User {0} updated."), vm.FullName);
+        return RedirectToAction(nameof(Profile), new { id = user.Id });
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private static string GenerateTempPassword()

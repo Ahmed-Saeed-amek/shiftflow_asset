@@ -46,6 +46,9 @@
     <div class="d-flex gap-2">
         @if (canManageUsers && !isVendor)
         {
+            <a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-pencil me-1"></i>@Loc.T("Edit")
+            </a>
             <form method="post" asp-action="ResetPassword" asp-route-id="@Model.Id"
                   onsubmit="return confirm('@Loc.T("Reset this user's password? They'll need the new temporary password to log in.")')">
                 @Html.AntiForgeryToken()
