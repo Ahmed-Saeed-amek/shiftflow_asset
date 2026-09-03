@@ -16,8 +16,19 @@ public class WorkOrderService : IWorkOrderService
     private readonly ISparePartService _spareParts;
     public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts) { _db = db; _audit = audit; _spareParts = spareParts; }
 
+    // The Assets/Details "New Work Order"/"Report Action" buttons are now hidden for a Retired
+    // asset, but that's UI-only — enforce it here too (both CreateAsync and ReportAsync route
+    // through this) so a direct POST, or another caller like OrdersController's vendor-required
+    // Maintenance branch, can't open new work against equipment that's already decommissioned.
+    private async Task EnsureAssetNotRetiredAsync(int assetId)
+    {
+        if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
+            throw new InvalidOperationException("This asset is retired and can't have new work orders opened against it.");
+    }
+
     public async Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId)
     {
+        await EnsureAssetNotRetiredAsync(workOrder.AssetId);
         workOrder.Stage = "New";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
@@ -42,6 +53,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId)
     {
+        await EnsureAssetNotRetiredAsync(workOrder.AssetId);
         // A non-existent ActionTypeId/CauseId (e.g. a stale dropdown value) used to reach an
         // unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync - which,
         // worse, isn't even a duplicate-key error, so the retry loop there just failed the same

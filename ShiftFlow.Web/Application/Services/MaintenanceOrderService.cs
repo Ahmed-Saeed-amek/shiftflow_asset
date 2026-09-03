@@ -33,6 +33,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     {
         if (string.IsNullOrWhiteSpace(assignedToUserId))
             throw new InvalidOperationException("Select an employee to assign this maintenance order to.");
+        if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
+            throw new InvalidOperationException("This asset is retired and can't have new orders opened against it.");
 
         var order = new MaintenanceOrder
         {

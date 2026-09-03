@@ -7,10 +7,15 @@
     var canManageAsset = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
     var canReportAction = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetReportAction)).Succeeded;
     var canViewVendor = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
+    // A retired asset is decommissioned — reporting a new fault or opening a work order against
+    // it doesn't make sense (there's nothing left to fix), and previously nothing stopped it:
+    // the forms loaded and submitted fine even for a Retired asset, silently creating orders
+    // against equipment that's no longer in service.
+    var isRetired = Model.Status == "Retired";
     string actionsHtml = "<a href='" + Url.Action("Label", new { id = Model.Id }) + "' target='_blank' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-upc-scan me-1\"></i>" + Loc.T("Print Label") + "</a> ";
-    if (canReportAction)
+    if (canReportAction && !isRetired)
         actionsHtml += "<a href='" + Url.Action("Report", "WorkOrders", new { assetId = Model.Id }) + "' class='btn btn-outline-warning btn-sm'><i class=\"bi bi-flag me-1\"></i>" + Loc.T("Report Action") + "</a> ";
-    if (canManageWorkOrders)
+    if (canManageWorkOrders && !isRetired)
         actionsHtml += "<a href='" + Url.Action("Create", "WorkOrders", new { assetId = Model.Id }) + "' class='btn btn-outline-primary btn-sm'><i class=\"bi bi-tools me-1\"></i>" + Loc.T("New Work Order") + "</a> ";
     if (canManageAsset)
         actionsHtml += "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>";

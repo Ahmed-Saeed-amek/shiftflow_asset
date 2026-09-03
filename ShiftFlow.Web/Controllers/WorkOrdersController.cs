@@ -60,7 +60,15 @@ public class WorkOrdersController : Controller
         if (assetId.HasValue)
         {
             var asset = await _db.Assets.FindAsync(assetId.Value);
-            if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
+            if (asset != null)
+            {
+                if (asset.Status == "Retired")
+                {
+                    TempData["Error"] = "This asset is retired and can't have new work orders opened against it.";
+                    return RedirectToAction("Details", "Assets", new { id = assetId });
+                }
+                ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
+            }
         }
         ViewBag.Priorities = WorkOrder.Priorities;
         ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
@@ -83,12 +91,28 @@ public class WorkOrdersController : Controller
             return View(vm);
         }
         var userId = _userManager.GetUserId(User)!;
-        var wo = await _workOrderService.CreateAsync(new WorkOrder
+        WorkOrder wo;
+        try
         {
-            AssetId = vm.AssetId, Priority = vm.Priority, Description = vm.Description, Notes = vm.Notes,
-            AssignedToUserId = string.IsNullOrWhiteSpace(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
-            RequiresVendorResponse = vm.RequiresVendorResponse,
-        }, userId);
+            wo = await _workOrderService.CreateAsync(new WorkOrder
+            {
+                AssetId = vm.AssetId, Priority = vm.Priority, Description = vm.Description, Notes = vm.Notes,
+                AssignedToUserId = string.IsNullOrWhiteSpace(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
+                RequiresVendorResponse = vm.RequiresVendorResponse,
+            }, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            if (vm.AssetId > 0)
+            {
+                var asset = await _db.Assets.FindAsync(vm.AssetId);
+                if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
+            }
+            ViewBag.Priorities = WorkOrder.Priorities;
+            ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+            return View(vm);
+        }
 
         if (vm.VendorId.HasValue)
         {
@@ -117,6 +141,11 @@ public class WorkOrdersController : Controller
     {
         var asset = await _db.Assets.Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == assetId);
         if (asset == null) return NotFound();
+        if (asset.Status == "Retired")
+        {
+            TempData["Error"] = "This asset is retired and can't have new work orders opened against it.";
+            return RedirectToAction("Details", "Assets", new { id = assetId });
+        }
         ViewBag.Asset = asset;
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Details", "Assets", new { id = assetId });
         return View(new ReportActionViewModel { AssetId = assetId });
@@ -131,10 +160,20 @@ public class WorkOrdersController : Controller
             return View(vm);
         }
         var userId = _userManager.GetUserId(User)!;
-        var wo = await _workOrderService.ReportAsync(new WorkOrder
+        WorkOrder wo;
+        try
         {
-            AssetId = vm.AssetId, ActionTypeId = vm.ActionTypeId, CauseId = vm.CauseId, Notes = vm.Notes,
-        }, userId);
+            wo = await _workOrderService.ReportAsync(new WorkOrder
+            {
+                AssetId = vm.AssetId, ActionTypeId = vm.ActionTypeId, CauseId = vm.CauseId, Notes = vm.Notes,
+            }, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            ViewBag.Asset = await _db.Assets.Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == vm.AssetId);
+            return View(vm);
+        }
         TempData["Success"] = $"Reported — {wo.WorkOrderNumber} is awaiting admin review.";
         return RedirectToAction(nameof(Details), "Assets", new { id = vm.AssetId });
     }
