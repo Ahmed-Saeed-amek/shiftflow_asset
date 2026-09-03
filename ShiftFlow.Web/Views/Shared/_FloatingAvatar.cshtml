@@ -12,9 +12,11 @@
 </div>
 <script>
 (function () {
-    // Narrow viewports only — on desktop the bubble sits in empty page margin, never over a
-    // table's action column, so there's nothing for scroll-hiding to fix there.
-    if (!window.matchMedia('(max-width: 575.98px)').matches) return;
+    // Applies at any viewport/zoom — originally mobile-only on the assumption that desktop's
+    // wider layout always leaves the bubble in empty margin, but at 200% browser zoom it was
+    // confirmed overlapping real content (a Dashboard stat value, an Assets row's Edit button)
+    // on a plain desktop-width page too, since zoom shrinks the effective content area without
+    // the fixed-position bubble moving.
     var el = document.getElementById('floatingAvatar');
     var hideTimer;
     function hideThenSettle(delayMs) {

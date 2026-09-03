@@ -620,14 +620,16 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
      card's bottom edge. Reserve real space at the bottom of the page content so the last
      scrolled-to element always clears it instead of being covered. */
   main { padding-bottom: 4rem !important; }
-  /* That reserved space only helps once you've scrolled past the table entirely — mid-list,
-     whatever row happens to sit at this fixed screen position (e.g. a table's Edit button)
-     is still covered with no way to reach it without scrolling further. Fading the bubble out
-     while the page is actively scrolling (see the script in _FloatingAvatar.cshtml) means it's
-     never in the way at the moment a row lands under it — it only reappears once scrolling
-     has stopped, by which point the user has already picked where to stop. */
-  #floatingAvatar.scroll-hide:not(.open) { opacity: 0; pointer-events: none; transition: opacity .15s ease-out; }
 }
+/* That reserved space (above) only helps once you've scrolled past the table entirely — and
+   only on narrow viewports at all. At high browser zoom (200%+) the same fixed-corner bubble
+   overlaps real desktop content too — confirmed covering a Dashboard stat card's value and an
+   Assets row's Edit button, since zoom shrinks the effective content area without the bubble
+   moving. Fading it out while the page is actively scrolling or freshly loaded (see the script
+   in _FloatingAvatar.cshtml, which now runs unconditionally rather than mobile-only) means it's
+   never in the way at the moment something lands under it — it only reappears once things have
+   settled, by which point the user has already picked where to look. */
+#floatingAvatar.scroll-hide:not(.open) { opacity: 0; pointer-events: none; transition: opacity .15s ease-out; }
 
 /* Bootstrap's .btn-close sizes its tappable box from font-size + padding — the chip "remove"
    buttons in _AssetMultiPicker/_EmployeePicker-style chip lists set font-size:.6rem for a small
