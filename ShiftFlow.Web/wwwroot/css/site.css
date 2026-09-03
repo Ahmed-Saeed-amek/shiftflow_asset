@@ -620,6 +620,13 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
      card's bottom edge. Reserve real space at the bottom of the page content so the last
      scrolled-to element always clears it instead of being covered. */
   main { padding-bottom: 4rem !important; }
+  /* That reserved space only helps once you've scrolled past the table entirely — mid-list,
+     whatever row happens to sit at this fixed screen position (e.g. a table's Edit button)
+     is still covered with no way to reach it without scrolling further. Fading the bubble out
+     while the page is actively scrolling (see the script in _FloatingAvatar.cshtml) means it's
+     never in the way at the moment a row lands under it — it only reappears once scrolling
+     has stopped, by which point the user has already picked where to stop. */
+  #floatingAvatar.scroll-hide:not(.open) { opacity: 0; pointer-events: none; transition: opacity .15s ease-out; }
 }
 
 /* Bootstrap's .btn-close sizes its tappable box from font-size + padding — the chip "remove"

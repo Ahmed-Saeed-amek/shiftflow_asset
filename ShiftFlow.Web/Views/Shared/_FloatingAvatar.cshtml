@@ -10,3 +10,17 @@
         <i class="bi bi-robot fs-4"></i>
     </div>
 </div>
+<script>
+(function () {
+    // Narrow viewports only — on desktop the bubble sits in empty page margin, never over a
+    // table's action column, so there's nothing for scroll-hiding to fix there.
+    if (!window.matchMedia('(max-width: 575.98px)').matches) return;
+    var el = document.getElementById('floatingAvatar');
+    var hideTimer;
+    window.addEventListener('scroll', function () {
+        el.classList.add('scroll-hide');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () { el.classList.remove('scroll-hide'); }, 500);
+    }, { passive: true });
+})();
+</script>
