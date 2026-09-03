@@ -121,7 +121,13 @@ public class AssetsController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(AssetViewModel vm)
     {
-        if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
+        if (!ModelState.IsValid) { await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId); return View(vm); }
+        if (await _db.Assets.AnyAsync(a => a.AssetTag == vm.AssetTag))
+        {
+            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
+        }
         var userId = _userManager.GetUserId(User)!;
         await _assetService.CreateAsync(new Asset
         {
@@ -139,10 +145,7 @@ public class AssetsController : Controller
         var asset = await _db.Assets.Include(a => a.Zone).ThenInclude(z => z!.LocationCategory).Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == id);
         if (asset == null) return NotFound();
         await PopulateLookupsAsync();
-        ViewBag.SelectedLocationCategoryId = asset.Zone?.LocationCategoryId;
-        ViewBag.SelectedZone = asset.Zone;
-        ViewBag.SelectedParentCategoryId = asset.Category?.ParentCategoryId ?? asset.CategoryId;
-        ViewBag.SelectedSubcategoryId = asset.Category?.ParentCategoryId != null ? asset.CategoryId : (int?)null;
+        await PopulateSelectedAsync(asset.CategoryId, asset.ZoneId);
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
         return View(new AssetViewModel
         {
@@ -156,7 +159,7 @@ public class AssetsController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetViewModel vm)
     {
-        if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
+        if (!ModelState.IsValid) { await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId); return View(vm); }
         var userId = _userManager.GetUserId(User)!;
         await _assetService.UpdateAsync(new Asset
         {
@@ -242,5 +245,20 @@ public class AssetsController : Controller
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
         ViewBag.Statuses = Asset.Statuses;
+    }
+
+    /// <summary>Populates the cascading Category/Subcategory and Location Category/Zone pickers'
+    /// pre-selected state from a CategoryId/ZoneId — used both by GET Edit (from the saved asset)
+    /// and by a failed Create/Edit POST (from the just-submitted values), so a validation error
+    /// doesn't silently reset those pickers back to blank the way it used to.</summary>
+    private async Task PopulateSelectedAsync(int categoryId, int zoneId)
+    {
+        var category = categoryId > 0 ? await _db.AssetCategories.FindAsync(categoryId) : null;
+        ViewBag.SelectedParentCategoryId = category?.ParentCategoryId ?? category?.Id;
+        ViewBag.SelectedSubcategoryId = category?.ParentCategoryId != null ? category.Id : (int?)null;
+
+        var zone = zoneId > 0 ? await _db.Zones.FindAsync(zoneId) : null;
+        ViewBag.SelectedLocationCategoryId = zone?.LocationCategoryId;
+        ViewBag.SelectedZone = zone;
     }
 }
