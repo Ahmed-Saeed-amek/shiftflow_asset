@@ -490,7 +490,12 @@ public class UsersController : Controller
 
         if (!ModelState.IsValid) return View(vm);
 
-        var oldValue = $"{user.FullName} ({user.Email})";
+        // Capture every field this action can change, not just Name/Email — an edit that only
+        // touched Department/Phone/etc. used to log an old/new pair that were byte-identical,
+        // making the audit trail useless for exactly the fields this form exists to fix.
+        string Snapshot(string fullName, string email, string? employeeNumber, string? department, string? specialization, string? phone) =>
+            $"{fullName} ({email}) — Emp#: {employeeNumber}, Dept: {department}, Spec: {specialization}, Phone: {phone}";
+        var oldValue = Snapshot(user.FullName, user.Email!, user.EmployeeNumber, user.Department, user.Specialization, user.Phone);
 
         if (!string.Equals(user.Email, vm.Email, StringComparison.OrdinalIgnoreCase))
         {
@@ -520,7 +525,8 @@ public class UsersController : Controller
             return View(vm);
         }
 
-        await _audit.LogAsync("Edit", "User", user.Id, _um.GetUserId(User)!, oldValue: oldValue, newValue: $"{vm.FullName} ({vm.Email})");
+        var newValue = Snapshot(vm.FullName, vm.Email, vm.EmployeeNumber, vm.Department, vm.Specialization, vm.Phone);
+        await _audit.LogAsync("Edit", "User", user.Id, _um.GetUserId(User)!, oldValue: oldValue, newValue: newValue);
         TempData["Success"] = string.Format(_loc.T("User {0} updated."), vm.FullName);
         return RedirectToAction(nameof(Profile), new { id = user.Id });
     }

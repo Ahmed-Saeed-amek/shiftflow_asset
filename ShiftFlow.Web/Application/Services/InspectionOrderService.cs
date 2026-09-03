@@ -215,7 +215,11 @@ public class InspectionOrderService : IInspectionOrderService
             _db.InspectionItemMaintenanceActions.Add(new InspectionItemMaintenanceAction { InspectionRunAssetId = itemId, MaintenanceActionTypeId = maintenanceActionTypeId });
 
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("UpdateMaintenanceActions", "InspectionRunAsset", itemId.ToString(), updatedByUserId);
+        var actionNames = await _db.MaintenanceActionTypes
+            .Where(t => (maintenanceActionTypeIds ?? new List<int>()).Contains(t.Id))
+            .Select(t => t.Name).ToListAsync();
+        await _audit.LogAsync("UpdateMaintenanceActions", "InspectionRunAsset", itemId.ToString(), updatedByUserId,
+            newValue: actionNames.Count > 0 ? string.Join(", ", actionNames) : "(none)");
     }
 
     public async Task CancelAsync(int orderId, string? reason, string userId)
