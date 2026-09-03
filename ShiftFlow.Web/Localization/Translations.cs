@@ -1599,7 +1599,10 @@ public static class Translations
         Ar["No contracts yet."] = "لا توجد عقود بعد.";
         Ar["more"] = "المزيد";
         Ar["assets"] = "أصول";
+        Ar["asset"] = "أصل";
         Ar["paid"] = "مدفوع";
+        Ar["Change Password"] = "تغيير كلمة المرور";
+        Ar["Spare Parts Analytics"] = "تحليلات قطع الغيار";
         Ar["Manage Contracts"] = "إدارة العقود";
         Ar["Installments"] = "الأقساط";
         Ar["First Due Date"] = "تاريخ أول استحقاق";

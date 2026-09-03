@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -25,12 +26,14 @@ public class OrdersController : Controller
     private readonly ITeamService _teams;
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ILanguageService _loc;
 
     public OrdersController(IInspectionOrderService inspectionOrders, IMaintenanceOrderService maintenanceOrders,
-        IWorkOrderService workOrders, ITeamService teams, ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+        IWorkOrderService workOrders, ITeamService teams, ApplicationDbContext db, UserManager<ApplicationUser> userManager,
+        ILanguageService loc)
     {
         _inspectionOrders = inspectionOrders; _maintenanceOrders = maintenanceOrders;
-        _workOrders = workOrders; _teams = teams; _db = db; _userManager = userManager;
+        _workOrders = workOrders; _teams = teams; _db = db; _userManager = userManager; _loc = loc;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -49,7 +52,7 @@ public class OrdersController : Controller
             rows.AddRange(orders.Select(o => new MyWorkOrderRow
             {
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
-                AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? "asset" : "assets"),
+                AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? _loc.T("asset") : _loc.T("assets")),
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
                 AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
             }));

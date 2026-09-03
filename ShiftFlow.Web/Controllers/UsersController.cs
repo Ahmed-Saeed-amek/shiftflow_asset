@@ -201,14 +201,22 @@ public class UsersController : Controller
         if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done" && o.Status != "Cancelled");
         if (from.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt <= to.Value);
-        var inspectionRows = await inspectionQuery
-            .Select(o => new MyWorkOrderRow
+        // Projected as raw counts (not a formatted "N/M assets" string) because the "assets"/"asset"
+        // word needs to go through _loc.T() for Arabic, and EF can't translate that call into SQL.
+        var inspectionRowsRaw = await inspectionQuery
+            .Select(o => new
             {
-                Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
-                AssetLabel = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending") + "/" + o.InspectionRun!.Items.Count + " " + "assets",
-                Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
+                o.Id, o.OrderNumber, o.Status, o.DueDate, o.CreatedAt,
+                Done = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending"),
+                Total = o.InspectionRun!.Items.Count,
             })
             .ToListAsync();
+        var inspectionRows = inspectionRowsRaw.Select(o => new MyWorkOrderRow
+        {
+            Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+            AssetLabel = $"{o.Done}/{o.Total} " + (o.Total == 1 ? _loc.T("asset") : _loc.T("assets")),
+            Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
+        }).ToList();
 
         var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset).Where(m => m.AssignedToUserId == userId);
         if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == "Open");
