@@ -302,6 +302,9 @@ public class WorkOrderViewModel : IValidatableObject
     [MaxLength(4000)] public string? Notes { get; set; }
     public string? AssignedToUserId { get; set; }
     public bool RequiresVendorResponse { get; set; } = false;
+    /// <summary>Optional — picking a vendor here sends the work order straight to "Sent to Vendor"
+    /// on creation instead of leaving it at "New" awaiting a separate Send to Vendor step.</summary>
+    public int? VendorId { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         ValidationHelper.CheckSelected(AssetId, nameof(AssetId), "Asset", ValidationHelper.Localizer(validationContext));

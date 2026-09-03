@@ -40,6 +40,17 @@
                         Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
                         Placeholder = Loc.T("Search by name or email…") }' />
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Vendor")</label>
+                    <select asp-for="VendorId" class="form-select">
+                        <option value="">@Loc.T("— None (create as New) —")</option>
+                        @foreach (var v in (List<Vendor>)ViewBag.AllVendors)
+                        {
+                            <option value="@v.Id">@v.Name</option>
+                        }
+                    </select>
+                    <div class="form-text">@Loc.T("Picking a vendor sends this work order straight to \"Sent to Vendor\" instead of leaving it at \"New\".")</div>
+                </div>
                 <div class="col-12">
                     <div class="form-check">
                         <input asp-for="RequiresVendorResponse" class="form-check-input" type="checkbox" />

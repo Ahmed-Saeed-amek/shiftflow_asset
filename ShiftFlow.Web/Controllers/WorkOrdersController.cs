@@ -63,6 +63,7 @@ public class WorkOrdersController : Controller
             if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
         }
         ViewBag.Priorities = WorkOrder.Priorities;
+        ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
         return View(new WorkOrderViewModel { AssetId = assetId ?? 0 });
     }
@@ -78,6 +79,7 @@ public class WorkOrdersController : Controller
                 if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
             }
             ViewBag.Priorities = WorkOrder.Priorities;
+            ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
             return View(vm);
         }
         var userId = _userManager.GetUserId(User)!;
@@ -87,7 +89,26 @@ public class WorkOrdersController : Controller
             AssignedToUserId = string.IsNullOrWhiteSpace(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
             RequiresVendorResponse = vm.RequiresVendorResponse,
         }, userId);
-        TempData["Success"] = $"Work order {wo.WorkOrderNumber} created.";
+
+        if (vm.VendorId.HasValue)
+        {
+            try
+            {
+                await _workOrderService.SendToVendorAsync(wo.Id, vm.VendorId.Value, userId);
+                TempData["Success"] = $"Work order {wo.WorkOrderNumber} created and sent to vendor.";
+            }
+            catch (InvalidOperationException ex)
+            {
+                // The work order itself was created fine - only the vendor hand-off failed (e.g. the
+                // vendor was deactivated between page load and submit). Leave it at "New" rather than
+                // losing the report; the manager can still send it to a vendor from the Details page.
+                TempData["Error"] = $"Work order {wo.WorkOrderNumber} created, but couldn't be sent to vendor: {ex.Message}";
+            }
+        }
+        else
+        {
+            TempData["Success"] = $"Work order {wo.WorkOrderNumber} created.";
+        }
         return RedirectToAction(nameof(Details), new { id = wo.Id });
     }
 
