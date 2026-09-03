@@ -573,6 +573,38 @@ public class UsersController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>Same pattern as VendorsController.ResetPassword — generates a fresh temp password
+    /// and shows it once via TempData (no email round-trip needed for an admin resetting someone
+    /// else's forgotten/unknown password), and flags the account to force a change on next login.</summary>
+    [HttpPost, Authorize(Policy = PermissionCatalog.UserManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(string id)
+    {
+        var user = await _um.FindByIdAsync(id);
+        if (user is null)
+        {
+            TempData["Error"] = "User not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var tempPassword = GenerateTempPassword();
+        var token = await _um.GeneratePasswordResetTokenAsync(user);
+        var result = await _um.ResetPasswordAsync(user, token, tempPassword);
+        if (!result.Succeeded)
+        {
+            TempData["Error"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return RedirectToAction(nameof(Profile), new { id });
+        }
+
+        var existingClaims = await _um.GetClaimsAsync(user);
+        if (!existingClaims.Any(c => c.Type == "must_change_password"))
+            await _um.AddClaimAsync(user, new Claim("must_change_password", "true"));
+
+        await _audit.LogAsync("ResetPassword", "User", id, _um.GetUserId(User)!, newValue: user.FullName);
+        TempData["Success"] = $"Password reset for '{user.FullName}'.";
+        TempData["TempPassword"] = tempPassword;
+        return RedirectToAction(nameof(Profile), new { id });
+    }
+
     // ── Import from Microsoft Entra ID directory ────────────────────────────────
 
     [HttpGet, Authorize(Policy = PermissionCatalog.UserManage)]

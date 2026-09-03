@@ -7,6 +7,7 @@
     var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
     var roleLabel = string.Join(", ", Model.Roles.Select(r => Loc.LocalizedName(r, roleNameArByName.GetValueOrDefault(r))));
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
+    var canManageUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserManage)).Succeeded;
     // Profile itself is reachable by anyone viewing their own page (a self-view exception on an
     // otherwise User.View-gated action), but the "Back to Users" button assumes the Users list is
     // reachable — for a role without User.View (e.g. Engineer viewing their own profile) that link
@@ -42,14 +43,35 @@
             <span class="badge bg-secondary">@Loc.T("Inactive")</span>
         }
     </div>
-    @if (canManagePermissions)
-    {
-        <a href="@Url.Action("UserPermissions", "Rbac", new { userId = Model.Id })"
-           class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-shield-lock me-1"></i>@Loc.T("Permissions")
-        </a>
-    }
+    <div class="d-flex gap-2">
+        @if (canManageUsers && !isVendor)
+        {
+            <form method="post" asp-action="ResetPassword" asp-route-id="@Model.Id"
+                  onsubmit="return confirm('@Loc.T("Reset this user's password? They'll need the new temporary password to log in.")')">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-key me-1"></i>@Loc.T("Reset Password")
+                </button>
+            </form>
+        }
+        @if (canManagePermissions)
+        {
+            <a href="@Url.Action("UserPermissions", "Rbac", new { userId = Model.Id })"
+               class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-shield-lock me-1"></i>@Loc.T("Permissions")
+            </a>
+        }
+    </div>
 </div>
+
+@if (TempData["TempPassword"] != null)
+{
+    <div class="alert alert-success small">@Loc.T("Temporary password"): <code>@TempData["TempPassword"]</code></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger small">@TempData["Error"]</div>
+}
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body p-4">
