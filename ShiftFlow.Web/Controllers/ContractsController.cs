@@ -30,6 +30,20 @@ public class ContractsController : Controller
     }
 
     [Authorize(Policy = PermissionCatalog.ContractView)]
+    public async Task<IActionResult> ExportExcel()
+    {
+        var bytes = await _contractService.ExportToExcelAsync();
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Contracts_{DateTime.Today:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Policy = PermissionCatalog.ContractView)]
+    public async Task<IActionResult> ExportPdf()
+    {
+        var bytes = await _contractService.ExportToPdfAsync();
+        return File(bytes, "application/pdf", $"Contracts_{DateTime.Today:yyyyMMdd}.pdf");
+    }
+
+    [Authorize(Policy = PermissionCatalog.ContractView)]
     public async Task<IActionResult> Details(int id)
     {
         var contract = await _db.Contracts.Include(c => c.Vendor)

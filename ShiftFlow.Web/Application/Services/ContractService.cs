@@ -1,4 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 
@@ -129,5 +133,62 @@ public class ContractService : IContractService
             }
         }
         return rows.OrderBy(r => r.DueDate).ThenBy(r => r.AssetLabel).ToList();
+    }
+
+    private async Task<List<Contract>> GetExportRowsAsync() =>
+        await _db.Contracts.Include(c => c.Vendor).Include(c => c.AssetLinks)
+            .OrderByDescending(c => c.StartDate).ToListAsync();
+
+    public async Task<byte[]> ExportToExcelAsync()
+    {
+        var contracts = await GetExportRowsAsync();
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using var pkg = new ExcelPackage();
+        var ws = pkg.Workbook.Worksheets.Add("Contracts");
+        string[] headers = ["Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets"];
+        for (var i = 0; i < headers.Length; i++) ws.Cells[1, i + 1].Value = headers[i];
+        using (var range = ws.Cells[1, 1, 1, headers.Length]) { range.Style.Font.Bold = true; }
+
+        var row = 2;
+        foreach (var c in contracts)
+        {
+            ws.Cells[row, 1].Value = c.ContractNumber;
+            ws.Cells[row, 2].Value = c.Vendor?.Name;
+            ws.Cells[row, 3].Value = c.ContractType;
+            ws.Cells[row, 4].Value = c.StartDate.ToString("yyyy-MM-dd");
+            ws.Cells[row, 5].Value = c.EndDate?.ToString("yyyy-MM-dd");
+            ws.Cells[row, 6].Value = c.Cost;
+            ws.Cells[row, 7].Value = c.AssetLinks.Count;
+            row++;
+        }
+        ws.Cells.AutoFitColumns();
+        return await pkg.GetAsByteArrayAsync();
+    }
+
+    public async Task<byte[]> ExportToPdfAsync()
+    {
+        var contracts = await GetExportRowsAsync();
+        using var ms = new MemoryStream();
+        using (var writer = new PdfWriter(ms))
+        using (var pdf = new PdfDocument(writer))
+        {
+            var doc = new Document(pdf);
+            doc.Add(new Paragraph("Contracts").SetBold().SetFontSize(16));
+            var table = new Table(7, true).UseAllAvailableWidth();
+            foreach (var h in new[] { "Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets" })
+                table.AddHeaderCell(h);
+            foreach (var c in contracts)
+            {
+                table.AddCell(c.ContractNumber ?? "");
+                table.AddCell(c.Vendor?.Name ?? "");
+                table.AddCell(c.ContractType);
+                table.AddCell(c.StartDate.ToString("yyyy-MM-dd"));
+                table.AddCell(c.EndDate?.ToString("yyyy-MM-dd") ?? "");
+                table.AddCell(c.Cost?.ToString("0.00") ?? "");
+                table.AddCell(c.AssetLinks.Count.ToString());
+            }
+            doc.Add(table);
+        }
+        return ms.ToArray();
     }
 }

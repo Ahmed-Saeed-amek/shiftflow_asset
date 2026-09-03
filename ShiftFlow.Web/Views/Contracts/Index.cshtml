@@ -4,9 +4,13 @@
 @{
     ViewData["Title"] = Loc.T("Contracts");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractManage)).Succeeded;
-    string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Contract") + "</a>"
-        : "";
+    var canView = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractView)).Succeeded;
+    string actionsHtml = "";
+    if (canView)
+        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
+                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
+    if (canManage)
+        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Contract") + "</a>";
     var today = DateTime.UtcNow.Date;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Contracts"),ActionsHtml=actionsHtml})" />

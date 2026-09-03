@@ -93,6 +93,8 @@ public interface IContractService
     /// against work orders already generated for it. Empty list if the contract isn't PM-type or is missing
     /// PmCadence/EndDate.</summary>
     Task<List<PmScheduleRow>> GetPreventiveMaintenanceScheduleAsync(int contractId);
+    Task<byte[]> ExportToExcelAsync();
+    Task<byte[]> ExportToPdfAsync();
 }
 
 public class ServiceVendorCandidate
