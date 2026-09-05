@@ -1603,6 +1603,7 @@ public static class Translations
         Ar["paid"] = "مدفوع";
         Ar["Change Password"] = "تغيير كلمة المرور";
         Ar["Spare Parts Analytics"] = "تحليلات قطع الغيار";
+        Ar["Low Stock Parts"] = "قطع الغيار منخفضة المخزون";
         Ar["Most Used"] = "الأكثر استخدامًا";
         Ar["By Asset"] = "حسب الأصل";
         Ar["By Category"] = "حسب الفئة";

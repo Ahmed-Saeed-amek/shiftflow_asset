@@ -5,6 +5,12 @@
     var recentOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.RecentOrders;
     var overdueOrders = (List<InspectionOrder>)ViewBag.OverdueOrders;
 
+    // The raw InspectionOrder.Status enum value has no space ("InProgress") — fine for a status
+    // badge (which shares this app-wide with a dedicated "InProgress" style), but the chart's own
+    // axis label has no badge styling to lean on, so the missing space read as a typo next to
+    // "Open"/"Done". Normalize to the already-translated "In Progress" (with space) before Loc.T.
+    string SpacedStatus(string s) => s == "InProgress" ? "In Progress" : s;
+
     string CategoryBadgeClass(string c) => c switch
     {
         "Inspection" => "bg-primary-subtle text-primary-emphasis",
@@ -112,7 +118,7 @@
     };
 
     const orderLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusLabels));
-    const orderDisplayLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(((string[])ViewBag.OrderStatusLabels).Select(s => Loc.T(s))));
+    const orderDisplayLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(((string[])ViewBag.OrderStatusLabels).Select(s => Loc.T(SpacedStatus(s)))));
     const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusData));
     new Chart(document.getElementById('orderStatusChart'), {
         type: 'bar',
