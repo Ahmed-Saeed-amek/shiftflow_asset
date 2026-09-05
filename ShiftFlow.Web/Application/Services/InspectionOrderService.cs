@@ -34,6 +34,12 @@ public class InspectionOrderService : IInspectionOrderService
         var resolvedAssetIds = assetIds ?? [];
         if (resolvedAssetIds.Count == 0)
             throw new InvalidOperationException("Select at least one asset to inspect.");
+        // Same guard as MaintenanceOrderService.CreateAsync — without it, a recurring schedule (or
+        // the AI assistant tool) keeps generating new orders against an asset retired after the
+        // schedule was created, since OrdersController's own retired-asset check only covers its
+        // own manual-create path, not every caller of this method.
+        if (await _db.Assets.AnyAsync(a => resolvedAssetIds.Contains(a.Id) && a.Status == "Retired"))
+            throw new InvalidOperationException("One or more selected assets are retired and can't have new orders opened against them.");
 
         // Provenance only (not used for resolution): if every picked asset happens to share one
         // Zone, record it so Zone-scoped reporting/display can rely on it; else left null.

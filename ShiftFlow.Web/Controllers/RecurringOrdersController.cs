@@ -108,6 +108,20 @@ public class RecurringOrdersController : Controller
             TempData["Error"] = "Vendor-required order types can't be scheduled yet — the recurring generator doesn't support the Work Order/vendor pipeline.";
             return false;
         }
+        // Unlike OrdersController.Create, this form can't just silently drop whichever side the
+        // OrderType's AssignmentMode disallows (there's no "resolve server-side from posted fields"
+        // step here — the admin picks employee-or-team directly) — reject the mismatch instead so a
+        // TeamOnly type never ends up with an individual employee baked into every future occurrence.
+        if (orderType.AssignmentMode == "EmployeeOnly" && hasTeam)
+        {
+            TempData["Error"] = $"'{orderType.Name}' can only be assigned to an employee, not a team.";
+            return false;
+        }
+        if (orderType.AssignmentMode == "TeamOnly" && hasUser)
+        {
+            TempData["Error"] = $"'{orderType.Name}' can only be assigned to a team, not an employee.";
+            return false;
+        }
         if (await _db.Assets.AnyAsync(a => a.Id == vm.AssetId && a.Status == "Retired"))
         {
             TempData["Error"] = "This asset is retired and can't be scheduled for new orders.";

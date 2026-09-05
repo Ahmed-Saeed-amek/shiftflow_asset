@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -11,7 +12,8 @@ namespace ShiftFlow.Web.Controllers;
 public class SparePartsAnalyticsController : Controller
 {
     private readonly ApplicationDbContext _db;
-    public SparePartsAnalyticsController(ApplicationDbContext db) => _db = db;
+    private readonly ILanguageService _loc;
+    public SparePartsAnalyticsController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
 
     public async Task<IActionResult> Index(DateTime? from, DateTime? to, int? assetId, int? categoryId)
     {
@@ -84,7 +86,8 @@ public class SparePartsAnalyticsController : Controller
             .Select(g => new CategoryUsageSummary
             {
                 CategoryId = g.Key,
-                CategoryLabel = assetsById.Values.FirstOrDefault(a => a.CategoryId == g.Key)?.Category?.Name ?? "—",
+                CategoryLabel = assetsById.Values.FirstOrDefault(a => a.CategoryId == g.Key)?.Category is { } cat
+                    ? _loc.LocalizedName(cat.Name, cat.NameAr) : "—",
                 TotalQuantity = g.Sum(u => u.Quantity),
                 TotalCost = g.Sum(u => (u.UnitCostAtUsage ?? 0) * u.Quantity),
             })

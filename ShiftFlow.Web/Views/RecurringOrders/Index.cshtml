@@ -57,7 +57,7 @@
                         }
                         <div class="col-12">
                             <label class="form-label small">@Loc.T("Order Type")</label>
-                            <select name="OrderTypeId" id="roOrderTypeId" class="form-select" required>
+                            <select name="OrderTypeId" id="roOrderTypeId" class="form-select" required onchange="applyRoAssignmentMode()">
                                 @foreach (var t in orderTypes)
                                 {
                                     <option value="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</option>
@@ -131,6 +131,9 @@
 <script>
     const jsNewSchedule = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Schedule")));
     const jsEditSchedule = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Schedule")));
+    // [orderTypeId]: assignmentMode — mirrors Orders/Create.cshtml's meta map, so this form can't
+    // submit an employee against a TeamOnly type (or vice versa), same as the manual Create flow.
+    const roAssignmentModes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => t.AssignmentMode)));
 
     function applyRoAssigneeType() {
         const showUser = document.getElementById('roAssigneeUser').checked;
@@ -138,6 +141,17 @@
         document.getElementById('roAssigneeTeamRow').classList.toggle('d-none', showUser);
     }
     document.querySelectorAll('input[name="roAssigneeType"]').forEach(r => r.addEventListener('change', applyRoAssigneeType));
+
+    function applyRoAssignmentMode() {
+        const mode = roAssignmentModes[document.getElementById('roOrderTypeId').value] || 'Either';
+        const userRadio = document.getElementById('roAssigneeUser');
+        const teamRadio = document.getElementById('roAssigneeTeam');
+        userRadio.disabled = mode === 'TeamOnly';
+        teamRadio.disabled = mode === 'EmployeeOnly';
+        document.getElementById('roAssigneeToggle').classList.toggle('d-none', mode !== 'Either');
+        if (mode === 'TeamOnly' && !teamRadio.checked) { teamRadio.checked = true; applyRoAssigneeType(); }
+        if (mode === 'EmployeeOnly' && !userRadio.checked) { userRadio.checked = true; applyRoAssigneeType(); }
+    }
 
     function setAssetPicker(assetId, label) {
         const wrap = document.querySelector('#recurringForm .asset-picker');
@@ -162,7 +176,9 @@
         setEmployeePicker('', '');
         document.getElementById('roAssignedToTeamId').value = '';
         document.getElementById('roAssigneeUser').checked = true;
+        document.getElementById('roOrderTypeId').selectedIndex = 0;
         applyRoAssigneeType();
+        applyRoAssignmentMode();
     }
 
     function openEdit(id, orderTypeId, assetId, assignedToUserId, assignedToTeamId, cadence, startDate, endDate, isActive, assetLabel, userLabel) {
@@ -170,6 +186,7 @@
         document.getElementById('recurringForm').setAttribute('action', '@Url.Action("Edit")');
         document.getElementById('roId').value = id;
         document.getElementById('roOrderTypeId').value = orderTypeId;
+        applyRoAssignmentMode();
         setAssetPicker(assetId, assetLabel);
         document.getElementById('roCadence').value = cadence;
         document.getElementById('roStartDate').value = startDate;
