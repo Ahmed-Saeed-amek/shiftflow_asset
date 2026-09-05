@@ -35,15 +35,7 @@
     <div class="col-auto">
         <select name="categoryId" class="form-select form-select-sm" onchange="this.form.submit()">
             <option value="">@Loc.T("Category")</option>
-            @{ var allCategories = (List<AssetCategory>)ViewBag.Categories; }
-            @foreach (var top in allCategories.Where(c => c.ParentCategoryId == null))
-            {
-                <option value="@top.Id" style="font-weight:bold" selected="@(ViewBag.CategoryId==top.Id)">@top.Name</option>
-                @foreach (var sub in allCategories.Where(c => c.ParentCategoryId == top.Id))
-                {
-                    <option value="@sub.Id" selected="@(ViewBag.CategoryId==sub.Id)">@("    ")@sub.Name</option>
-                }
-            }
+            <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=(List<AssetCategory>)ViewBag.Categories, SelectedId=ViewBag.CategoryId as int?})" />
         </select>
     </div>
     <div class="col-auto">
@@ -93,8 +85,8 @@
                 @foreach (var a in Model)
                 {
                     <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = a.Id })'">
-                        <td class="small text-muted font-monospace">@a.AssetTag</td>
-                        <td>@a.Name</td>
+                        <td class="small text-muted font-monospace"><span class="d-inline-block text-truncate" style="max-width:160px" title="@a.AssetTag">@a.AssetTag</span></td>
+                        <td><span class="d-inline-block text-truncate" style="max-width:320px" title="@a.Name">@a.Name</span></td>
                         <td class="d-none d-lg-table-cell">@a.Category?.Name</td>
                         <td class="small d-none d-xl-table-cell">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@a.Status" /></td>

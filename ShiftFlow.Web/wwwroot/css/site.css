@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap');
 
 /* Not a Bootstrap utility class — every row-clickable table across the app (Assets, Work
    Orders, Vendors, Contracts, Zones, Inspection Orders, My Orders, Vendor Portal, etc.) applies
@@ -87,9 +87,12 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
 }
 
-/* Arabic / RTL font override */
+/* Arabic / RTL font override — Cairo is the closest Google-Fonts geometric-sans match to
+   Montserrat (the requested look) that actually ships Arabic glyphs; Montserrat itself has none,
+   so using it here would only affect stray Latin characters/numerals and leave every Arabic
+   letter silently falling back anyway. English/LTR text is untouched (still Inter Tight above). */
 :lang(ar), [dir="rtl"] {
-  font-family: 'IBM Plex Sans Arabic', 'Geeza Pro', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Cairo', 'Geeza Pro', 'Segoe UI', system-ui, sans-serif;
   line-height: 1.625;
 }
 

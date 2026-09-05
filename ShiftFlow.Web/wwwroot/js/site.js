@@ -113,8 +113,8 @@ function initAssetPickers(){
       if(!list.length){results.innerHTML='<div class="list-group-item small text-muted">'+esc(results.dataset.nomatch||'No matches')+'</div>';results.classList.remove('d-none');return;}
       results.innerHTML=list.map(function(a){
         var label=a.assetTag+' — '+(a.name||'');
-        return '<button type="button" class="list-group-item list-group-item-action py-1" data-id="'+esc(a.id)+'" data-label="'+esc(label)+'">'+
-               '<div class="fw-semibold small">'+esc(a.assetTag)+'</div><div class="text-muted" style="font-size:.72rem">'+esc(a.name||'')+'</div></button>';
+        return '<button type="button" class="list-group-item list-group-item-action py-1 text-truncate" data-id="'+esc(a.id)+'" data-label="'+esc(label)+'">'+
+               '<div class="fw-semibold small text-truncate">'+esc(a.assetTag)+'</div><div class="text-muted text-truncate" style="font-size:.72rem">'+esc(a.name||'')+'</div></button>';
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){

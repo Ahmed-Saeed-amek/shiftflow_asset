@@ -1,0 +1,19 @@
+@*
+    Renders <option> tags for a two-level (category / subcategory) dropdown — bold, selectable
+    parent options with their subcategories indented underneath, also selectable. Used instead of
+    <optgroup> because the parent category itself is a valid pick here, not just a group label.
+    Usage:
+      <select name="categoryId" class="form-select">
+          <option value="">@Loc.T("All Categories")</option>
+          <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=topLevelCategoriesWithSubcategoriesIncluded, SelectedId=selectedId})" />
+      </select>
+*@
+@model ShiftFlow.Web.ViewModels.CategoryOptionsModel
+@foreach (var top in Model.Categories.OrderBy(c => c.Name))
+{
+    <option value="@top.Id" class="fw-semibold" selected="@(Model.SelectedId == top.Id)">@Loc.LocalizedName(top.Name, top.NameAr)</option>
+    @foreach (var sub in top.Subcategories.OrderBy(s => s.Name))
+    {
+        <option value="@sub.Id" selected="@(Model.SelectedId == sub.Id)">@Html.Raw("&nbsp;&nbsp;&nbsp;&nbsp;" + System.Net.WebUtility.HtmlEncode(Loc.LocalizedName(sub.Name, sub.NameAr)))</option>
+    }
+}

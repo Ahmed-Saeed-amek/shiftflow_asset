@@ -81,11 +81,18 @@
                 <li><a class="nav-link" asp-controller="Users" asp-action="MyHistory"><i class="bi bi-clock-history me-2"></i>@Loc.T("History")</a></li>
             }
 
-            @if (canManageInspectionOrders)
+            @if (canManageInspectionOrders || canViewSpareParts)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Overview")</li>
-                <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>@Loc.T("Executive Dashboard")</a></li>
-                <li><a class="nav-link" asp-controller="ZoneOverview" asp-action="Index"><i class="bi bi-geo me-2"></i>@Loc.T("Zone Overview")</a></li>
+                @if (canManageInspectionOrders)
+                {
+                    <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>@Loc.T("Executive Dashboard")</a></li>
+                    <li><a class="nav-link" asp-controller="ZoneOverview" asp-action="Index"><i class="bi bi-geo me-2"></i>@Loc.T("Zone Overview")</a></li>
+                }
+                @if (canViewSpareParts)
+                {
+                    <li><a class="nav-link" asp-controller="SparePartsAnalytics" asp-action="Index"><i class="bi bi-graph-up me-2"></i>@Loc.T("Spare Parts Analytics")</a></li>
+                }
             }
 
             @if (canViewInspectionOrders || canViewMaintenanceOrders)
@@ -126,7 +133,6 @@
                 if (canViewSpareParts)
                 {
                     <li><a class="nav-link" asp-controller="SpareParts" asp-action="Index"><i class="bi bi-boxes me-2"></i>@Loc.T("Spare Parts")</a></li>
-                    <li><a class="nav-link" asp-controller="SparePartsAnalytics" asp-action="Index"><i class="bi bi-graph-up me-2"></i>@Loc.T("Spare Parts Analytics")</a></li>
                 }
 
                 // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one

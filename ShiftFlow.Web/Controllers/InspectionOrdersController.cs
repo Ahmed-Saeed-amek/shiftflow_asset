@@ -136,9 +136,6 @@ public class InspectionOrdersController : Controller
         if (!isManager && !isAssignee && !isTeamMember)
             return Forbid();
 
-        if (maintenanceActionTypeIds == null || maintenanceActionTypeIds.Count == 0)
-            return BadRequest(new { error = "Select at least one maintenance action before saving." });
-
         try
         {
             await _orders.UpdateMaintenanceActionsAsync(itemId, maintenanceActionTypeIds, CurrentUserId);

@@ -14,7 +14,7 @@
     var allVendors = ViewBag.AllVendors as List<Vendor>;
     var currentUserId = ViewBag.CurrentUserId as string;
     var canReportFixMyself = Model.VendorId == null && Model.AssignedToUserId == currentUserId && isNew;
-    var canAdvanceWithoutVendor = Model.Stage == "Sent to Vendor" && !Model.RequiresVendorResponse && (canManage || Model.AssignedToUserId == currentUserId);
+    var canAdvanceWithoutVendor = Model.Stage == "Sent to Vendor" && (canManage || Model.AssignedToUserId == currentUserId);
     var hasSpecs = Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku));
 }
 
@@ -295,7 +295,7 @@
                     <i class="bi bi-fast-forward text-info"></i>@Loc.T("Advance Without Vendor")
                 </div>
                 <div class="card-body">
-                    <div class="small text-muted mb-2">@Loc.T("This work order doesn't require a vendor response — report the fix directly instead of waiting.")</div>
+                    <div class="small text-muted mb-2">@Loc.T("Report the fix yourself instead of waiting on the vendor's own response.")</div>
                     <form method="post" asp-action="AdvanceWithoutVendor" asp-route-id="@Model.Id">
                         @Html.AntiForgeryToken()
                         <div class="row g-2">

@@ -372,6 +372,17 @@ public class VendorFixViewModel
     public List<IFormFile>? Files { get; set; }
 }
 
+/// <summary>Renders &lt;option&gt; tags (not the enclosing &lt;select&gt;) for a category dropdown that
+/// must offer both a top-level category and its subcategories as selectable values — a plain
+/// two-level indented list (bold parent, indented child), not &lt;optgroup&gt;, since &lt;optgroup&gt;
+/// labels themselves can't be selected and the parent category is a valid pick on its own.
+/// Categories must arrive top-level-only with Subcategories already Include()'d.</summary>
+public class CategoryOptionsModel
+{
+    public List<ShiftFlow.Domain.Entities.AssetCategory> Categories { get; set; } = new();
+    public int? SelectedId { get; set; }
+}
+
 public class EmployeePickerModel
 {
     public string Name { get; set; } = string.Empty;   // hidden input name (carries user id)

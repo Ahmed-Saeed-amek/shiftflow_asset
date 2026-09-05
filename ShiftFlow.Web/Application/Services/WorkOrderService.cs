@@ -339,15 +339,17 @@ public class WorkOrderService : IWorkOrderService
         return wo;
     }
 
-    /// <summary>Bypasses waiting on the vendor's own response for a work order sitting at "Sent to
-    /// Vendor" whose RequiresVendorResponse flag is off — usable by a manager (WorkOrder.Manage) or
-    /// the assigned employee. Ends in the same "Fixed - Pending Confirmation" state as VendorFixAsync/
-    /// EmployeeFixAsync so ConfirmFixAsync works unchanged regardless of who actually reported the fix.</summary>
+    /// <summary>Lets a manager (WorkOrder.Manage) or the work order's own assigned employee report
+    /// the fix directly instead of waiting on the vendor's own portal response — regardless of
+    /// RequiresVendorResponse, since an assigned employee is still the one actually accountable for
+    /// getting the asset fixed even when a vendor is also on the job (e.g. the vendor has no portal
+    /// login, or is simply slow to respond). Ends in the same "Fixed - Pending Confirmation" state as
+    /// VendorFixAsync/EmployeeFixAsync so ConfirmFixAsync works unchanged regardless of who actually
+    /// reported the fix.</summary>
     public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
     {
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.RequiresVendorResponse) throw new InvalidOperationException("This work order requires a vendor response.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         if (!isManager && wo.AssignedToUserId != userId) throw new InvalidOperationException("This work order isn't assigned to you.");
 

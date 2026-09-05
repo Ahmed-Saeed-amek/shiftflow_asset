@@ -49,7 +49,8 @@ public class AssetsController : Controller
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(a => a.AssetTag.Contains(q) || a.Name.Contains(q) || (a.SerialNumber != null && a.SerialNumber.Contains(q)));
 
-        ViewBag.Categories = await _db.AssetCategories.Include(c => c.ParentCategory).OrderBy(c => c.ParentCategoryId == null ? c.Name : c.ParentCategory!.Name).ThenBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
+            .OrderBy(c => c.Name).ToListAsync();
         ViewBag.Zones = await _db.Zones.Include(z => z.LocationCategory)
             .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name).ToListAsync();
         ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();

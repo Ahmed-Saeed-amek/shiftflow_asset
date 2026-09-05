@@ -41,10 +41,7 @@
                     <label class="form-label small">@Loc.T("Category")</label>
                     <select asp-for="CategoryId" class="form-select">
                         <option value="">@Loc.T("(Any)")</option>
-                        @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
-                        {
-                            <option value="@c.Id">@c.Name</option>
-                        }
+                        <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=(List<AssetCategory>)ViewBag.Categories})" />
                     </select>
                 </div>
             </div>

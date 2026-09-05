@@ -89,6 +89,7 @@ public class UserAssetScopesController : Controller
     {
         ViewBag.Zones = await _db.Zones.OrderBy(z => z.Name).ToListAsync();
         ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.OrderBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
+            .OrderBy(c => c.Name).ToListAsync();
     }
 }
