@@ -66,10 +66,12 @@ public class TeamsController : Controller
         var team = await _teams.GetByIdAsync(id);
         if (team == null) return NotFound();
         ViewBag.CurrentMembers = team.Members.Select(m => new TeamMemberChip { UserId = m.UserId, Label = m.User.FullName }).ToList();
+        var memberIds = team.Members.Select(m => m.UserId).ToList();
         return View(new TeamEditVm
         {
             Id = team.Id, Name = team.Name, NameAr = team.NameAr, Description = team.Description, IsActive = team.IsActive,
-            MemberUserIds = team.Members.Select(m => m.UserId).ToList(),
+            MemberUserIds = memberIds,
+            OriginalMemberUserIds = memberIds,
         });
     }
 
@@ -83,7 +85,7 @@ public class TeamsController : Controller
         {
             await _teams.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
             await _teams.SetActiveAsync(id, vm.IsActive, CurrentUserId);
-            await _teams.SetMembersAsync(id, vm.MemberUserIds ?? new(), CurrentUserId);
+            await _teams.SetMembersAsync(id, vm.MemberUserIds ?? new(), vm.OriginalMemberUserIds ?? new(), CurrentUserId);
             TempData["Success"] = "Team updated.";
             return RedirectToAction(nameof(Details), new { id });
         }

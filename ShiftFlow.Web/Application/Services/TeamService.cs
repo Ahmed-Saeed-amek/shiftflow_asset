@@ -116,11 +116,19 @@ public class TeamService : ITeamService
 
     /// <summary>Reconciles a team's membership to exactly the given user id list — diffs against
     /// the current members and adds/removes only what changed, so the audit trail reads the same
-    /// as the old separate AddMember/RemoveMember actions this replaces on the Edit page.</summary>
-    public async Task SetMembersAsync(int teamId, List<string> memberUserIds, string actingUserId)
+    /// as the old separate AddMember/RemoveMember actions this replaces on the Edit page.
+    /// originalMemberUserIds is the snapshot the edit form was loaded with (carried as hidden
+    /// fields) — if it no longer matches what's actually in the DB, someone else changed this
+    /// team's membership in between, and blindly diffing against the live set would silently
+    /// discard their change (confirmed live: two admins editing the same team concurrently, the
+    /// second submit erased the first's just-added member with no error or warning). Rejecting the
+    /// stale submit instead forces a reload, same as a real concurrency-token check would.</summary>
+    public async Task SetMembersAsync(int teamId, List<string> memberUserIds, List<string> originalMemberUserIds, string actingUserId)
     {
         var current = await _db.TeamMembers.Where(m => m.TeamId == teamId).ToListAsync();
         var currentIds = current.Select(m => m.UserId).ToHashSet();
+        if (!currentIds.SetEquals(originalMemberUserIds.Distinct()))
+            throw new InvalidOperationException("This team's membership was changed by someone else since you opened this page. Reload and try again.");
         var wantedIds = memberUserIds.Distinct().ToHashSet();
 
         var toRemove = current.Where(m => !wantedIds.Contains(m.UserId)).ToList();

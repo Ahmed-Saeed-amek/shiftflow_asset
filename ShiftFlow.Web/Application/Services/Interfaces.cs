@@ -67,8 +67,11 @@ public interface ITeamService
     Task AddMemberAsync(int teamId, string userId, string actingUserId);
     Task RemoveMemberAsync(int teamId, string userId, string actingUserId);
     Task<bool> IsMemberAsync(int teamId, string userId);
-    /// <summary>Reconciles a team's membership to exactly the given list — used by the Edit page instead of separate AddMember/RemoveMember calls.</summary>
-    Task SetMembersAsync(int teamId, List<string> memberUserIds, string actingUserId);
+    /// <summary>Reconciles a team's membership to exactly the given list — used by the Edit page
+    /// instead of separate AddMember/RemoveMember calls. originalMemberUserIds is the snapshot the
+    /// edit form was loaded with; rejects the call if the DB's current membership no longer matches
+    /// it (someone else changed it concurrently), instead of silently discarding their change.</summary>
+    Task SetMembersAsync(int teamId, List<string> memberUserIds, List<string> originalMemberUserIds, string actingUserId);
 }
 
 // ── Asset Management ─────────────────────────────────────────────────────────

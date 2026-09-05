@@ -18,6 +18,14 @@
                 </div>
             }
             <input type="hidden" asp-for="Id" />
+            @* Snapshot of the membership this form was loaded with — lets SetMembersAsync detect a
+               concurrent edit (someone else changed membership since this page loaded) instead of
+               silently overwriting it. Must survive a validation-error redisplay unchanged, so it's
+               bound straight from the model rather than rebuilt from ViewBag.CurrentMembers. *@
+            @foreach (var originalId in Model.OriginalMemberUserIds)
+            {
+                <input type="hidden" name="OriginalMemberUserIds" value="@originalId" />
+            }
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">@Loc.T("Name") <span class="text-danger">*</span></label>
