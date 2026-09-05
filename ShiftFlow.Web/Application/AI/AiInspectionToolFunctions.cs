@@ -48,12 +48,16 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         var order = await _orders.GetByIdAsync(orderId);
         if (order == null) return new { error = "not_found", message = "Inspection order not found." };
 
+        // This tool is registered with RequiredPermission = null (self-scoped, gated only by the
+        // broad AiAssistant.Use permission — see AiAssistantOrchestrator), not InspectionOrder.Manage
+        // as the removed comment here incorrectly assumed. Without this check, granting
+        // AiAssistant.Use to any non-manager role would let that role read any inspection order's
+        // full detail via the assistant, bypassing the identical restriction
+        // InspectionOrdersController.Details enforces for the same data.
+        var isManager = await _permissions.HasPermissionAsync(userId, PermissionCatalog.InspectionOrderManage);
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
-        if (order.AssignedToUserId != userId && !isTeamMember)
-        {
-            // Allow managers through — callers without InspectionOrder.Manage never reach this
-            // tool at all (see orchestrator's RequiredPermission on getInspectionOrderDetail).
-        }
+        if (!isManager && order.AssignedToUserId != userId && !isTeamMember)
+            throw new InvalidOperationException("This inspection order isn't assigned to you.");
 
         return new
         {

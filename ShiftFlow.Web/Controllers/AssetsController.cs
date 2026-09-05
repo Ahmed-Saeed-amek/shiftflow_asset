@@ -130,12 +130,23 @@ public class AssetsController : Controller
             return View(vm);
         }
         var userId = _userManager.GetUserId(User)!;
-        await _assetService.CreateAsync(new Asset
+        try
         {
-            AssetTag = vm.AssetTag, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
-            Model = vm.Model, SerialNumber = vm.SerialNumber, Manufacturer = vm.Manufacturer, Sku = vm.Sku, Status = vm.Status,
-            AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
-        }, userId);
+            await _assetService.CreateAsync(new Asset
+            {
+                AssetTag = vm.AssetTag, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
+                Model = vm.Model, SerialNumber = vm.SerialNumber, Manufacturer = vm.Manufacturer, Sku = vm.Sku, Status = vm.Status,
+                AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
+            }, userId);
+        }
+        catch (DbUpdateException)
+        {
+            // The AnyAsync check above and this save aren't atomic — two concurrent submissions with
+            // the same tag can both pass the check and race the DB's unique index on AssetTag.
+            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
+        }
         TempData["Success"] = "Asset created.";
         return RedirectToAction(nameof(Index));
     }
