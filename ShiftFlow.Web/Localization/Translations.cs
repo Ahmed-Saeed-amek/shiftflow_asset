@@ -1604,6 +1604,7 @@ public static class Translations
         Ar["Change Password"] = "تغيير كلمة المرور";
         Ar["Spare Parts Analytics"] = "تحليلات قطع الغيار";
         Ar["Low Stock Parts"] = "قطع الغيار منخفضة المخزون";
+        Ar["— Select a category —"] = "— اختر فئة —";
         Ar["Most Used"] = "الأكثر استخدامًا";
         Ar["By Asset"] = "حسب الأصل";
         Ar["By Category"] = "حسب الفئة";

@@ -31,7 +31,7 @@
                             <span class="small">@cause.Name</span>
                             <div class="d-flex align-items-center gap-2">
                                 <partial name="_StatusBadge" model="@(cause.IsActive ? "Active" : "Inactive")" />
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bs-toggle="modal" data-bs-target="#causeEditModal"
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#causeEditModal"
                                         onclick='openEditCause(@cause.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.NameAr)), @(cause.IsActive ? "true" : "false"))'>
                                     @Loc.T("Edit")
                                 </button>

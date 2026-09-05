@@ -73,7 +73,7 @@
                             </div>
                             <div class="form-text mb-2">@Loc.T("Unscoped actions apply everywhere; a specific category (or subcategory) limits this action to just that one.")</div>
                             <select name="CategoryId" id="actionTypeCategoryId" class="form-select d-none">
-                                <option value="">@Loc.T("All Categories")</option>
+                                <option value="" disabled>@Loc.T("— Select a category —")</option>
                                 @foreach (var c in categories)
                                 {
                                     <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>

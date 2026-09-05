@@ -47,7 +47,11 @@
             @foreach (var t in activeOrderTypes)
             {
                 var isActive = orderTypeId == t.Id;
-                <a class="btn @(isActive ? "" : "btn-outline-secondary")" style="@(isActive ? $"background-color:{t.Color};color:{ReadableTextColor(t.Color)};border-color:{t.Color}" : "")"
+                // Every chip carries its type's color, even unselected — otherwise there's no way
+                // to visually pattern-match a chip to its row badges below (confirmed by a
+                // fresh-eyes pass: only the active chip had any color at all). Selected = solid
+                // fill; unselected = colored outline/text on a plain background.
+                <a class="btn" style="@(isActive ? $"background-color:{t.Color};color:{ReadableTextColor(t.Color)};border-color:{t.Color}" : $"color:{t.Color};border-color:{t.Color}")"
                    asp-action="Index" asp-route-status="@status" asp-route-orderTypeId="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</a>
             }
         </div>
