@@ -27,6 +27,11 @@ public class ContractService : IContractService
             throw new InvalidOperationException($"Cost must be between 0 and {MaxCost:N2}.");
         if (!await _db.Vendors.AnyAsync(v => v.Id == contract.VendorId))
             throw new InvalidOperationException("Selected vendor not found.");
+        // A stale multi-select value or a raw/tampered POST with a non-existent asset id otherwise
+        // hits the DB's Restrict FK constraint on ContractAssets.AssetId and raises an unhandled
+        // DbUpdateException — same bug class the VendorId check above already guards against.
+        if (assetIds.Count > 0 && await _db.Assets.CountAsync(a => assetIds.Contains(a.Id)) != assetIds.Distinct().Count())
+            throw new InvalidOperationException("One or more selected assets were not found.");
         // Every other order-creation path (Inspection/Maintenance/WorkOrder) blocks new work
         // against a Retired asset — a Contract linking one is a dangling, misleading association
         // (it can still surface via GetDerivedVendorAsync/GetActiveServiceVendorsAsync) since no

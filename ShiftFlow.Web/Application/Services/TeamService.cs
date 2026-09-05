@@ -31,6 +31,14 @@ public class TeamService : ITeamService
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Team name is required.");
+        // A stale multi-select value or a raw/tampered POST with a non-existent user id otherwise
+        // hits the DB's FK constraint on TeamMembers.UserId and raises an unhandled
+        // DbUpdateException — Edit already guards the equivalent path (SetMembersAsync) with a
+        // try/catch, per its own comment acknowledging this exact failure mode; Create had no such
+        // check at all.
+        var distinctMemberIds = initialMemberUserIds.Distinct().ToList();
+        if (distinctMemberIds.Count > 0 && await _db.Users.CountAsync(u => distinctMemberIds.Contains(u.Id)) != distinctMemberIds.Count)
+            throw new InvalidOperationException("One or more selected members were not found.");
 
         var team = new Team
         {

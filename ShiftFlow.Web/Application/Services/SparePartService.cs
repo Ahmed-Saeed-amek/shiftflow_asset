@@ -10,8 +10,24 @@ public class SparePartService : ISparePartService
     private readonly IAuditService _audit;
     public SparePartService(ApplicationDbContext db, IAuditService audit) { _db = db; _audit = audit; }
 
+    // A stale multi-select value or a raw/tampered POST with a non-existent asset id otherwise hits
+    // the DB's Restrict FK constraint on SparePartAssets.AssetId and raises an unhandled
+    // DbUpdateException — same bug class fixed elsewhere (UserAssetScopesController, ContractService's
+    // vendor check). Checked up front, before either method's first write, so a bad id can't also
+    // leave an orphaned SpareParts row behind (CreateAsync's part-metadata save and its asset-link
+    // save aren't atomic — a failure in the second save previously still left the first committed).
+    private async Task EnsureAssetsExistAsync(List<int> assetIds)
+    {
+        var distinctIds = assetIds.Distinct().ToList();
+        if (distinctIds.Count == 0) return;
+        var existingCount = await _db.Assets.CountAsync(a => distinctIds.Contains(a.Id));
+        if (existingCount != distinctIds.Count)
+            throw new InvalidOperationException("One or more selected assets were not found.");
+    }
+
     public async Task<SparePart> CreateAsync(SparePart part, List<int> assetIds, string userId)
     {
+        await EnsureAssetsExistAsync(assetIds);
         part.CreatedDate = DateTime.UtcNow;
         _db.SpareParts.Add(part);
         await _db.SaveChangesAsync(); // need part.Id before inserting links
@@ -24,6 +40,7 @@ public class SparePartService : ISparePartService
 
     public async Task UpdateAsync(SparePart part, List<int> assetIds, string userId)
     {
+        await EnsureAssetsExistAsync(assetIds);
         var existing = await _db.SpareParts.Include(p => p.AssetLinks).FirstOrDefaultAsync(p => p.Id == part.Id)
             ?? throw new InvalidOperationException("Spare part not found.");
         existing.Name = part.Name; existing.NameAr = part.NameAr; existing.Sku = part.Sku;

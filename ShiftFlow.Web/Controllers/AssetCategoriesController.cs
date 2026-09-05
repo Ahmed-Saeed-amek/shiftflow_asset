@@ -30,7 +30,13 @@ public class AssetCategoriesController : Controller
         if (vm.ParentCategoryId.HasValue)
         {
             var parent = await _db.AssetCategories.FindAsync(vm.ParentCategoryId.Value);
-            if (parent?.ParentCategoryId != null)
+            // A non-existent ParentCategoryId (stale dropdown, tampered POST) previously made
+            // `parent` null, and the null-conditional below silently skipped validation instead of
+            // rejecting it — the value then hit the DB's Restrict FK constraint at SaveChangesAsync
+            // and raised an unhandled DbUpdateException.
+            if (parent == null)
+                ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("Selected parent category not found."));
+            else if (parent.ParentCategoryId != null)
                 ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("Only 2 levels are supported — a subcategory can't itself have a parent that's already a subcategory."));
         }
         if (!string.IsNullOrWhiteSpace(vm.Name) &&
@@ -61,7 +67,9 @@ public class AssetCategoriesController : Controller
             else
             {
                 var parent = await _db.AssetCategories.FindAsync(vm.ParentCategoryId.Value);
-                if (parent?.ParentCategoryId != null)
+                if (parent == null)
+                    ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("Selected parent category not found."));
+                else if (parent.ParentCategoryId != null)
                     ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("Only 2 levels are supported — a subcategory can't itself have a parent that's already a subcategory."));
             }
             var hasChildren = await _db.AssetCategories.AnyAsync(c => c.ParentCategoryId == vm.Id);
