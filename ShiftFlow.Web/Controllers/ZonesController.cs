@@ -48,6 +48,14 @@ public class ZonesController : Controller
     public async Task<IActionResult> Create(ZoneViewModel vm)
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
+        // A stale dropdown value or a raw/tampered POST with a non-existent LocationCategoryId
+        // otherwise hits the DB's Restrict FK constraint and raises an unhandled DbUpdateException.
+        if (!await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
+        {
+            ModelState.AddModelError(nameof(vm.LocationCategoryId), "Selected location type not found.");
+            await PopulateLookupsAsync();
+            return View(vm);
+        }
         if (await _db.Zones.AnyAsync(z => z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
         {
             ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");
@@ -85,6 +93,12 @@ public class ZonesController : Controller
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         var zone = await _db.Zones.FindAsync(vm.Id);
         if (zone == null) return NotFound();
+        if (!await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
+        {
+            ModelState.AddModelError(nameof(vm.LocationCategoryId), "Selected location type not found.");
+            await PopulateLookupsAsync();
+            return View(vm);
+        }
         if (await _db.Zones.AnyAsync(z => z.Id != vm.Id && z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
         {
             ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");

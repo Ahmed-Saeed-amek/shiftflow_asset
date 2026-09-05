@@ -31,6 +31,13 @@ public class AssetActionTypesController : Controller
     {
         if (ModelState.IsValid)
         {
+            // A stale dropdown value or a raw/tampered POST with a non-existent CategoryId
+            // otherwise hits the DB's Restrict FK constraint and raises an unhandled DbUpdateException.
+            if (!await _db.AssetCategories.AnyAsync(c => c.Id == vm.CategoryId))
+            {
+                TempData["Error"] = "Selected category not found.";
+                return RedirectToAction(nameof(Index), new { categoryId = vm.CategoryId });
+            }
             _db.AssetActionTypes.Add(new AssetActionType { CategoryId = vm.CategoryId, Name = vm.Name, NameAr = vm.NameAr, IsActive = true });
             await _db.SaveChangesAsync();
             TempData["Success"] = "Action type added.";

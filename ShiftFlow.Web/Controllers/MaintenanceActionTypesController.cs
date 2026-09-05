@@ -35,6 +35,13 @@ public class MaintenanceActionTypesController : Controller
             TempData["Error"] = "Name is required.";
             return RedirectToAction(nameof(Index));
         }
+        // A stale dropdown value or a raw/tampered POST with a non-existent CategoryId otherwise
+        // hits the DB's Restrict FK constraint and raises an unhandled DbUpdateException.
+        if (vm.CategoryId.HasValue && !await _db.AssetCategories.AnyAsync(c => c.Id == vm.CategoryId))
+        {
+            TempData["Error"] = "Selected category not found.";
+            return RedirectToAction(nameof(Index));
+        }
         _db.MaintenanceActionTypes.Add(new MaintenanceActionType { CategoryId = vm.CategoryId, Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
         await _db.SaveChangesAsync();
         TempData["Success"] = "Maintenance action created.";
@@ -47,6 +54,11 @@ public class MaintenanceActionTypesController : Controller
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Name is required.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (vm.CategoryId.HasValue && !await _db.AssetCategories.AnyAsync(c => c.Id == vm.CategoryId))
+        {
+            TempData["Error"] = "Selected category not found.";
             return RedirectToAction(nameof(Index));
         }
         var type = await _db.MaintenanceActionTypes.FindAsync(vm.Id);
