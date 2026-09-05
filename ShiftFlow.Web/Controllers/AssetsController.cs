@@ -154,7 +154,9 @@ public class AssetsController : Controller
     [Authorize(Policy = PermissionCatalog.AssetManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var asset = await _db.Assets.Include(a => a.Zone).ThenInclude(z => z!.LocationCategory).Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == id);
+        var userId = _userManager.GetUserId(User)!;
+        var asset = await (await ScopedAssetsAsync(userId))
+            .Include(a => a.Zone).ThenInclude(z => z!.LocationCategory).Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == id);
         if (asset == null) return NotFound();
         await PopulateLookupsAsync();
         await PopulateSelectedAsync(asset.CategoryId, asset.ZoneId);
@@ -173,6 +175,10 @@ public class AssetsController : Controller
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId); return View(vm); }
         var userId = _userManager.GetUserId(User)!;
+        // Unlike GET Edit, the posted vm carries no reliable "which asset is this" signal beyond
+        // vm.Id itself, so the scope check here is a direct existence check against the scoped
+        // queryable rather than routing the whole update through it.
+        if (!await (await ScopedAssetsAsync(userId)).AnyAsync(a => a.Id == vm.Id)) return NotFound();
         await _assetService.UpdateAsync(new Asset
         {
             Id = vm.Id, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,

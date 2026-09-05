@@ -239,9 +239,18 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             throw new InvalidOperationException("Selected team not found.");
 
         var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
-        order.AssignedToUserId = hasUser ? assignedToUserId : null;
-        order.AssignedToTeamId = hasTeam ? assignedToTeamId : null;
-        await _db.SaveChangesAsync();
+        // Claim atomically against the DB's current status, not the copy loaded above — a concurrent
+        // Complete/Cancel could otherwise close the order between that load and this write, and this
+        // Reassign would still apply, permanently misattributing a completed order to someone who
+        // never touched it (confirmed live: a concurrent Complete+Reassign pair left the order Done
+        // but assigned to the Reassign's target, erasing who actually did the work).
+        var newAssignedToUserId = hasUser ? assignedToUserId : null;
+        var newAssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        var claimed = await _db.MaintenanceOrders.Where(m => m.Id == orderId && m.Status != "Done" && m.Status != "Cancelled")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.AssignedToUserId, newAssignedToUserId)
+                .SetProperty(m => m.AssignedToTeamId, newAssignedToTeamId));
+        if (claimed == 0) throw new InvalidOperationException("A closed maintenance order can't be reassigned.");
         await _audit.LogAsync("Reassign", "MaintenanceOrder", order.Id.ToString(), managerUserId,
             oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
     }

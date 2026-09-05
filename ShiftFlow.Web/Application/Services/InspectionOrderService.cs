@@ -316,9 +316,18 @@ public class InspectionOrderService : IInspectionOrderService
             throw new InvalidOperationException("Selected team not found.");
 
         var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
-        order.AssignedToUserId = hasUser ? assignedToUserId : null;
-        order.AssignedToTeamId = hasTeam ? assignedToTeamId : null;
-        await _db.SaveChangesAsync();
+        // Claim atomically against the DB's current status, not the copy loaded above — a concurrent
+        // Cancel or item-outcome update (which can independently drive the order to Done via
+        // UpdateInspectionItemAsync) could otherwise close the order between that load and this
+        // write, and this Reassign would still apply, permanently misattributing a closed order to
+        // someone who never touched it. Same race class Cancel/Complete already guard against.
+        var newAssignedToUserId = hasUser ? assignedToUserId : null;
+        var newAssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "Cancelled")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.AssignedToUserId, newAssignedToUserId)
+                .SetProperty(o => o.AssignedToTeamId, newAssignedToTeamId));
+        if (claimed == 0) throw new InvalidOperationException("A closed inspection order can't be reassigned.");
         await _audit.LogAsync("Reassign", "InspectionOrder", order.Id.ToString(), managerUserId,
             oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
     }

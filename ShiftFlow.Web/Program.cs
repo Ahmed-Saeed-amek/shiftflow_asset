@@ -255,6 +255,9 @@ var mvcBuilder = builder.Services.AddControllersWithViews(options =>
     // This restricts any action with no HTTP-verb-selector attribute of its own to GET/HEAD —
     // actions already carrying [HttpPost] etc. (every write action in this app) are untouched.
     options.Conventions.Add(new ShiftFlow.Web.Infrastructure.Mvc.DefaultGetOnlyConvention());
+    // Re-checks "must_change_password" on every authenticated request — previously only acted on
+    // once, inside AccountController.Login's own redirect, so any other URL bypassed it entirely.
+    options.Filters.Add<ShiftFlow.Web.Authorization.MustChangePasswordFilter>();
 })
 .AddDataAnnotationsLocalization(options =>
 {
