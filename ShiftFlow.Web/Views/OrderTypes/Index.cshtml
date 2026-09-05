@@ -8,7 +8,7 @@
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead><tr><th></th><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Prefix")</th><th class="d-none d-xl-table-cell">@Loc.T("Tracks Defect Outcome")</th><th class="d-none d-xl-table-cell">@Loc.T("Requires Vendor")</th><th class="d-none d-xl-table-cell">@Loc.T("Direct Fix")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
+            <thead><tr><th></th><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Prefix")</th><th class="d-none d-xl-table-cell">@Loc.T("Direct Fix")</th><th class="d-none d-xl-table-cell">@Loc.T("Assets")</th><th class="d-none d-xl-table-cell">@Loc.T("Assign To")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -20,13 +20,13 @@
                         <td><span class="d-inline-block rounded-circle" style="width:14px;height:14px;background-color:@t.Color" title="@t.Color"></span></td>
                         <td>@Loc.LocalizedName(t.Name, t.NameAr)</td>
                         <td class="small font-monospace d-none d-lg-table-cell">@t.Prefix</td>
-                        <td class="d-none d-xl-table-cell">@(t.TracksDefectOutcome ? Loc.T("Yes") : Loc.T("No"))</td>
-                        <td class="d-none d-xl-table-cell">@(t.RequiresVendor ? Loc.T("Yes") : Loc.T("No"))</td>
                         <td class="d-none d-xl-table-cell">@(t.IsDirectFix ? Loc.T("Yes") : Loc.T("No"))</td>
+                        <td class="small d-none d-xl-table-cell">@(t.AllowsMultipleAssets ? Loc.T("Multiple") : Loc.T("Single"))</td>
+                        <td class="small d-none d-xl-table-cell">@Loc.T(t.AssignmentMode)</td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
-                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"))'>
+                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"), @(t.AllowsMultipleAssets ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.AssignmentMode)))'>
                                 @Loc.T("Edit")
                             </button>
                         </td>
@@ -76,13 +76,25 @@
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" name="IsDirectFix" id="otIsDirectFix" class="form-check-input" value="true" />
-                                <label class="form-check-label small" for="otIsDirectFix">@Loc.T("Direct fix (single asset, no survey — like today's Maintenance Orders)")</label>
+                                <label class="form-check-label small" for="otIsDirectFix">@Loc.T("Direct fix (single-asset fix report, no survey — like today's Maintenance Orders)")</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="AllowsMultipleAssets" id="otAllowsMultiple" class="form-check-input" value="true" />
+                                <label class="form-check-label small" for="otAllowsMultiple">@Loc.T("Allows multiple assets per order (independent of Direct Fix — a direct-fix type creates one order per selected asset)")</label>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" name="IsActive" id="otIsActive" class="form-check-input" value="true" checked />
                                 <input type="hidden" name="IsActive" value="false" />
                                 <label class="form-check-label small" for="otIsActive">@Loc.T("Active")</label>
                             </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Assign To")</label>
+                            <select name="AssignmentMode" id="otAssignmentMode" class="form-select">
+                                <option value="Either">@Loc.T("Either (Employee or Team)")</option>
+                                <option value="EmployeeOnly">@Loc.T("Employee only")</option>
+                                <option value="TeamOnly">@Loc.T("Team only")</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -111,10 +123,12 @@
         document.getElementById('otTracksDefect').checked = false;
         document.getElementById('otRequiresVendor').checked = false;
         document.getElementById('otIsDirectFix').checked = false;
+        document.getElementById('otAllowsMultiple').checked = false;
+        document.getElementById('otAssignmentMode').value = 'Either';
         document.getElementById('otIsActive').checked = true;
     }
 
-    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive, isDirectFix) {
+    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive, isDirectFix, allowsMultiple, assignmentMode) {
         document.getElementById('orderTypeModalTitle').textContent = jsEditOrderType;
         document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Edit")');
         document.getElementById('otId').value = id;
@@ -126,6 +140,8 @@
         document.getElementById('otRequiresVendor').checked = requiresVendor;
         document.getElementById('otIsActive').checked = isActive;
         document.getElementById('otIsDirectFix').checked = isDirectFix;
+        document.getElementById('otAllowsMultiple').checked = allowsMultiple;
+        document.getElementById('otAssignmentMode').value = assignmentMode || 'Either';
     }
 </script>
 }

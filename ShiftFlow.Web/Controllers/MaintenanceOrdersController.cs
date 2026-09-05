@@ -18,10 +18,11 @@ public class MaintenanceOrdersController : Controller
 {
     private readonly IMaintenanceOrderService _orders;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ITeamService _teams;
 
-    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager)
+    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager, ITeamService teams)
     {
-        _orders = orders; _userManager = userManager;
+        _orders = orders; _userManager = userManager; _teams = teams;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -39,10 +40,11 @@ public class MaintenanceOrdersController : Controller
         var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
             .AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
         var isAssignee = order.AssignedToUserId == CurrentUserId;
-        if (!isManager && !isAssignee) return Forbid();
+        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isTeamMember) return Forbid();
 
         ViewBag.IsManager = isManager;
-        ViewBag.IsAssignee = isAssignee;
+        ViewBag.IsAssignee = isAssignee || isTeamMember;
         return View(order);
     }
 

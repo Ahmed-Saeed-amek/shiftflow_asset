@@ -36,7 +36,7 @@
                             @foreach (var t in orderTypes)
                             {
                                 <input type="radio" class="btn-check" name="OrderTypeId" id="orderType@(t.Id)" value="@t.Id"
-                                       data-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-requires-vendor="@(t.RequiresVendor ? "true" : "false")"
+                                       data-requires-vendor="@(t.RequiresVendor ? "true" : "false")" data-direct-fix="@(t.IsDirectFix ? "true" : "false")"
                                        checked="@(Model.OrderTypeId == t.Id || (Model.OrderTypeId == 0 && t == orderTypes.First()))" />
                                 <label class="btn btn-outline-secondary" for="orderType@(t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</label>
                             }
@@ -53,23 +53,25 @@
                     <label class="form-label">@Loc.T("Due Date")</label>
                     <input asp-for="DueDate" type="date" class="form-control" />
                 </div>
-                <div class="col-12" id="inspectionFields">
+
+                @* Assign To and Assets are each ONE shared area now — cardinality (single/multiple
+                   assets) and assignment mode (employee/team/either) are properties of the selected
+                   Order Type, independent of whether it's survey-style or direct-fix, so there's no
+                   longer a reason to duplicate these blocks per style (as the old
+                   inspectionFields/maintenanceFields split did). *@
+                <div class="col-12">
+                    <label class="form-label d-block">@Loc.T("Assign To")</label>
+                    <div class="btn-group btn-group-sm mb-2" role="group" id="assigneeToggle">
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
+                        <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked="@(Model.AssigneeType != "User")" />
+                        <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
+                    </div>
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label d-block">@Loc.T("Assign To")</label>
-                            <div class="btn-group btn-group-sm mb-2" role="group">
-                                <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
-                                <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
-                                <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked="@(Model.AssigneeType != "User")" />
-                                <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
-                            </div>
-                        </div>
-                        <div class="col-md-6 @(Model.AssigneeType == "User" ? "" : "d-none")" id="assigneeUserRow">
-                            <label class="form-label">@Loc.T("Employee")</label>
+                        <div class="col-md-6" id="assigneeUserRow">
                             <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=ViewBag.SelectedEmployeeLabel as string,Placeholder=Loc.T("Search by name or email…")})" />
                         </div>
-                        <div class="col-md-6 @(Model.AssigneeType == "User" ? "d-none" : "")" id="assigneeTeamRow">
-                            <label class="form-label">@Loc.T("Team")</label>
+                        <div class="col-md-6" id="assigneeTeamRow">
                             <select asp-for="AssignedToTeamId" class="form-select">
                                 <option value="">@Loc.T("Select a team")</option>
                                 @foreach (var t in teams)
@@ -78,29 +80,20 @@
                                 }
                             </select>
                         </div>
-                        <div class="col-12"><hr /></div>
-                        <div class="col-12">
-                            <label class="form-label">@Loc.T("Assets")</label>
-                            <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
-                        </div>
                     </div>
                 </div>
 
-                <div class="col-12 d-none" id="maintenanceFields">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">@Loc.T("Asset")</label>
-                            <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
-                                Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
-                                SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">@Loc.T("Assigned Employee")</label>
-                            <partial name="_EmployeePicker" model='new EmployeePickerModel {
-                                Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
-                                SelectedLabel = ViewBag.SelectedEmployeeLabel as string,
-                                Placeholder = Loc.T("Search by name or email…") }' />
-                        </div>
+                <div class="col-12"><hr /></div>
+
+                <div class="col-12">
+                    <label class="form-label d-block">@Loc.T("Assets")</label>
+                    <div id="assetSingleWrap">
+                        <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
+                            Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
+                            SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
+                    </div>
+                    <div id="assetMultiWrap">
+                        <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
                     </div>
                 </div>
             </div>
@@ -116,43 +109,63 @@
 @section Scripts {
 <script>
 (function () {
-    const meta = @Html.Raw(orderTypeMetaJson); // { [orderTypeId]: { isDirectFix, requiresVendor } }
-    const inspectionFields = document.getElementById('inspectionFields');
-    const maintenanceFields = document.getElementById('maintenanceFields');
+    // { [orderTypeId]: { isDirectFix, requiresVendor, allowsMultipleAssets, assignmentMode } }
+    const meta = @Html.Raw(orderTypeMetaJson);
     const vendorHint = document.getElementById('vendorHint');
-    // _EmployeePicker's hidden input is data-attribute-scoped, not id-based, so two instances on
-    // this page don't collide in the DOM/JS — but both would post under the same "AssignedToUserId"
-    // name if both were enabled. A disabled input is excluded from form submission entirely, so
-    // toggling `disabled` alongside visibility guarantees exactly one value ever posts.
-    const inspectionEmployeeHidden = inspectionFields.querySelector('[data-ep-value]');
-    const maintenanceEmployeeHidden = maintenanceFields.querySelector('[data-ep-value]');
+
+    const assigneeToggle = document.getElementById('assigneeToggle');
+    const userRow = document.getElementById('assigneeUserRow');
+    const teamRow = document.getElementById('assigneeTeamRow');
+    const userHidden = userRow.querySelector('[data-ep-value]');
+    const teamSelect = teamRow.querySelector('select[name="AssignedToTeamId"]');
+
+    const assetSingleWrap = document.getElementById('assetSingleWrap');
+    const assetMultiWrap = document.getElementById('assetMultiWrap');
+    const assetSingleHidden = assetSingleWrap.querySelector('[data-ap-value]');
+    const assetMultiChips = assetMultiWrap.querySelector('[data-chips]');
+
+    function applyAssignmentMode(mode) {
+        const isEither = mode === 'Either';
+        assigneeToggle.classList.toggle('d-none', !isEither);
+        const showUser = mode === 'EmployeeOnly' || (isEither && document.getElementById('assigneeUser').checked);
+        const showTeam = mode === 'TeamOnly' || (isEither && !document.getElementById('assigneeUser').checked);
+        userRow.classList.toggle('d-none', !showUser);
+        teamRow.classList.toggle('d-none', !showTeam);
+        // Clear whichever side is hidden so a stale value from a previous type's selection never
+        // posts alongside the visible one.
+        if (!showUser && userHidden) userHidden.value = '';
+        if (!showTeam && teamSelect) teamSelect.value = '';
+    }
+
+    function applyCardinality(allowsMultiple) {
+        assetSingleWrap.classList.toggle('d-none', allowsMultiple);
+        assetMultiWrap.classList.toggle('d-none', !allowsMultiple);
+        // Clear whichever picker is now hidden, same reasoning as assignment above — a multi-picker
+        // chip's hidden input is added/removed dynamically (not a single static field to disable),
+        // so clearing its content on switch is simpler and more robust than trying to disable it.
+        if (allowsMultiple && assetSingleHidden) assetSingleHidden.value = '';
+        if (!allowsMultiple && assetMultiChips) assetMultiChips.innerHTML = '';
+    }
 
     function applyType(radio) {
-        const meta2 = meta[radio.value] || {};
-        const isDirectFix = radio.dataset.directFix === 'true';
-        inspectionFields.classList.toggle('d-none', isDirectFix);
-        maintenanceFields.classList.toggle('d-none', !isDirectFix);
-        if (inspectionEmployeeHidden) inspectionEmployeeHidden.disabled = isDirectFix;
-        if (maintenanceEmployeeHidden) maintenanceEmployeeHidden.disabled = !isDirectFix;
+        const m = meta[radio.value] || {};
+        applyAssignmentMode(m.assignmentMode || 'Either');
+        applyCardinality(!!m.allowsMultipleAssets);
         // Vendor-at-creation conversion only actually happens for direct-fix (maintenance-style)
         // types — see OrdersController.Create's POST handler. For inspection-style types,
         // RequiresVendor instead flags any Work Order later spawned from a Defective outcome, not
         // this submission, so showing the hint here would be a false alarm.
-        vendorHint.style.display = (isDirectFix && radio.dataset.requiresVendor === 'true') ? '' : 'none';
+        vendorHint.style.display = (m.isDirectFix && m.requiresVendor) ? '' : 'none';
     }
 
     document.querySelectorAll('input[name="OrderTypeId"]').forEach(r => r.addEventListener('change', () => applyType(r)));
     const initiallyChecked = document.querySelector('input[name="OrderTypeId"]:checked');
     if (initiallyChecked) applyType(initiallyChecked);
 
-    const userRow = document.getElementById('assigneeUserRow');
-    const teamRow = document.getElementById('assigneeTeamRow');
     document.querySelectorAll('input[name="AssigneeType"]').forEach(r => {
         r.addEventListener('change', () => {
-            if (!r.checked) return;
-            const isTeam = r.value === 'Team';
-            userRow.classList.toggle('d-none', isTeam);
-            teamRow.classList.toggle('d-none', !isTeam);
+            const checkedType = document.querySelector('input[name="OrderTypeId"]:checked');
+            applyAssignmentMode((meta[checkedType?.value] || {}).assignmentMode || 'Either');
         });
     });
 })();

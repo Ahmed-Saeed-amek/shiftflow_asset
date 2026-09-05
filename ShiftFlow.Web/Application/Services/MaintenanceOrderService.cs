@@ -12,7 +12,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly ISparePartService _spareParts;
-    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts) { _db = db; _audit = audit; _spareParts = spareParts; }
+    private readonly ITeamService _teams;
+    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, ITeamService teams) { _db = db; _audit = audit; _spareParts = spareParts; _teams = teams; }
 
     // Stages/statuses (across both entities) that mean "this asset still has open work" —
     // checked before restoring Asset.Status to "Working" so a second, unrelated issue on the
@@ -29,17 +30,20 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == assetId && m.Id != excludeMaintenanceOrderId && m.Status == "Open")
         || await _db.WorkOrders.AnyAsync(w => w.AssetId == assetId && OpenWorkOrderStages.Contains(w.Stage));
 
-    public async Task<MaintenanceOrder> CreateAsync(int assetId, string assignedToUserId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null)
+    public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null)
     {
-        if (string.IsNullOrWhiteSpace(assignedToUserId))
-            throw new InvalidOperationException("Select an employee to assign this maintenance order to.");
+        var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
+        var hasTeam = assignedToTeamId.HasValue;
+        if (hasUser == hasTeam)
+            throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
         if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
             throw new InvalidOperationException("This asset is retired and can't have new orders opened against it.");
 
         var order = new MaintenanceOrder
         {
             AssetId = assetId,
-            AssignedToUserId = assignedToUserId,
+            AssignedToUserId = hasUser ? assignedToUserId : null,
+            AssignedToTeamId = hasTeam ? assignedToTeamId : null,
             Description = description,
             DueDate = dueDate,
             CreatedByUserId = createdByUserId,
@@ -81,7 +85,12 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     {
         var order = await _db.MaintenanceOrders.Include(m => m.Parts).FirstOrDefaultAsync(m => m.Id == orderId)
             ?? throw new InvalidOperationException("Maintenance order not found.");
-        if (order.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
+        // Same "assignee or team member" rule as InspectionOrder — a Team-assigned order can be
+        // completed by any member, not just whoever happens to be recorded as AssignedToUserId
+        // (which is null for a Team-assigned order in the first place).
+        var isAssignee = order.AssignedToUserId == employeeUserId;
+        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, employeeUserId);
+        if (!isAssignee && !isTeamMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
         if (order.Status != "Open") throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
 
         order.CompletedDate = completedDate;
@@ -143,6 +152,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         await _db.MaintenanceOrders
             .Include(m => m.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Include(m => m.AssignedToUser)
+            .Include(m => m.AssignedToTeam)
             .Include(m => m.CreatedByUser)
             .Include(m => m.Parts)
             .FirstOrDefaultAsync(m => m.Id == id);
@@ -152,6 +162,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
+            .Include(m => m.AssignedToTeam)
             .Include(m => m.OrderType)
             .AsQueryable();
 
@@ -172,6 +183,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var orders = await _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
+            .Include(m => m.AssignedToTeam)
             .OrderByDescending(m => m.CreatedDate)
             .ToListAsync();
 
@@ -187,7 +199,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         {
             ws.Cells[row, 1].Value = o.OrderNumber;
             ws.Cells[row, 2].Value = o.Asset?.AssetTag;
-            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName;
+            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null);
             ws.Cells[row, 4].Value = o.Status;
             ws.Cells[row, 5].Value = o.Cost;
             ws.Cells[row, 6].Value = o.CompletedDate?.ToString("yyyy-MM-dd");

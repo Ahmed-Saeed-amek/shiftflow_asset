@@ -205,7 +205,8 @@ public class UsersController : Controller
             Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
         }).ToList();
 
-        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset).Where(m => m.AssignedToUserId == userId);
+        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset)
+            .Where(m => m.AssignedToUserId == userId || (m.AssignedToTeamId != null && myTeamIds.Contains(m.AssignedToTeamId.Value)));
         if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == "Open");
         if (from.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate >= from.Value);
         if (to.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate <= to.Value);
@@ -250,7 +251,7 @@ public class UsersController : Controller
             .ToListAsync();
 
         var maintenanceGroups = await _db.MaintenanceOrders.AsNoTracking()
-            .Where(m => m.AssignedToUserId == id)
+            .Where(m => m.AssignedToUserId == id || (m.AssignedToTeamId != null && myTeamIds.Contains(m.AssignedToTeamId.Value)))
             .GroupBy(m => new { m.CreatedDate.Year, m.CreatedDate.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
             .ToListAsync();

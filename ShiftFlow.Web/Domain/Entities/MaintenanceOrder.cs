@@ -9,7 +9,11 @@ public class MaintenanceOrder
     public int Id{get;set;}
     public string OrderNumber{get;set;}=string.Empty;      // "MO-{year}-{seq:D4}"
     public int AssetId{get;set;} public virtual Asset? Asset{get;set;}
-    public string AssignedToUserId{get;set;}=string.Empty; public virtual ApplicationUser? AssignedToUser{get;set;}
+    // Exactly one of these two is set — enforced in the service layer + a DB CHECK constraint,
+    // same pattern as InspectionOrder. Team assignment added specifically so OrderType.AssignmentMode
+    // ("TeamOnly"/"Either") means something for direct-fix types too, not just survey-style ones.
+    public string? AssignedToUserId{get;set;} public virtual ApplicationUser? AssignedToUser{get;set;}
+    public int? AssignedToTeamId{get;set;} public virtual Team? AssignedToTeam{get;set;}
     public string? Description{get;set;}
     public string CreatedByUserId{get;set;}=string.Empty; public virtual ApplicationUser? CreatedByUser{get;set;}
     public DateTime CreatedDate{get;set;}=DateTime.UtcNow;

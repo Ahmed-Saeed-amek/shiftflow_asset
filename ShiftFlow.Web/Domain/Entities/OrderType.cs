@@ -30,6 +30,15 @@ public class OrderType
     /// (round-robin, no repeats until the 20-color palette is exhausted) — never user-editable, so
     /// every type gets a distinct identity on the Orders list without an admin having to pick one.</summary>
     public string Color { get; set; } = "#6c757d";
+    /// <summary>Independent of IsDirectFix — a direct-fix type can now survey/act on several assets
+    /// at once (batch-creates one order per asset) just as a survey-style type normally does, and a
+    /// survey-style type can be locked to exactly one asset if that reads more naturally for it.</summary>
+    public bool AllowsMultipleAssets { get; set; }
+    /// <summary>Which assignee kinds this type's Create form offers — independent of IsDirectFix.
+    /// Maintenance-style orders gained team assignment (AssignedToTeamId on MaintenanceOrder)
+    /// specifically to make "TeamOnly"/"Either" meaningful for direct-fix types too, not just survey ones.</summary>
+    public string AssignmentMode { get; set; } = "Either";
+    public static readonly string[] AssignmentModes = ["EmployeeOnly", "TeamOnly", "Either"];
 }
 
 /// <summary>A fixed, hand-picked 20-color categorical palette (good contrast on a white badge

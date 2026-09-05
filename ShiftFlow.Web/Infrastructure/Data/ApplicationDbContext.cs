@@ -313,10 +313,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(m => m.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.AssignedToUser).WithMany()
                 .HasForeignKey(m => m.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.AssignedToTeam).WithMany()
+                .HasForeignKey(m => m.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.CreatedByUser).WithMany()
                 .HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.OrderType).WithMany()
                 .HasForeignKey(m => m.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
+            // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
+            e.ToTable(tb => tb.HasCheckConstraint(
+                "CK_MaintenanceOrder_ExactlyOneAssignee",
+                "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
         });
         b.Entity<OrderType>(e =>
         {

@@ -75,13 +75,14 @@ public class DashboardController : Controller
             .ToListAsync();
 
         var maintenanceRows = await _db.MaintenanceOrders.AsNoTracking()
-            .Include(m => m.AssignedToUser)
+            .Include(m => m.AssignedToUser).Include(m => m.AssignedToTeam)
             .OrderByDescending(m => m.CreatedDate).Take(6)
             .Select(m => new MyWorkOrderRow
             {
                 Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
                 Status = m.Status, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
-                AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName : null,
+                AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName
+                    : m.AssignedToTeam != null ? "Team: " + m.AssignedToTeam.Name : null,
             })
             .ToListAsync();
 

@@ -73,7 +73,8 @@ public class OrdersController : Controller
                 OrderTypeLabel = m.OrderType != null ? _loc.LocalizedName(m.OrderType.Name, m.OrderType.NameAr) : _loc.T("Maintenance"),
                 OrderTypeColor = m.OrderType?.Color ?? "#6c757d",
                 AssetLabel = m.Asset?.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
-                DetailsController = "MaintenanceOrders", AssignedToLabel = m.AssignedToUser?.FullName,
+                DetailsController = "MaintenanceOrders",
+                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToTeam != null ? $"Team: {m.AssignedToTeam.Name}" : null),
             }));
         }
 
@@ -131,29 +132,26 @@ public class OrdersController : Controller
         if (orderType.IsDirectFix && !canManageMaintenance) return Forbid();
         if (!orderType.IsDirectFix && !canManageInspection) return Forbid();
 
+        // Asset cardinality and assignment mode are now independent of IsDirectFix (OrderType's own
+        // AllowsMultipleAssets/AssignmentMode) — resolve which posted fields actually apply here,
+        // server-side, rather than trusting whichever inputs the client happened to enable/disable.
+        var assetIds = orderType.AllowsMultipleAssets
+            ? (vm.AssetIds ?? []).Distinct().ToList()
+            : (vm.AssetId > 0 ? [vm.AssetId] : []);
+
+        string? assignedToUserId = orderType.AssignmentMode == "TeamOnly" ? null : vm.AssignedToUserId;
+        int? assignedToTeamId = orderType.AssignmentMode == "EmployeeOnly" ? null : vm.AssignedToTeamId;
+        if (orderType.AssignmentMode == "Either")
+        {
+            if (vm.AssigneeType == "User") assignedToTeamId = null; else assignedToUserId = null;
+        }
+
         if (!orderType.IsDirectFix)
         {
-            var nested = new InspectionOrderCreateVm
-            {
-                OrderTypeId = vm.OrderTypeId, DueDate = vm.DueDate,
-                AssigneeType = vm.AssigneeType, AssignedToUserId = vm.AssignedToUserId,
-                AssignedToTeamId = vm.AssignedToTeamId, AssetIds = vm.AssetIds,
-            };
-            ModelState.Clear();
-            // No prefix - TryValidateModel(model) keys ModelState by the nested VM's own property
-            // names (AssetIds, AssignedToTeamId, ...), which are identical to OrderCreateVm's, so
-            // asp-validation-for on the same-named fields in Views/Orders/Create.cshtml lines up.
-            if (!TryValidateModel(nested))
-            {
-                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                return View(vm);
-            }
             try
             {
-                var order = await _inspectionOrders.CreateAsync(nested.OrderTypeId, nested.Description,
-                    nested.AssigneeType == "User" ? nested.AssignedToUserId : null,
-                    nested.AssigneeType == "Team" ? nested.AssignedToTeamId : null,
-                    nested.AssetIds, nested.DueDate, CurrentUserId);
+                var order = await _inspectionOrders.CreateAsync(orderType.Id, null,
+                    assignedToUserId, assignedToTeamId, assetIds, vm.DueDate, CurrentUserId);
                 TempData["Success"] = $"Order {order.OrderNumber} created.";
                 return RedirectToAction("Details", "InspectionOrders", new { id = order.Id });
             }
@@ -166,36 +164,60 @@ public class OrdersController : Controller
         }
         else
         {
-            var nested = new MaintenanceOrderCreateVm
+            if (assetIds.Count == 0)
             {
-                AssetId = vm.AssetId, OrderTypeId = vm.OrderTypeId,
-                AssignedToUserId = vm.AssignedToUserId, DueDate = vm.DueDate,
-            };
-            ModelState.Clear();
-            if (!TryValidateModel(nested))
+                ModelState.AddModelError("", "Select at least one asset.");
+                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
+                return View(vm);
+            }
+            if (await _db.Assets.AnyAsync(a => assetIds.Contains(a.Id) && a.Status == "Retired"))
             {
+                ModelState.AddModelError("", "One or more selected assets are retired and can't have new orders opened against them.");
                 await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
                 return View(vm);
             }
             try
             {
-                // Preserves MaintenanceOrdersController.Create POST's existing branch verbatim: a
-                // RequiresVendor OrderType produces a WorkOrder instead of a MaintenanceOrder.
+                // Preserves the original single-asset branch's behavior exactly: a RequiresVendor
+                // OrderType produces a WorkOrder instead of a MaintenanceOrder. For
+                // AllowsMultipleAssets, one order is created per selected asset (no shared "batch"
+                // row exists in the schema) — redirect to the single order's Details page for the
+                // common single-asset case, or the Orders list with a count for a real batch.
                 if (orderType.RequiresVendor)
                 {
-                    var wo = await _workOrders.CreateAsync(new WorkOrder
+                    WorkOrder? first = null;
+                    foreach (var assetId in assetIds)
                     {
-                        AssetId = nested.AssetId,
-                        AssignedToUserId = string.IsNullOrWhiteSpace(nested.AssignedToUserId) ? null : nested.AssignedToUserId,
-                        Description = nested.Description, RequiresVendorResponse = true,
-                    }, CurrentUserId);
-                    TempData["Success"] = $"Work order {wo.WorkOrderNumber} created — this order type requires a vendor.";
-                    return RedirectToAction("Details", "WorkOrders", new { id = wo.Id });
+                        var wo = await _workOrders.CreateAsync(new WorkOrder
+                        {
+                            AssetId = assetId,
+                            AssignedToUserId = string.IsNullOrWhiteSpace(assignedToUserId) ? null : assignedToUserId,
+                            Description = null, RequiresVendorResponse = true,
+                        }, CurrentUserId);
+                        first ??= wo;
+                    }
+                    if (assetIds.Count == 1)
+                    {
+                        TempData["Success"] = $"Work order {first!.WorkOrderNumber} created — this order type requires a vendor.";
+                        return RedirectToAction("Details", "WorkOrders", new { id = first!.Id });
+                    }
+                    TempData["Success"] = $"{assetIds.Count} work orders created — this order type requires a vendor.";
+                    return RedirectToAction(nameof(Index));
                 }
-                var order = await _maintenanceOrders.CreateAsync(nested.AssetId, nested.AssignedToUserId!,
-                    nested.Description, nested.DueDate, CurrentUserId, orderType.Id);
-                TempData["Success"] = $"Order {order.OrderNumber} created.";
-                return RedirectToAction("Details", "MaintenanceOrders", new { id = order.Id });
+                MaintenanceOrder? firstOrder = null;
+                foreach (var assetId in assetIds)
+                {
+                    var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToTeamId,
+                        null, vm.DueDate, CurrentUserId, orderType.Id);
+                    firstOrder ??= order;
+                }
+                if (assetIds.Count == 1)
+                {
+                    TempData["Success"] = $"Order {firstOrder!.OrderNumber} created.";
+                    return RedirectToAction("Details", "MaintenanceOrders", new { id = firstOrder!.Id });
+                }
+                TempData["Success"] = $"{assetIds.Count} orders created.";
+                return RedirectToAction(nameof(Index));
             }
             catch (InvalidOperationException ex)
             {
@@ -228,7 +250,8 @@ public class OrdersController : Controller
         var offered = allTypes.Where(t => (t.IsDirectFix && canManageMaintenance) || (!t.IsDirectFix && canManageInspection)).ToList();
         ViewBag.OrderTypes = offered;
         ViewBag.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
-            offered.ToDictionary(t => t.Id, t => new { t.IsDirectFix, t.RequiresVendor }));
+            offered.ToDictionary(t => t.Id, t => new { t.IsDirectFix, t.RequiresVendor, t.AllowsMultipleAssets, t.AssignmentMode }),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
 
         ViewBag.SelectedAssetChips = vm?.AssetIds is { Count: > 0 }
             ? await _db.Assets.Where(a => vm.AssetIds.Contains(a.Id))

@@ -166,9 +166,10 @@ public interface IWorkOrderService
 
 public interface IMaintenanceOrderService
 {
-    /// <summary>Admin/manager assigns an employee to fix an asset in-house — no vendor, no Work Order.
-    /// Sets Asset.Status to "Maintenance" (unless Retired).</summary>
-    Task<MaintenanceOrder> CreateAsync(int assetId, string assignedToUserId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
+    /// <summary>Admin/manager assigns an employee or a Team to fix an asset in-house — no vendor, no
+    /// Work Order. Exactly one of assignedToUserId/assignedToTeamId must be set. Sets Asset.Status
+    /// to "Maintenance" (unless Retired).</summary>
+    Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
     /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
     Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);

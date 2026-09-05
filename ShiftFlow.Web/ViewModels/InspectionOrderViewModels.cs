@@ -2,63 +2,28 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ShiftFlow.Web.ViewModels;
 
-public class InspectionOrderCreateVm : IValidatableObject
-{
-    public string? Description { get; set; }
-    [Required] public int OrderTypeId { get; set; }
-
-    /// <summary>"User" or "Team"</summary>
-    [Required] public string AssigneeType { get; set; } = "Team";
-    public string? AssignedToUserId { get; set; }
-    public int? AssignedToTeamId { get; set; }
-
-    public List<int>? AssetIds { get; set; }
-
-    public DateTime? DueDate { get; set; }
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        var t = ValidationHelper.Localizer(validationContext);
-
-        if (AssigneeType == "Team")
-        {
-            if (!AssignedToTeamId.HasValue || AssignedToTeamId <= 0)
-                yield return new ValidationResult(string.Format(t("Please select a {0}."), t("Team")), new[] { nameof(AssignedToTeamId) });
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(AssignedToUserId))
-                yield return new ValidationResult(string.Format(t("Please select a {0}."), t("Employee")), new[] { nameof(AssignedToUserId) });
-        }
-
-        if (AssetIds == null || AssetIds.Count == 0)
-            yield return new ValidationResult(t("Select at least one asset."), new[] { nameof(AssetIds) });
-    }
-}
-
-/// <summary>Union of InspectionOrderCreateVm's and MaintenanceOrderCreateVm's fields, bound by the
-/// unified Views/Orders/Create.cshtml form. Only the subset relevant to the selected OrderTypeId's
-/// IsDirectFix flag is actually used at submit time — OrdersController.Create (POST) projects this
-/// into whichever of the two existing VMs matches and re-validates that one; this VM itself carries
-/// no IValidatableObject logic of its own. Property names are kept identical to both source VMs so
-/// the re-validated ModelState keys line up with this view's asp-validation-for attributes.</summary>
+/// <summary>Bound by the unified Views/Orders/Create.cshtml form — every field an Order Type's
+/// configuration (AllowsMultipleAssets, AssignmentMode) might call for, regardless of IsDirectFix.
+/// No IValidatableObject here: OrdersController.Create (POST) resolves which fields actually apply
+/// server-side (never trusting the client) and relies on IInspectionOrderService/
+/// IMaintenanceOrderService's own "exactly one assignee"/"at least one asset" guards, surfacing
+/// their InvalidOperationException as a page-level error banner like every other failure in that
+/// action already does — simpler than re-deriving per-type-conditional field validation here.</summary>
 public class OrderCreateVm
 {
     [Required] public int OrderTypeId { get; set; }
     public DateTime? DueDate { get; set; }
 
-    // Inspection-style fields
+    /// <summary>"User" or "Team" — which side of the toggle is active when AssignmentMode=="Either".
+    /// Ignored (server re-derives from OrderType.AssignmentMode) when the mode is EmployeeOnly/TeamOnly.</summary>
     public string AssigneeType { get; set; } = "Team";
-    public int? AssignedToTeamId { get; set; }
-    public List<int>? AssetIds { get; set; }
-
-    // Maintenance-style fields
-    public int AssetId { get; set; }
-
-    // Shared - the SAME hidden input name is used by both _EmployeePicker instances on the Create
-    // page; only the active one is enabled at submit time, so exactly one value ever posts here
-    // regardless of which field-set was showing.
     public string? AssignedToUserId { get; set; }
+    public int? AssignedToTeamId { get; set; }
+
+    /// <summary>Used when the type's AllowsMultipleAssets is false.</summary>
+    public int AssetId { get; set; }
+    /// <summary>Used when the type's AllowsMultipleAssets is true.</summary>
+    public List<int>? AssetIds { get; set; }
 }
 
 /// <summary>Row shape for the Profile page's "recent orders" list — unrelated to the

@@ -61,8 +61,8 @@
             </div>
             <div class="card-body">
                 <dl class="row small mb-0 gy-2">
-                    <dt class="col-5 text-muted fw-normal">@Loc.T("Assigned Employee")</dt>
-                    <dd class="col-7 text-end mb-0">@(Model.AssignedToUser?.FullName ?? "—")</dd>
+                    <dt class="col-5 text-muted fw-normal">@Loc.T("Assigned To")</dt>
+                    <dd class="col-7 text-end mb-0">@(Model.AssignedToUser?.FullName ?? (Model.AssignedToTeam != null ? $"{Loc.T("Team")}: {Model.AssignedToTeam.Name}" : "—"))</dd>
                     <dt class="col-5 text-muted fw-normal">@Loc.T("Created By")</dt>
                     <dd class="col-7 text-end mb-0">@(Model.CreatedByUser?.FullName ?? "—")</dd>
                     @if (Model.DueDate.HasValue)

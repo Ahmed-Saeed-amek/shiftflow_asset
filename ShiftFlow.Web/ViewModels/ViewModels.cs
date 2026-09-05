@@ -310,23 +310,6 @@ public class WorkOrderViewModel : IValidatableObject
         ValidationHelper.CheckSelected(AssetId, nameof(AssetId), "Asset", ValidationHelper.Localizer(validationContext));
 }
 
-public class MaintenanceOrderCreateVm : IValidatableObject
-{
-    public int AssetId { get; set; }
-    public int OrderTypeId { get; set; }
-    public string? AssignedToUserId { get; set; }
-    public string? Description { get; set; }
-    public DateTime? DueDate { get; set; }
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        var t = ValidationHelper.Localizer(validationContext);
-        foreach (var r in ValidationHelper.CheckSelected(AssetId, nameof(AssetId), "Asset", t)) yield return r;
-        if (string.IsNullOrWhiteSpace(AssignedToUserId))
-            yield return new ValidationResult(string.Format(t("Please select a {0}."), t("Employee")), new[] { nameof(AssignedToUserId) });
-    }
-}
-
 public class MaintenanceOrderCompleteVm
 {
     public DateTime? CompletedDate { get; set; }
@@ -363,6 +346,8 @@ public class OrderTypeViewModel
     public bool IsDirectFix { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
+    public bool AllowsMultipleAssets { get; set; }
+    [Required] public string AssignmentMode { get; set; } = "Either";
 }
 
 public class VendorFixViewModel
