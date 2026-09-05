@@ -45,7 +45,6 @@ public class InspectionOrderCreateVm : IValidatableObject
 public class OrderCreateVm
 {
     [Required] public int OrderTypeId { get; set; }
-    public string? Description { get; set; }
     public DateTime? DueDate { get; set; }
 
     // Inspection-style fields
@@ -62,7 +61,7 @@ public class OrderCreateVm
     public string? AssignedToUserId { get; set; }
 }
 
-/// <summary>Row shape for the Profile / My Metrics "recent orders" list — unrelated to the
+/// <summary>Row shape for the Profile page's "recent orders" list — unrelated to the
 /// unified My Orders page (MyWorkOrderRow below); this one is Inspection-Orders-only, scoped to
 /// whichever employee's profile is being viewed.</summary>
 public sealed class InspectionOrderRow
@@ -83,9 +82,16 @@ public sealed class InspectionOrderRow
 /// be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work Orders).</summary>
 public sealed class MyWorkOrderRow
 {
-    /// <summary>"Inspection" | "Maintenance" | "WorkOrder" — drives the category filter and badge; matches the category query param.</summary>
+    /// <summary>"Inspection" | "Maintenance" | "WorkOrder" — internal routing bucket only (drives
+    /// which controller "View" links to); NOT what's shown to the user any more, see OrderTypeLabel/Color.</summary>
     public string Category { get; init; } = "";
     public string CategoryLabel { get; init; } = "";
+    /// <summary>The actual OrderType this order was created with — null for Work Orders, which
+    /// aren't created via an OrderType. Drives the Orders list's per-type filter tab and row badge.</summary>
+    public int? OrderTypeId { get; init; }
+    public string OrderTypeLabel { get; init; } = "";
+    /// <summary>Hex color for the badge/filter chip — from OrderType.Color, or a fixed neutral for Work Orders.</summary>
+    public string OrderTypeColor { get; init; } = "#6c757d";
     public int Id { get; init; }
     public string OrderNumber { get; init; } = "";
     /// <summary>Asset tag for single-asset orders (Maintenance/Work Order), or "N assets" for a multi-asset Inspection Order.</summary>

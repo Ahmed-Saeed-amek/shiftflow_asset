@@ -32,12 +32,7 @@
                 </div>
                 <div class="col-12">
                     <label class="form-label small">@Loc.T("Notes")</label>
-                    <select id="notesPreset" class="form-select mb-2">
-                        <option value="">@Loc.T("— Select —")</option>
-                        <option value="__other__">@Loc.T("Other…")</option>
-                    </select>
-                    <textarea id="notesOther" class="form-control d-none" rows="3" placeholder="@Loc.T("Describe…")"></textarea>
-                    <input type="hidden" asp-for="Notes" id="notesHidden" />
+                    <textarea asp-for="Notes" class="form-control" rows="3" placeholder="@Loc.T("Describe…")"></textarea>
                 </div>
             </div>
             <div class="mt-4 d-flex gap-2">
@@ -81,53 +76,5 @@
 
     actionTypeSel.addEventListener('change', () => loadCauses(actionTypeSel.value ? Number(actionTypeSel.value) : null, null));
     loadActionTypes();
-
-    // Notes preset dropdown — admin-managed canned text scoped per asset Category (inheriting its
-    // parent category's presets too), with an "Other…" escape hatch.
-    const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
-    const notesPresetSel = document.getElementById('notesPreset');
-    const notesOther = document.getElementById('notesOther');
-    const notesHidden = document.getElementById('notesHidden');
-    const jsSelectOne = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("— Select —")));
-    const jsOther = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Other…")));
-    let notesPresets = [];
-
-    async function loadNotesPresets() {
-        const resp = await fetch(`/TextPresets/ByField?fieldKey=ReportActionNotes&categoryId=${categoryId}`);
-        notesPresets = resp.ok ? await resp.json() : [];
-        const priorValue = notesHidden.value;
-        notesPresetSel.innerHTML = '';
-        const blankOpt = document.createElement('option'); blankOpt.value = ''; blankOpt.textContent = jsSelectOne;
-        notesPresetSel.appendChild(blankOpt);
-        notesPresets.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = String(p.id); opt.textContent = (isRTL && p.textAr) ? p.textAr : p.text;
-            notesPresetSel.appendChild(opt);
-        });
-        const otherOpt = document.createElement('option'); otherOpt.value = '__other__'; otherOpt.textContent = jsOther;
-        notesPresetSel.appendChild(otherOpt);
-
-        if (priorValue) {
-            const match = notesPresets.find(p => p.text === priorValue || p.textAr === priorValue);
-            if (match) { notesPresetSel.value = String(match.id); notesOther.classList.add('d-none'); }
-            else { notesPresetSel.value = '__other__'; notesOther.value = priorValue; notesOther.classList.remove('d-none'); }
-        }
-    }
-
-    notesPresetSel.addEventListener('change', () => {
-        if (notesPresetSel.value === '__other__') {
-            notesOther.classList.remove('d-none');
-            notesHidden.value = notesOther.value;
-        } else if (notesPresetSel.value === '') {
-            notesOther.classList.add('d-none');
-            notesHidden.value = '';
-        } else {
-            notesOther.classList.add('d-none');
-            const chosen = notesPresets.find(p => String(p.id) === notesPresetSel.value);
-            notesHidden.value = chosen ? ((isRTL && chosen.textAr) ? chosen.textAr : chosen.text) : '';
-        }
-    });
-    notesOther.addEventListener('input', () => { notesHidden.value = notesOther.value; });
-    loadNotesPresets();
 })();
 </script>

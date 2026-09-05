@@ -64,8 +64,15 @@
                             <input name="NameAr" id="actionTypeNameAr" class="form-control" dir="rtl" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Category")</label>
-                            <select name="CategoryId" id="actionTypeCategoryId" class="form-select">
+                            <label class="form-label small d-block">@Loc.T("Applies to")</label>
+                            <div class="btn-group btn-group-sm mb-2" role="group">
+                                <input type="radio" class="btn-check" name="scopeMode" id="scopeAll" value="all" checked />
+                                <label class="btn btn-outline-secondary" for="scopeAll">@Loc.T("All Categories")</label>
+                                <input type="radio" class="btn-check" name="scopeMode" id="scopeSpecific" value="specific" />
+                                <label class="btn btn-outline-secondary" for="scopeSpecific">@Loc.T("Specific Category")</label>
+                            </div>
+                            <div class="form-text mb-2">@Loc.T("Unscoped actions apply everywhere; a specific category (or subcategory) limits this action to just that one.")</div>
+                            <select name="CategoryId" id="actionTypeCategoryId" class="form-select d-none">
                                 <option value="">@Loc.T("All Categories")</option>
                                 @foreach (var c in categories)
                                 {
@@ -100,6 +107,27 @@
     const jsNewActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Maintenance Action")));
     const jsEditActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Maintenance Action")));
 
+    const scopeAll = document.getElementById('scopeAll');
+    const scopeSpecific = document.getElementById('scopeSpecific');
+    const categorySelect = document.getElementById('actionTypeCategoryId');
+
+    function setScopeMode(hasCategoryId) {
+        scopeSpecific.checked = hasCategoryId;
+        scopeAll.checked = !hasCategoryId;
+        categorySelect.classList.toggle('d-none', !hasCategoryId);
+    }
+    document.querySelectorAll('input[name=scopeMode]').forEach(r => r.addEventListener('change', () => {
+        categorySelect.classList.toggle('d-none', scopeAll.checked);
+        if (scopeAll.checked) categorySelect.value = '';
+    }));
+
+    // "All Categories" clears CategoryId to null before submit, regardless of whatever the
+    // (now-hidden) select still holds from an earlier toggle — the toggle is the source of
+    // truth, not the select's own value.
+    document.getElementById('actionTypeForm').addEventListener('submit', () => {
+        if (scopeAll.checked) categorySelect.value = '';
+    });
+
     function openCreate() {
         document.getElementById('actionTypeModalTitle').textContent = jsNewActionType;
         document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Create")');
@@ -107,7 +135,8 @@
         document.getElementById('actionTypeName').value = '';
         document.getElementById('actionTypeNameAr').value = '';
         document.getElementById('actionTypeIsActive').checked = true;
-        document.getElementById('actionTypeCategoryId').value = '';
+        categorySelect.value = '';
+        setScopeMode(false);
     }
 
     function openEdit(id, name, nameAr, isActive, categoryId) {
@@ -117,7 +146,8 @@
         document.getElementById('actionTypeName').value = name || '';
         document.getElementById('actionTypeNameAr').value = nameAr || '';
         document.getElementById('actionTypeIsActive').checked = isActive;
-        document.getElementById('actionTypeCategoryId').value = categoryId ?? '';
+        categorySelect.value = categoryId ?? '';
+        setScopeMode(categoryId != null);
     }
 </script>
 }

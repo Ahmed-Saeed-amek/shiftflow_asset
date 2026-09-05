@@ -145,23 +145,10 @@ public class UsersController : Controller
         return View(vm);
     }
 
-    // Self-service metrics — any authenticated user sees only their own data.
-    [Authorize]
-    public async Task<IActionResult> MyMetrics(string? range)
-    {
-        var id = _um.GetUserId(User)!;
-        var (from, to) = ResolveRange(range);
-        ViewBag.SelectedRange = range ?? "all";
-        var vm = await BuildProfileAsync(id, from, to);
-        if (vm is null) return NotFound();
-        ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
-        return View(vm);
-    }
-
     // Read-only list of inspection orders assigned to the current user (directly, or via a
     // Team they belong to). Open work by default; showAll=true also includes Done.
     // Employees see only this month's tasks by default (range=null -> "month"); pass range=all
-    // for the full history (no date bound), matching MyMetrics' range convention.
+    // for the full history (no date bound).
     // Unified "what's assigned to me" list — combines Inspection Orders (direct or via team),
     // Maintenance Orders, and Work Orders into one list with a Category badge, replacing what
     // used to be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work

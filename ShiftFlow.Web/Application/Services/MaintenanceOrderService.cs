@@ -77,23 +77,23 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         }
     }
 
-    public async Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
+    public async Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
         var order = await _db.MaintenanceOrders.Include(m => m.Parts).FirstOrDefaultAsync(m => m.Id == orderId)
             ?? throw new InvalidOperationException("Maintenance order not found.");
         if (order.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
         if (order.Status != "Open") throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
 
-        order.FixDescription = fixDescription;
-        order.Cost = cost;
         order.CompletedDate = completedDate;
 
         // Same pattern as WorkOrderService.ApplyPartsAsync: validate compatibility, decrement stock
         // atomically per part, snapshot Name/UnitCost from the catalog, all inside one transaction
-        // so a mid-loop stock-insufficiency failure rolls back any parts already decremented.
+        // so a mid-loop stock-insufficiency failure rolls back any parts already decremented. Cost
+        // is entirely derived from the parts used — there's no manually-typed cost field anymore.
         var validParts = parts.Where(p => p.Quantity > 0).ToList();
         await using var tx = await _db.Database.BeginTransactionAsync();
         _db.MaintenanceOrderParts.RemoveRange(order.Parts);
+        var totalCost = 0m;
         if (validParts.Count > 0)
         {
             var compatibleIds = await _db.SparePartAssets.Where(sa => sa.AssetId == order.AssetId)
@@ -113,8 +113,10 @@ public class MaintenanceOrderService : IMaintenanceOrderService
                     MaintenanceOrderId = order.Id, SparePartId = p.SparePartId,
                     Name = catalogPart.Name, Quantity = p.Quantity, UnitCostAtUsage = catalogPart.UnitCost,
                 });
+                totalCost += (catalogPart.UnitCost ?? 0m) * p.Quantity;
             }
         }
+        order.Cost = totalCost;
 
         order.Status = "Done";
         order.ClosedDate = DateTime.UtcNow;
@@ -150,6 +152,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
+            .Include(m => m.OrderType)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status))

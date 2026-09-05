@@ -140,14 +140,14 @@ public interface IWorkOrderService
     Task SendToVendorAsync(int workOrderId, int vendorId, string userId);
     /// <summary>Admin assigns/reassigns/clears the internal employee on a work order — independent of and combinable with VendorId, usable at any stage.</summary>
     Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId);
-    /// <summary>The assigned employee's own equivalent of VendorFixAsync — only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely).</summary>
-    Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
+    /// <summary>The assigned employee's own equivalent of VendorFixAsync — only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely). FixCost is computed from the parts used, not a manual input.</summary>
+    Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false — usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
-    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false);
+    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false);
     /// <summary>Admin override — force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
     Task ForceCloseAsync(int workOrderId, string? reason, string userId);
-    /// <summary>Vendor submits a fix — Stage="Fixed - Pending Confirmation".</summary>
-    Task VendorFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId);
+    /// <summary>Vendor submits a fix — Stage="Fixed - Pending Confirmation". FixCost is computed from the parts used, not a manual input.</summary>
+    Task VendorFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId);
     /// <summary>Vendor reports they can't proceed — Stage="Blocked".</summary>
     Task VendorBlockAsync(int workOrderId, int blockReasonId, string? detail, string vendorUserId);
     /// <summary>Admin resolves whatever blocked the vendor and sends it back to the same vendor — Stage="Sent to Vendor", block fields cleared.</summary>
@@ -171,7 +171,7 @@ public interface IMaintenanceOrderService
     Task<MaintenanceOrder> CreateAsync(int assetId, string assignedToUserId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
     /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
-    Task<MaintenanceOrder> CompleteAsync(int orderId, string fixDescription, decimal? cost, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
+    Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
     Task<MaintenanceOrder?> GetByIdAsync(int id);

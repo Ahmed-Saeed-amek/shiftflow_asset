@@ -1,12 +1,14 @@
 @model List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>
 @using Microsoft.AspNetCore.Authorization
+@using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Orders");
     var status = (string?)ViewBag.Status;
     var search = (string?)ViewBag.Search;
-    var category = ViewBag.Category as string;
+    var orderTypeId = ViewBag.OrderTypeId as int?;
+    var activeOrderTypes = (List<OrderType>)ViewBag.ActiveOrderTypes;
     var overdue = ViewBag.Overdue is true;
     var canManageInspection = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     var canManageMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
@@ -14,12 +16,19 @@
     if (canManageInspection || canManageMaintenance)
         actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
 
-    string CategoryBadgeClass(string c) => c switch
+    // Picks readable text (near-black or white) for an arbitrary hex badge background — the
+    // 20-color auto-assigned palette (OrderTypeColors) spans both light and dark hues, so a
+    // single hardcoded text color would be unreadable on roughly half of them.
+    string ReadableTextColor(string hex)
     {
-        "Inspection" => "bg-primary-subtle text-primary-emphasis",
-        "Maintenance" => "bg-warning-subtle text-warning-emphasis",
-        _ => "bg-info-subtle text-info-emphasis",
-    };
+        hex = hex.TrimStart('#');
+        if (hex.Length != 6) return "#fff";
+        var r = Convert.ToInt32(hex[..2], 16);
+        var g = Convert.ToInt32(hex[2..4], 16);
+        var b = Convert.ToInt32(hex[4..6], 16);
+        var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.6 ? "#1a1a1a" : "#fff";
+    }
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),ActionsHtml=actionsHtml})" />
 
@@ -32,19 +41,25 @@
 }
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
-    <div class="btn-group btn-group-sm" role="group">
-        <a class="btn @(string.IsNullOrEmpty(category) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status">@Loc.T("All")</a>
-        <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status" asp-route-category="Inspection">@Loc.T("Inspection")</a>
-        <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
+    <div class="overflow-x-auto">
+        <div class="btn-group btn-group-sm text-nowrap" role="group">
+            <a class="btn @(orderTypeId == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status">@Loc.T("All")</a>
+            @foreach (var t in activeOrderTypes)
+            {
+                var isActive = orderTypeId == t.Id;
+                <a class="btn @(isActive ? "" : "btn-outline-secondary")" style="@(isActive ? $"background-color:{t.Color};color:{ReadableTextColor(t.Color)};border-color:{t.Color}" : "")"
+                   asp-action="Index" asp-route-status="@status" asp-route-orderTypeId="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</a>
+            }
+        </div>
     </div>
     <div class="btn-group btn-group-sm" role="group">
-        <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category">@Loc.T("All Statuses")</a>
-        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="Open">@Loc.T("Open")</a>
-        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="InProgress">@Loc.T("In Progress")</a>
-        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-category="@category" asp-route-status="Done">@Loc.T("Done")</a>
+        <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId">@Loc.T("All Statuses")</a>
+        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Open">@Loc.T("Open")</a>
+        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Done">@Loc.T("Done")</a>
     </div>
     <form method="get" class="d-flex gap-2">
-        <input type="hidden" name="category" value="@category" />
+        <input type="hidden" name="orderTypeId" value="@orderTypeId" />
         <input type="hidden" name="status" value="@status" />
         <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:220px" />
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
@@ -74,7 +89,7 @@
                     @foreach (var o in Model)
                     {
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", o.DetailsController, new { id = o.Id })'">
-                            <td><span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
+                            <td><span class="badge" style="background-color:@o.OrderTypeColor;color:@ReadableTextColor(o.OrderTypeColor)">@o.OrderTypeLabel</span></td>
                             <td class="fw-semibold">@o.OrderNumber</td>
                             <td class="small d-none d-sm-table-cell">@(o.AssetLabel ?? "—")</td>
                             <td>@(o.AssignedToLabel ?? "—")</td>

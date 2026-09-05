@@ -39,11 +39,13 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
             return RedirectToAction(nameof(Index));
         }
+        var usedColors = await _db.OrderTypes.Select(t => t.Color).ToListAsync();
         _db.OrderTypes.Add(new OrderType
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,
             TracksDefectOutcome = vm.TracksDefectOutcome, RequiresVendor = vm.RequiresVendor,
             IsDirectFix = vm.IsDirectFix, IsActive = vm.IsActive, SortOrder = vm.SortOrder,
+            Color = OrderTypeColors.NextColor(usedColors),
         });
         await _db.SaveChangesAsync();
         TempData["Success"] = "Order type created.";

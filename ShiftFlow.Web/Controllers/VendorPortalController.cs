@@ -107,13 +107,6 @@ public class VendorPortalController : Controller
         // read here to InvariantCulture keeps it correct regardless of locale.
         var completionDate = FixFormRetainer.ParseCompletionDate(Request.Form);
 
-        if (!ModelState.IsValid)
-        {
-            FixFormRetainer.Stash(TempData, vm, completionDate);
-            TempData["Error"] = _loc.T("Fix not submitted — a description is required.");
-            return RedirectToAction(nameof(Details), new { id });
-        }
-
         // Validate attachments before touching any work order state — a bad file must block the
         // whole submission, not silently go through with the fix report saved and the file dropped.
         if (vm.Files is { Count: > 0 })
@@ -131,7 +124,7 @@ public class VendorPortalController : Controller
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
-            await _workOrderService.VendorFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
+            await _workOrderService.VendorFixAsync(id, completionDate, parts, userId);
             await WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = _loc.T("Fix report submitted.");
         }

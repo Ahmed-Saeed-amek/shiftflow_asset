@@ -204,13 +204,6 @@ public class WorkOrdersController : Controller
         // InvariantCulture regardless of the request's locale.
         var completionDate = ShiftFlow.Web.Services.FixFormRetainer.ParseCompletionDate(Request.Form);
 
-        if (!ModelState.IsValid)
-        {
-            ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate);
-            TempData["Error"] = "Fix not submitted — a description is required.";
-            return RedirectToAction(nameof(Details), new { id });
-        }
-
         if (vm.Files is { Count: > 0 })
         {
             var (_, rejected) = await ShiftFlow.Web.Services.FileUploadValidator.ValidateAllAsync(vm.Files);
@@ -226,7 +219,7 @@ public class WorkOrdersController : Controller
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
-            await _workOrderService.EmployeeFixAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId);
+            await _workOrderService.EmployeeFixAsync(id, completionDate, parts, userId);
             await ShiftFlow.Web.Services.WorkOrderAttachmentStorage.SaveAsync(_db, id, vm.Files, userId);
             TempData["Success"] = "Fix report submitted.";
         }
@@ -241,20 +234,13 @@ public class WorkOrdersController : Controller
     {
         var completionDate = ShiftFlow.Web.Services.FixFormRetainer.ParseCompletionDate(Request.Form);
 
-        if (!ModelState.IsValid)
-        {
-            ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate);
-            TempData["Error"] = "Not submitted — a description is required.";
-            return RedirectToAction(nameof(Details), new { id });
-        }
-
         var userId = _userManager.GetUserId(User)!;
         var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
             .AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
-            await _workOrderService.AdvanceWithoutVendorAsync(id, vm.Description ?? "", vm.Cost, completionDate, parts, userId, isManager);
+            await _workOrderService.AdvanceWithoutVendorAsync(id, completionDate, parts, userId, isManager);
             TempData["Success"] = "Work order advanced without waiting on the vendor.";
         }
         catch (InvalidOperationException ex) { ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }

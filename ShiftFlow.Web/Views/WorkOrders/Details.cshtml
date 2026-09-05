@@ -265,14 +265,6 @@
                         @Html.AntiForgeryToken()
                         <div class="row g-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Fix Description")</label>
-                                <textarea name="Description" class="form-control form-control-sm" rows="3" required></textarea>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small">@Loc.T("Fix Cost")</label>
-                                <input type="number" step="0.01" name="Cost" class="form-control form-control-sm" />
-                            </div>
-                            <div class="col-6">
                                 <label class="form-label small">@Loc.T("Completion Date")</label>
                                 <input type="date" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
@@ -308,14 +300,6 @@
                         @Html.AntiForgeryToken()
                         <div class="row g-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Fix Description")</label>
-                                <textarea name="Description" class="form-control form-control-sm" rows="3" required></textarea>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small">@Loc.T("Fix Cost")</label>
-                                <input type="number" step="0.01" name="Cost" class="form-control form-control-sm" />
-                            </div>
-                            <div class="col-6">
                                 <label class="form-label small">@Loc.T("Completion Date")</label>
                                 <input type="date" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
@@ -485,25 +469,21 @@
 </style>
 
 <script>
-    // Restores what was already typed after a rejected submission (e.g. a bad attachment or a
-    // missing description) sent the page back to a fresh GET — otherwise the fix report the
-    // employee/manager had already filled in would silently vanish. Only one of the two forms
-    // below is ever rendered for a given work order stage, so restoring into "the Description
-    // field that exists" is unambiguous. The parts picker loads its <select> options
-    // asynchronously (SpareParts/CompatibleForAsset), so restoring the selected SparePartId per
-    // row has to wait for that fetch via window.__sparePartsReady before the rows even exist.
+    // Restores what was already selected after a rejected submission (e.g. a bad attachment)
+    // sent the page back to a fresh GET — otherwise the parts/date the employee/manager had
+    // already filled in would silently vanish. Only one of the two forms below is ever rendered
+    // for a given work order stage, so restoring into "the CompletionDate field that exists" is
+    // unambiguous. The parts picker loads its <select> options asynchronously
+    // (SpareParts/CompatibleForAsset), so restoring the selected SparePartId per row has to wait
+    // for that fetch via window.__sparePartsReady before the rows even exist.
     (function restoreFixForm() {
-        const description = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Description"] as string));
-        const cost = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_Cost"] as string));
         const completionDate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(TempData["FixForm_CDate"] as string));
         const sparePartIds = @Html.Raw((string?)TempData["FixForm_SparePartIds"] ?? "[]");
         const partQuantities = @Html.Raw((string?)TempData["FixForm_PartQuantities"] ?? "[]");
 
-        const descField = document.querySelector('textarea[name=Description]');
-        if (!descField) return;
-        if (description) descField.value = description;
-        if (cost) { const f = document.querySelector('input[name=Cost]'); if (f) f.value = cost; }
-        if (completionDate) { const f = document.querySelector('input[name=CompletionDate]'); if (f) f.value = completionDate; }
+        const dateField = document.querySelector('input[name=CompletionDate]');
+        if (!dateField) return;
+        if (completionDate) dateField.value = completionDate;
 
         if (sparePartIds.length === 0) return;
         const containerId = document.getElementById('employeeFixPartsList') ? 'employeeFixPartsList'

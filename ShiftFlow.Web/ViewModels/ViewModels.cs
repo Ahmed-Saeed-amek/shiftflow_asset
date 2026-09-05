@@ -329,10 +329,6 @@ public class MaintenanceOrderCreateVm : IValidatableObject
 
 public class MaintenanceOrderCompleteVm
 {
-    [Required(ErrorMessage = "Describe the fix before closing this order.")]
-    public string? FixDescription { get; set; }
-    [Range(0, 9999999999.99, ErrorMessage = "Cost can't be negative.")]
-    public decimal? Cost { get; set; }
     public DateTime? CompletedDate { get; set; }
     public List<int>? SparePartIds { get; set; }
     public List<int>? PartQuantities { get; set; }
@@ -356,19 +352,6 @@ public class MaintenanceActionTypeViewModel
     public bool IsActive { get; set; } = true;
 }
 
-public class TextPresetViewModel
-{
-    public int Id { get; set; }
-    [Required] public string FieldKey { get; set; } = string.Empty;
-    /// <summary>Null = applies to every value of whichever scope this FieldKey uses.</summary>
-    public int? OrderTypeId { get; set; }
-    public int? CategoryId { get; set; }
-    [Required, MaxLength(500)] public string Text { get; set; } = string.Empty;
-    public string? TextAr { get; set; }
-    public bool IsActive { get; set; } = true;
-    public int SortOrder { get; set; }
-}
-
 public class OrderTypeViewModel
 {
     public int Id { get; set; }
@@ -384,9 +367,6 @@ public class OrderTypeViewModel
 
 public class VendorFixViewModel
 {
-    [Required(ErrorMessage = "Describe what was done before submitting the fix."), MaxLength(4000)]
-    public string? Description { get; set; }
-    public decimal? Cost { get; set; }
     public DateTime? CompletionDate { get; set; }
     public List<int>? SparePartIds { get; set; }
     public List<int>? PartQuantities { get; set; }

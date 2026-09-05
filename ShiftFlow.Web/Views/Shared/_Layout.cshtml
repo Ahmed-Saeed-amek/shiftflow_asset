@@ -78,7 +78,6 @@
                 <li class="nav-section-label">@Loc.T("My Work")</li>
                 <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
                 <li><a class="nav-link" asp-controller="Users" asp-action="MyOrders"><i class="bi bi-list-check me-2"></i>@Loc.T("My Orders")</a></li>
-                <li><a class="nav-link" asp-controller="Users" asp-action="MyMetrics"><i class="bi bi-graph-up-arrow me-2"></i>@Loc.T("My Metrics")</a></li>
                 <li><a class="nav-link" asp-controller="Users" asp-action="MyHistory"><i class="bi bi-clock-history me-2"></i>@Loc.T("History")</a></li>
             }
 
@@ -155,7 +154,6 @@
                                 {
                                     <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
                                     <li><a class="nav-link" asp-controller="MaintenanceActionTypes" asp-action="Index"><i class="bi bi-wrench me-2"></i>@Loc.T("Maintenance Action Types")</a></li>
-                                    <li><a class="nav-link" asp-controller="TextPresets" asp-action="Index"><i class="bi bi-list-check me-2"></i>@Loc.T("Text Presets")</a></li>
                                 }
                                 @if (canManageOrderTypes)
                                 {

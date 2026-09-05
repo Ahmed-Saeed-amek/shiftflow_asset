@@ -26,4 +26,31 @@ public class OrderType
     public bool IsDirectFix { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
+    /// <summary>Hex badge color, auto-assigned at creation from <see cref="OrderTypeColors.Palette"/>
+    /// (round-robin, no repeats until the 20-color palette is exhausted) — never user-editable, so
+    /// every type gets a distinct identity on the Orders list without an admin having to pick one.</summary>
+    public string Color { get; set; } = "#6c757d";
+}
+
+/// <summary>A fixed, hand-picked 20-color categorical palette (good contrast on a white badge
+/// background, distinguishable from each other) that OrderType.Color is auto-assigned from.</summary>
+public static class OrderTypeColors
+{
+    public static readonly IReadOnlyList<string> Palette =
+    [
+        "#4C6EF5", "#F76707", "#2F9E44", "#E03131", "#9C36B5",
+        "#0C8599", "#F08C00", "#5C940D", "#C2255C", "#1971C2",
+        "#E8590C", "#37B24D", "#862E9C", "#1098AD", "#F59F00",
+        "#495057", "#D6336C", "#3B5BDB", "#099268", "#A61E4D",
+    ];
+
+    /// <summary>First palette color not already used by an active OrderType; once all 20 are
+    /// taken, cycles back round-robin (by count) rather than erroring — a 21st type just shares a
+    /// color with the 1st instead of blocking creation.</summary>
+    public static string NextColor(IEnumerable<string> usedColors)
+    {
+        var used = new HashSet<string>(usedColors, StringComparer.OrdinalIgnoreCase);
+        var next = Palette.FirstOrDefault(c => !used.Contains(c));
+        return next ?? Palette[used.Count % Palette.Count];
+    }
 }

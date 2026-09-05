@@ -38,7 +38,7 @@ public class OrdersController : Controller
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
 
-    public async Task<IActionResult> Index(string? status, string? search, string? category, bool overdue = false)
+    public async Task<IActionResult> Index(string? status, string? search, int? orderTypeId, bool overdue = false)
     {
         var canViewInspection = (await AuthZ(PermissionCatalog.InspectionOrderView)).Succeeded;
         var canViewMaintenance = (await AuthZ(PermissionCatalog.MaintenanceOrderView)).Succeeded;
@@ -46,12 +46,15 @@ public class OrdersController : Controller
 
         var rows = new List<MyWorkOrderRow>();
 
-        if (canViewInspection && category != "Maintenance")
+        if (canViewInspection)
         {
             var orders = await _inspectionOrders.GetAllAsync(status, search, overdue);
             rows.AddRange(orders.Select(o => new MyWorkOrderRow
             {
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+                OrderTypeId = o.OrderTypeId,
+                OrderTypeLabel = o.OrderType != null ? _loc.LocalizedName(o.OrderType.Name, o.OrderType.NameAr) : _loc.T("Inspection"),
+                OrderTypeColor = o.OrderType?.Color ?? "#6c757d",
                 AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? _loc.T("asset") : _loc.T("assets")),
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
                 AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
@@ -60,18 +63,27 @@ public class OrdersController : Controller
         // overdue is an Inspection-only concept (DueDate + Status != Done) - a request for the
         // overdue view suppresses Maintenance rows entirely rather than silently mixing in
         // non-overdue Maintenance rows under a filter name that doesn't apply to them.
-        if (canViewMaintenance && !overdue && category != "Inspection")
+        if (canViewMaintenance && !overdue)
         {
             var orders = await _maintenanceOrders.GetAllAsync(status, search);
             rows.AddRange(orders.Select(m => new MyWorkOrderRow
             {
                 Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
+                OrderTypeId = m.OrderTypeId,
+                OrderTypeLabel = m.OrderType != null ? _loc.LocalizedName(m.OrderType.Name, m.OrderType.NameAr) : _loc.T("Maintenance"),
+                OrderTypeColor = m.OrderType?.Color ?? "#6c757d",
                 AssetLabel = m.Asset?.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
                 DetailsController = "MaintenanceOrders", AssignedToLabel = m.AssignedToUser?.FullName,
             }));
         }
 
-        ViewBag.Status = status; ViewBag.Search = search; ViewBag.Category = category; ViewBag.Overdue = overdue;
+        if (orderTypeId.HasValue) rows = rows.Where(r => r.OrderTypeId == orderTypeId).ToList();
+
+        ViewBag.Status = status; ViewBag.Search = search; ViewBag.OrderTypeId = orderTypeId; ViewBag.Overdue = overdue;
+        // Every active Order Type, each carrying its own auto-assigned color - drives the Orders
+        // list's per-type filter chips (see Views/Orders/Index.cshtml), replacing the old static
+        // All/Inspection/Maintenance tabs now that each type has its own distinct identity.
+        ViewBag.ActiveOrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
         return View(rows.OrderByDescending(r => r.CreatedAt).ToList());
     }
 
@@ -123,7 +135,7 @@ public class OrdersController : Controller
         {
             var nested = new InspectionOrderCreateVm
             {
-                OrderTypeId = vm.OrderTypeId, Description = vm.Description, DueDate = vm.DueDate,
+                OrderTypeId = vm.OrderTypeId, DueDate = vm.DueDate,
                 AssigneeType = vm.AssigneeType, AssignedToUserId = vm.AssignedToUserId,
                 AssignedToTeamId = vm.AssignedToTeamId, AssetIds = vm.AssetIds,
             };
@@ -157,7 +169,7 @@ public class OrdersController : Controller
             var nested = new MaintenanceOrderCreateVm
             {
                 AssetId = vm.AssetId, OrderTypeId = vm.OrderTypeId,
-                AssignedToUserId = vm.AssignedToUserId, Description = vm.Description, DueDate = vm.DueDate,
+                AssignedToUserId = vm.AssignedToUserId, DueDate = vm.DueDate,
             };
             ModelState.Clear();
             if (!TryValidateModel(nested))

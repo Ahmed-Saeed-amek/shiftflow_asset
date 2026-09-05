@@ -12,7 +12,13 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
                     <span class="fw-semibold">@actionType.Name</span>
-                    <partial name="_StatusBadge" model="@(actionType.IsActive ? "Active" : "Inactive")" />
+                    <div class="d-flex align-items-center gap-2">
+                        <partial name="_StatusBadge" model="@(actionType.IsActive ? "Active" : "Inactive")" />
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeEditModal"
+                                onclick='openEditActionType(@actionType.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(actionType.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(actionType.NameAr)), @(actionType.IsActive ? "true" : "false"))'>
+                            @Loc.T("Edit")
+                        </button>
+                    </div>
                 </div>
                 <div class="list-group list-group-flush">
                     @if (actionType.Causes.Count == 0)
@@ -23,7 +29,13 @@
                     {
                         <div class="list-group-item d-flex justify-content-between align-items-center py-1">
                             <span class="small">@cause.Name</span>
-                            <partial name="_StatusBadge" model="@(cause.IsActive ? "Active" : "Inactive")" />
+                            <div class="d-flex align-items-center gap-2">
+                                <partial name="_StatusBadge" model="@(cause.IsActive ? "Active" : "Inactive")" />
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bs-toggle="modal" data-bs-target="#causeEditModal"
+                                        onclick='openEditCause(@cause.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.NameAr)), @(cause.IsActive ? "true" : "false"))'>
+                                    @Loc.T("Edit")
+                                </button>
+                            </div>
                         </div>
                     }
                 </div>
@@ -52,3 +64,98 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="actionTypeEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-action="Edit">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="atId" value="0" />
+                <input type="hidden" name="CategoryId" value="@category.Id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">@Loc.T("Edit Action Type")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name")</label>
+                            <input name="Name" id="atName" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <input name="NameAr" id="atNameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="IsActive" id="atIsActive" class="form-check-input" value="true" checked />
+                                <input type="hidden" name="IsActive" value="false" />
+                                <label class="form-check-label small" for="atIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="causeEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-action="EditCause">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="causeId" value="0" />
+                <div class="modal-header">
+                    <h5 class="modal-title">@Loc.T("Edit Cause")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name")</label>
+                            <input name="Name" id="causeName" class="form-control" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <input name="NameAr" id="causeNameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="IsActive" id="causeIsActive" class="form-check-input" value="true" checked />
+                                <input type="hidden" name="IsActive" value="false" />
+                                <label class="form-check-label small" for="causeIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openEditActionType(id, name, nameAr, isActive) {
+        document.getElementById('atId').value = id;
+        document.getElementById('atName').value = name || '';
+        document.getElementById('atNameAr').value = nameAr || '';
+        document.getElementById('atIsActive').checked = isActive;
+    }
+
+    function openEditCause(id, name, nameAr, isActive) {
+        document.getElementById('causeId').value = id;
+        document.getElementById('causeName').value = name || '';
+        document.getElementById('causeNameAr').value = nameAr || '';
+        document.getElementById('causeIsActive').checked = isActive;
+    }
+</script>
+}

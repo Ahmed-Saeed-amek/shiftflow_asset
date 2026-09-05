@@ -47,7 +47,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<OrderType> OrderTypes => Set<OrderType>();
     public DbSet<SparePart> SpareParts => Set<SparePart>();
     public DbSet<SparePartAsset> SparePartAssets => Set<SparePartAsset>();
-    public DbSet<TextPreset> TextPresets => Set<TextPreset>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -148,16 +147,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(m => m.Name).IsUnique();
             e.HasOne(m => m.Category).WithMany()
                 .HasForeignKey(m => m.CategoryId).OnDelete(DeleteBehavior.Restrict);
-        });
-        b.Entity<TextPreset>(e =>
-        {
-            e.HasKey(t => t.Id);
-            e.Property(t => t.FieldKey).HasMaxLength(50).IsRequired();
-            e.Property(t => t.Text).HasMaxLength(500).IsRequired();
-            e.HasOne(t => t.OrderType).WithMany()
-                .HasForeignKey(t => t.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(t => t.Category).WithMany()
-                .HasForeignKey(t => t.CategoryId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<InspectionItemMaintenanceAction>(e =>
         {

@@ -39,18 +39,6 @@ public class WorkOrderService : IWorkOrderService
         return workOrder;
     }
 
-    // Both decimal(12,2) columns FixCost lands in (Report/EmployeeFix/VendorFix/AdvanceWithoutVendor
-    // all set it) — an out-of-range value used to reach an unhandled ArgumentException at the SQL
-    // parameter layer instead of a clean message, and a negative value was silently accepted and
-    // persisted with no business validation at all. Confirmed live on EmployeeFix.
-    private const decimal MaxCost = 9_999_999_999.99m;
-
-    private static void ValidateCost(decimal? cost)
-    {
-        if (cost is { } c && (c < 0 || c > MaxCost))
-            throw new InvalidOperationException($"Cost must be between 0 and {MaxCost:N2}.");
-    }
-
     public async Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId)
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
@@ -195,11 +183,13 @@ public class WorkOrderService : IWorkOrderService
     // must not silently decrement an unrelated part's stock. Caller must have wo.Parts already
     // loaded (Include(w => w.Parts)) and must run this inside the same transaction as the stage
     // transition, since a part failing mid-loop must roll back any parts already decremented.
-    private async Task ApplyPartsAsync(WorkOrder wo, List<(int SparePartId, int Quantity)> parts)
+    // Returns the sum of each applied part's UnitCost * Quantity — FixCost is entirely derived
+    // from this now; there's no manually-typed cost field anywhere in the fix-report forms.
+    private async Task<decimal> ApplyPartsAsync(WorkOrder wo, List<(int SparePartId, int Quantity)> parts)
     {
         var validParts = parts.Where(p => p.Quantity > 0).ToList();
         _db.WorkOrderParts.RemoveRange(wo.Parts);
-        if (validParts.Count == 0) return;
+        if (validParts.Count == 0) return 0m;
 
         var compatibleIds = await _db.SparePartAssets.Where(sa => sa.AssetId == wo.AssetId)
             .Select(sa => sa.SparePartId).ToListAsync();
@@ -209,6 +199,7 @@ public class WorkOrderService : IWorkOrderService
         var partsCatalog = await _db.SpareParts.Where(p => validParts.Select(vp => vp.SparePartId).Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
 
+        var totalCost = 0m;
         foreach (var p in validParts)
         {
             var catalogPart = partsCatalog[p.SparePartId];
@@ -219,26 +210,25 @@ public class WorkOrderService : IWorkOrderService
                 WorkOrderId = wo.Id, SparePartId = p.SparePartId,
                 Name = catalogPart.Name, Quantity = p.Quantity, UnitCostAtUsage = catalogPart.UnitCost,
             });
+            totalCost += (catalogPart.UnitCost ?? 0m) * p.Quantity;
         }
+        return totalCost;
     }
 
-    public async Task VendorFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId)
+    public async Task VendorFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId)
     {
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
-        ValidateCost(cost);
 
         await using var tx = await _db.Database.BeginTransactionAsync();
         var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
-                .SetProperty(w => w.FixDescription, description)
-                .SetProperty(w => w.FixCost, cost)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
-        await ApplyPartsAsync(wo, parts);
+        wo.FixCost = await ApplyPartsAsync(wo, parts);
 
         AddStageEvent(wo, "Fixed - Pending Confirmation", vendorUserId);
         await _db.SaveChangesAsync();
@@ -322,14 +312,13 @@ public class WorkOrderService : IWorkOrderService
         await _audit.LogAsync("AssignEmployee", "WorkOrder", wo.Id.ToString(), userId, oldValue: await NameOf(old), newValue: await NameOf(wo.AssignedToUserId));
     }
 
-    public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
+    public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This work order isn't assigned to you.");
         if (wo.VendorId != null) throw new InvalidOperationException("A vendor is already handling this work order.");
         if (wo.Stage != "New") throw new InvalidOperationException("This work order isn't awaiting a fix.");
-        ValidateCost(cost);
 
         // Same race as ForceCloseAsync/ConfirmFixAsync: claim the transition atomically before
         // touching Parts, so two concurrent submissions can't both pass the in-memory check above.
@@ -338,12 +327,10 @@ public class WorkOrderService : IWorkOrderService
             .Where(w => w.Id == workOrderId && w.Stage == "New")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
-                .SetProperty(w => w.FixDescription, description)
-                .SetProperty(w => w.FixCost, cost)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a fix.");
 
-        await ApplyPartsAsync(wo, parts);
+        wo.FixCost = await ApplyPartsAsync(wo, parts);
 
         AddStageEvent(wo, "Fixed - Pending Confirmation", employeeUserId);
         await _db.SaveChangesAsync();
@@ -356,25 +343,22 @@ public class WorkOrderService : IWorkOrderService
     /// Vendor" whose RequiresVendorResponse flag is off — usable by a manager (WorkOrder.Manage) or
     /// the assigned employee. Ends in the same "Fixed - Pending Confirmation" state as VendorFixAsync/
     /// EmployeeFixAsync so ConfirmFixAsync works unchanged regardless of who actually reported the fix.</summary>
-    public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, string description, decimal? cost, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
+    public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
     {
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.RequiresVendorResponse) throw new InvalidOperationException("This work order requires a vendor response.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         if (!isManager && wo.AssignedToUserId != userId) throw new InvalidOperationException("This work order isn't assigned to you.");
-        ValidateCost(cost);
 
         await using var tx = await _db.Database.BeginTransactionAsync();
         var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
-                .SetProperty(w => w.FixDescription, description)
-                .SetProperty(w => w.FixCost, cost)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
-        await ApplyPartsAsync(wo, parts);
+        wo.FixCost = await ApplyPartsAsync(wo, parts);
 
         AddStageEvent(wo, "Fixed - Pending Confirmation", userId);
         await _db.SaveChangesAsync();
