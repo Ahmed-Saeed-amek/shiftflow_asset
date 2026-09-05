@@ -27,6 +27,16 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         if (asset != null && asset.Status != "Retired") asset.Status = status;
     }
 
+    // Details (round 12) blocks a scoped user from even viewing an out-of-scope Maintenance Order,
+    // but every mutating action below still took only a bare orderId — a scoped user who can't
+    // view an order via Details could still Complete/Cancel/Approve/Reassign it via a direct POST
+    // with a guessed ID, since none of these re-checked scope.
+    private async Task EnsureOrderInScopeAsync(int assetId, string userId)
+    {
+        var inScope = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).AnyAsync(a => a.Id == assetId);
+        if (!inScope) throw new InvalidOperationException("Maintenance order not found.");
+    }
+
     private async Task<bool> HasOtherOpenWorkAsync(int assetId, int excludeMaintenanceOrderId) =>
         await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == assetId && m.Id != excludeMaintenanceOrderId && m.Status == "Open")
         || await _db.WorkOrders.AnyAsync(w => w.AssetId == assetId && OpenWorkOrderStages.Contains(w.Stage));
@@ -137,6 +147,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var isAssignee = order.AssignedToUserId == employeeUserId;
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, employeeUserId);
         if (!isAssignee && !isTeamMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
+        await EnsureOrderInScopeAsync(order.AssetId, employeeUserId);
         if (order.Status != "Open") throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
 
         var requiresApproval = order.OrderType?.RequiresApproval ?? false;
@@ -204,6 +215,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     public async Task ApproveAsync(int orderId, string managerUserId)
     {
         var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
+        await EnsureOrderInScopeAsync(order.AssetId, managerUserId);
         if (order.Status != "PendingApproval") throw new InvalidOperationException("This order isn't awaiting approval.");
         order.Status = "Done";
         order.ClosedDate = DateTime.UtcNow;
@@ -214,6 +226,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     public async Task CancelAsync(int orderId, string? reason, string userId)
     {
         var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
+        await EnsureOrderInScopeAsync(order.AssetId, userId);
         if (order.Status != "Open") throw new InvalidOperationException("Only an open maintenance order can be cancelled.");
 
         // Claim the transition atomically — same race CompleteAsync already guards against: a
@@ -236,6 +249,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
     {
         var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
+        await EnsureOrderInScopeAsync(order.AssetId, managerUserId);
         if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed maintenance order can't be reassigned.");
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
@@ -273,7 +287,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             .Include(m => m.Parts)
             .FirstOrDefaultAsync(m => m.Id == id);
 
-    public async Task<List<MaintenanceOrder>> GetAllAsync(string? status, string? search)
+    public async Task<List<MaintenanceOrder>> GetAllAsync(string? status, string? search, string userId)
     {
         var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
@@ -281,6 +295,15 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             .Include(m => m.AssignedToTeam)
             .Include(m => m.OrderType)
             .AsQueryable();
+
+        // Details (round 12) 404s a scoped user out of an out-of-scope order — this list must hide
+        // the same rows, or a scoped user sees every order exist in the list and only gets blocked
+        // one click later on Details.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(m => scopedAssetIds.Contains(m.AssetId));
+        }
 
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(m => m.Status == status);
@@ -294,14 +317,21 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         return await query.OrderByDescending(m => m.CreatedDate).Take(500).ToListAsync();
     }
 
-    public async Task<byte[]> ExportToExcelAsync()
+    public async Task<byte[]> ExportToExcelAsync(string userId)
     {
-        var orders = await _db.MaintenanceOrders
+        var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
             .Include(m => m.AssignedToTeam)
-            .OrderByDescending(m => m.CreatedDate)
-            .ToListAsync();
+            .AsQueryable();
+        // Same scope enforcement as GetAllAsync — an export must not dump orders the exporting
+        // user can't even see in the list, matching round 3's fix for Assets export.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(m => scopedAssetIds.Contains(m.AssetId));
+        }
+        var orders = await query.OrderByDescending(m => m.CreatedDate).ToListAsync();
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();

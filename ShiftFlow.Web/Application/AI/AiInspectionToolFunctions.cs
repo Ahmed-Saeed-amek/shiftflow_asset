@@ -14,9 +14,10 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     private readonly IWorkOrderService _workOrders;
     private readonly ApplicationDbContext _db;
     private readonly IPermissionService _permissions;
+    private readonly IAssetScopeService _scope;
 
     public AiInspectionToolFunctions(IInspectionOrderService orders, ITeamService teams,
-        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db, IPermissionService permissions)
+        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db, IPermissionService permissions, IAssetScopeService scope)
     {
         _orders = orders;
         _teams = teams;
@@ -24,6 +25,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         _workOrders = workOrders;
         _db = db;
         _permissions = permissions;
+        _scope = scope;
     }
 
     private static object OrderSummary(InspectionOrder o) => new
@@ -58,6 +60,17 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
         if (!isManager && order.AssignedToUserId != userId && !isTeamMember)
             throw new InvalidOperationException("This inspection order isn't assigned to you.");
+
+        // UserAssetScope restricts which assets a user can see even when they'd otherwise have
+        // access via role/assignment — InspectionOrdersController.Details enforces this (round 12)
+        // with no manager exception, so this tool must too, or the AI assistant becomes a
+        // scope-bypass side channel for a scoped manager.
+        var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
+        if (assetIds.Count > 0)
+        {
+            var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).CountAsync(a => assetIds.Contains(a.Id));
+            if (inScopeCount != assetIds.Count) return new { error = "not_found", message = "Inspection order not found." };
+        }
 
         return new
         {

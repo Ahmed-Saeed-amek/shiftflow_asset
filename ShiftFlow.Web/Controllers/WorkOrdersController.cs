@@ -28,7 +28,16 @@ public class WorkOrdersController : Controller
     public async Task<IActionResult> Index(string? stage, string? priority, string? q)
     {
         q = SearchQuery.Cap(q);
+        var userId = _userManager.GetUserId(User)!;
         var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
+        // Details (round 12) 404s a scoped user out of an out-of-scope Work Order — this list must
+        // hide the same rows, or a scoped user sees every work order exist in the list and only
+        // gets blocked one click later on Details.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(w => scopedAssetIds.Contains(w.AssetId));
+        }
         if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
         if (!string.IsNullOrWhiteSpace(priority)) query = query.Where(w => w.Priority == priority);
         if (!string.IsNullOrWhiteSpace(q))
@@ -339,14 +348,14 @@ public class WorkOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
     public async Task<IActionResult> ExportExcel()
     {
-        var bytes = await _workOrderService.ExportToExcelAsync();
+        var bytes = await _workOrderService.ExportToExcelAsync(_userManager.GetUserId(User)!);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"WorkOrders_{DateTime.Today:yyyyMMdd}.xlsx");
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
     public async Task<IActionResult> ExportPdf()
     {
-        var bytes = await _workOrderService.ExportToPdfAsync();
+        var bytes = await _workOrderService.ExportToPdfAsync(_userManager.GetUserId(User)!);
         return File(bytes, "application/pdf", $"WorkOrders_{DateTime.Today:yyyyMMdd}.pdf");
     }
 }

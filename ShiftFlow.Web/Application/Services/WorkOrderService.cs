@@ -40,6 +40,19 @@ public class WorkOrderService : IWorkOrderService
             throw new InvalidOperationException("Asset not found.");
     }
 
+    // Details (round 12) blocks a scoped user from even viewing an out-of-scope Work Order, but
+    // every mutating action below still took only a bare workOrderId — a scoped user who can't
+    // view a Work Order via Details could still Accept/Cancel/Reassign/etc. it via a direct POST
+    // with a guessed ID, since none of these re-checked scope. Skipped for VendorFixAsync/
+    // VendorBlockAsync since UserAssetScope is a staff concept — a vendor portal user is never
+    // scoped this way (see VendorPortalController's own vendor-ownership checks instead).
+    private async Task EnsureWorkOrderInScopeAsync(int workOrderId, string userId)
+    {
+        var assetId = await _db.WorkOrders.Where(w => w.Id == workOrderId).Select(w => (int?)w.AssetId).FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Work order not found.");
+        await EnsureAssetInScopeAsync(assetId, userId);
+    }
+
     public async Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId)
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
@@ -139,6 +152,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task AcceptAsync(int workOrderId, int? vendorId, string priority, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Draft") throw new InvalidOperationException("Only a Draft report can be accepted.");
         if (vendorId == null && wo.AssignedToUserId == null)
@@ -175,6 +189,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task RejectAsync(int workOrderId, string? reason, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Draft") throw new InvalidOperationException("Only a Draft report can be rejected.");
         var newNotes = string.IsNullOrWhiteSpace(reason) ? wo.Notes : $"{wo.Notes}\n\nRejected: {reason}".Trim();
@@ -189,6 +204,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task SendToVendorAsync(int workOrderId, int vendorId, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "New") throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
         await ValidateVendorAsync(vendorId);
@@ -281,6 +297,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task ResendToVendorAsync(int workOrderId, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Blocked") throw new InvalidOperationException("Only a Blocked work order can be resent.");
         if (wo.VendorId == null) throw new InvalidOperationException("This work order has no vendor to resend to.");
@@ -295,6 +312,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task ConfirmFixAsync(int workOrderId, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Fixed - Pending Confirmation") throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
 
@@ -319,6 +337,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         var old = wo.AssignedToUserId;
         // A non-existent employeeUserId (e.g. a stale/tampered picker value) used to reach an
@@ -339,6 +358,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, employeeUserId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This work order isn't assigned to you.");
@@ -373,6 +393,7 @@ public class WorkOrderService : IWorkOrderService
     /// reported the fix.</summary>
     public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
@@ -396,6 +417,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task ForceCloseAsync(int workOrderId, string? reason, string userId)
     {
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage == "Closed") throw new InvalidOperationException("Already closed.");
         var old = wo.Stage;
@@ -428,6 +450,7 @@ public class WorkOrderService : IWorkOrderService
     public async Task UpdatePriorityAsync(int workOrderId, string priority, string userId)
     {
         if (!WorkOrder.Priorities.Contains(priority)) throw new InvalidOperationException("Invalid priority.");
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage is not ("Draft" or "New")) throw new InvalidOperationException("Priority can only be changed before a work order is sent to a vendor.");
         if (wo.Priority == priority) return;
@@ -467,12 +490,22 @@ public class WorkOrderService : IWorkOrderService
         return wo;
     }
 
-    private async Task<List<WorkOrder>> GetExportRowsAsync() =>
-        await _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).OrderByDescending(w => w.CreatedDate).ToListAsync();
-
-    public async Task<byte[]> ExportToExcelAsync()
+    private async Task<List<WorkOrder>> GetExportRowsAsync(string userId)
     {
-        var orders = await GetExportRowsAsync();
+        var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).AsQueryable();
+        // Same scope enforcement as Details (round 12) — an export must not dump orders the
+        // exporting user can't even see in the list, matching round 3's fix for Assets export.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(w => scopedAssetIds.Contains(w.AssetId));
+        }
+        return await query.OrderByDescending(w => w.CreatedDate).ToListAsync();
+    }
+
+    public async Task<byte[]> ExportToExcelAsync(string userId)
+    {
+        var orders = await GetExportRowsAsync(userId);
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();
         var ws = pkg.Workbook.Worksheets.Add("Work Orders");
@@ -496,9 +529,9 @@ public class WorkOrderService : IWorkOrderService
         return await pkg.GetAsByteArrayAsync();
     }
 
-    public async Task<byte[]> ExportToPdfAsync()
+    public async Task<byte[]> ExportToPdfAsync(string userId)
     {
-        var orders = await GetExportRowsAsync();
+        var orders = await GetExportRowsAsync(userId);
         using var ms = new MemoryStream();
         using (var writer = new PdfWriter(ms))
         using (var pdf = new PdfDocument(writer))

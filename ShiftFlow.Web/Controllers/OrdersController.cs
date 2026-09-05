@@ -48,7 +48,7 @@ public class OrdersController : Controller
 
         if (canViewInspection)
         {
-            var orders = await _inspectionOrders.GetAllAsync(status, search, overdue);
+            var orders = await _inspectionOrders.GetAllAsync(status, search, overdue, CurrentUserId);
             rows.AddRange(orders.Select(o => new MyWorkOrderRow
             {
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
@@ -65,7 +65,7 @@ public class OrdersController : Controller
         // non-overdue Maintenance rows under a filter name that doesn't apply to them.
         if (canViewMaintenance && !overdue)
         {
-            var orders = await _maintenanceOrders.GetAllAsync(status, search);
+            var orders = await _maintenanceOrders.GetAllAsync(status, search, CurrentUserId);
             rows.AddRange(orders.Select(m => new MyWorkOrderRow
             {
                 Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,

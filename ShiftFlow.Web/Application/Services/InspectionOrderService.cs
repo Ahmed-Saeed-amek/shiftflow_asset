@@ -178,7 +178,7 @@ public class InspectionOrderService : IInspectionOrderService
         return await query.OrderByDescending(o => o.CreatedAt).Take(300).ToListAsync();
     }
 
-    public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue = false)
+    public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue, string userId)
     {
         var query = _db.InspectionOrders
             .Include(o => o.OrderType)
@@ -186,6 +186,15 @@ public class InspectionOrderService : IInspectionOrderService
             .Include(o => o.AssignedToTeam)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
             .AsQueryable();
+
+        // Details (round 12) 404s a scoped user out of an order with any out-of-scope asset — this
+        // list must hide the same rows, or a scoped user sees every order exist (asset tag, status,
+        // assignee) in the list and only gets blocked one click later on Details.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        }
 
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(o => o.Status == status);
@@ -218,6 +227,8 @@ public class InspectionOrderService : IInspectionOrderService
             .Select(r => r.InspectionOrderId).FirstAsync();
         var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
+        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
+            throw new InvalidOperationException("Inspection item not found.");
         if (order.Status is "Done" or "PendingApproval" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");
 
@@ -261,11 +272,25 @@ public class InspectionOrderService : IInspectionOrderService
         await _audit.LogAsync("UpdateInspectionItem", "InspectionRunAsset", itemId.ToString(), updatedByUserId, newValue: outcome);
     }
 
+    // Details (round 12) blocks a scoped user from even viewing an out-of-scope Inspection Order,
+    // but every mutating action below still took only a bare orderId — a scoped user who can't
+    // view an order via Details could still Approve/Cancel/Reassign it via a direct POST with a
+    // guessed ID, since none of these re-checked scope. All of an order's assets must be in scope.
+    private async Task EnsureOrderInScopeAsync(int orderId, string userId)
+    {
+        var assetIds = await _db.InspectionRunAssets.Where(i => i.InspectionRun!.InspectionOrderId == orderId)
+            .Select(i => i.AssetId).Distinct().ToListAsync();
+        if (assetIds.Count == 0) return;
+        var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).CountAsync(a => assetIds.Contains(a.Id));
+        if (inScopeCount != assetIds.Count) throw new InvalidOperationException("Inspection order not found.");
+    }
+
     /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — the only
     /// way a PendingApproval order can actually finalize to Done.</summary>
     public async Task ApproveAsync(int orderId, string managerUserId)
     {
         var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
+        await EnsureOrderInScopeAsync(orderId, managerUserId);
         if (order.Status != "PendingApproval") throw new InvalidOperationException("This order isn't awaiting approval.");
         order.Status = "Done";
         order.ClosedAt = DateTime.UtcNow;
@@ -307,6 +332,7 @@ public class InspectionOrderService : IInspectionOrderService
     {
         var order = await _db.InspectionOrders.FindAsync(orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
+        await EnsureOrderInScopeAsync(orderId, userId);
         if (order.Status is "Done" or "Cancelled")
             throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
         var oldStatus = order.Status;
@@ -327,6 +353,7 @@ public class InspectionOrderService : IInspectionOrderService
     public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
     {
         var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
+        await EnsureOrderInScopeAsync(orderId, managerUserId);
         if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed inspection order can't be reassigned.");
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
@@ -355,14 +382,21 @@ public class InspectionOrderService : IInspectionOrderService
             oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
     }
 
-    public async Task<byte[]> ExportToExcelAsync()
+    public async Task<byte[]> ExportToExcelAsync(string userId)
     {
-        var orders = await _db.InspectionOrders
+        var query = _db.InspectionOrders
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToTeam)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
-            .OrderByDescending(o => o.CreatedAt)
-            .ToListAsync();
+            .AsQueryable();
+        // Same scope enforcement as GetAllAsync — an export must not dump orders the exporting
+        // user can't even see in the list, matching round 3's fix for Assets export.
+        if (await _scope.HasScopeAsync(userId))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id).ToListAsync();
+            query = query.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        }
+        var orders = await query.OrderByDescending(o => o.CreatedAt).ToListAsync();
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();

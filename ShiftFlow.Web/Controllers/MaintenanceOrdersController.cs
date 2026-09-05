@@ -134,7 +134,7 @@ public class MaintenanceOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.MaintenanceOrderExport)]
     public async Task<IActionResult> ExportExcel()
     {
-        var bytes = await _orders.ExportToExcelAsync();
+        var bytes = await _orders.ExportToExcelAsync(CurrentUserId);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"MaintenanceOrders_{DateTime.Today:yyyyMMdd}.xlsx");
     }

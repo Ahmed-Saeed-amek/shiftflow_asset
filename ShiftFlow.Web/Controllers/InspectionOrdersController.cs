@@ -33,7 +33,7 @@ public class InspectionOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.InspectionOrderView)]
     public async Task<IActionResult> Index(string? status, string? search, bool overdue = false)
     {
-        var orders = await _orders.GetAllAsync(status, search, overdue);
+        var orders = await _orders.GetAllAsync(status, search, overdue, CurrentUserId);
         ViewBag.Status = status;
         ViewBag.Search = search;
         ViewBag.Overdue = overdue;
@@ -212,7 +212,7 @@ public class InspectionOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.InspectionOrderExport)]
     public async Task<IActionResult> ExportExcel()
     {
-        var bytes = await _orders.ExportToExcelAsync();
+        var bytes = await _orders.ExportToExcelAsync(CurrentUserId);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"InspectionOrders_{DateTime.Today:yyyyMMdd}.xlsx");
     }
