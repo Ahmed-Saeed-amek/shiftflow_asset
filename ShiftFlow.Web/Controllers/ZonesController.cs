@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -12,7 +13,8 @@ namespace ShiftFlow.Web.Controllers;
 public class ZonesController : Controller
 {
     private readonly ApplicationDbContext _db;
-    public ZonesController(ApplicationDbContext db) => _db = db;
+    private readonly ILanguageService _loc;
+    public ZonesController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Index()
@@ -52,13 +54,13 @@ public class ZonesController : Controller
         // otherwise hits the DB's Restrict FK constraint and raises an unhandled DbUpdateException.
         if (!await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
         {
-            ModelState.AddModelError(nameof(vm.LocationCategoryId), "Selected location type not found.");
+            ModelState.AddModelError(nameof(vm.LocationCategoryId), _loc.T("Selected location type not found."));
             await PopulateLookupsAsync();
             return View(vm);
         }
         if (await _db.Zones.AnyAsync(z => z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
         {
-            ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");
+            ModelState.AddModelError(nameof(vm.Name), _loc.T("A zone with this name already exists in this location category."));
             await PopulateLookupsAsync();
             return View(vm);
         }
@@ -68,7 +70,7 @@ public class ZonesController : Controller
             Latitude = vm.Latitude, Longitude = vm.Longitude, CreatedDate = DateTime.UtcNow,
         });
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Asset location created.";
+        TempData["Success"] = _loc.T("Asset location created.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -95,20 +97,20 @@ public class ZonesController : Controller
         if (zone == null) return NotFound();
         if (!await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
         {
-            ModelState.AddModelError(nameof(vm.LocationCategoryId), "Selected location type not found.");
+            ModelState.AddModelError(nameof(vm.LocationCategoryId), _loc.T("Selected location type not found."));
             await PopulateLookupsAsync();
             return View(vm);
         }
         if (await _db.Zones.AnyAsync(z => z.Id != vm.Id && z.LocationCategoryId == vm.LocationCategoryId && z.Name == vm.Name))
         {
-            ModelState.AddModelError(nameof(vm.Name), "A zone with this name already exists in this location category.");
+            ModelState.AddModelError(nameof(vm.Name), _loc.T("A zone with this name already exists in this location category."));
             await PopulateLookupsAsync();
             return View(vm);
         }
         zone.Name = vm.Name; zone.NameAr = vm.NameAr; zone.LocationCategoryId = vm.LocationCategoryId; zone.Address = vm.Address;
         zone.Latitude = vm.Latitude; zone.Longitude = vm.Longitude;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Asset location updated.";
+        TempData["Success"] = _loc.T("Asset location updated.");
         return RedirectToAction(nameof(Index));
     }
 

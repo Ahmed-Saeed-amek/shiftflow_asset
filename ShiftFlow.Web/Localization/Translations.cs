@@ -2221,6 +2221,19 @@ public static class Translations
         Ar["Use this if the current assignee's account has been deactivated and the order needs to move to someone else."] = "استخدم هذا إذا تم إلغاء تفعيل حساب المُسنَد إليه الحالي وتحتاج نقل الأمر إلى شخص آخر.";
         Ar["Reassign"] = "إعادة إسناد";
         Ar["— or select a team —"] = "— أو اختر فريقًا —";
+
+        // ── Round-18 fixes: missing translations for validation errors added in rounds 10-17 ──
+        Ar["Selected zone not found."] = "المنطقة المحددة غير موجودة.";
+        Ar["Selected location type not found."] = "نوع الموقع المحدد غير موجود.";
+        Ar["Selected category not found."] = "الفئة المحددة غير موجودة.";
+        Ar["Selected parent category not found."] = "الفئة الرئيسية المحددة غير موجودة.";
+        Ar["A zone with this name already exists in this location category."] = "توجد منطقة بهذا الاسم بالفعل ضمن نوع الموقع هذا.";
+        Ar["Asset location created."] = "تم إنشاء موقع الأصل.";
+        Ar["Asset location updated."] = "تم تحديث موقع الأصل.";
+        Ar["A vendor named '{0}' already exists."] = "يوجد مورد باسم '{0}' بالفعل.";
+        Ar["A block reason named '{0}' already exists."] = "يوجد سبب حظر باسم '{0}' بالفعل.";
+        Ar["Role '{0}' already exists."] = "الدور '{0}' موجود بالفعل.";
+        Ar["Role '{0}' created."] = "تم إنشاء الدور '{0}'.";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -12,7 +13,8 @@ namespace ShiftFlow.Web.Controllers;
 public class WorkOrderBlockReasonsController : Controller
 {
     private readonly ApplicationDbContext _db;
-    public WorkOrderBlockReasonsController(ApplicationDbContext db) => _db = db;
+    private readonly ILanguageService _loc;
+    public WorkOrderBlockReasonsController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
 
     [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
@@ -34,7 +36,7 @@ public class WorkOrderBlockReasonsController : Controller
         }
         if (await _db.WorkOrderBlockReasons.AnyAsync(r => r.Name == vm.Name))
         {
-            TempData["Error"] = $"A block reason named '{vm.Name}' already exists.";
+            TempData["Error"] = _loc.T("A block reason named '{0}' already exists.", vm.Name);
             return RedirectToAction(nameof(Index));
         }
         _db.WorkOrderBlockReasons.Add(new WorkOrderBlockReason { Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
@@ -55,7 +57,7 @@ public class WorkOrderBlockReasonsController : Controller
         if (reason == null) return NotFound();
         if (await _db.WorkOrderBlockReasons.AnyAsync(r => r.Id != vm.Id && r.Name == vm.Name))
         {
-            TempData["Error"] = $"A block reason named '{vm.Name}' already exists.";
+            TempData["Error"] = _loc.T("A block reason named '{0}' already exists.", vm.Name);
             return RedirectToAction(nameof(Index));
         }
         reason.Name = vm.Name; reason.NameAr = vm.NameAr; reason.IsActive = vm.IsActive;

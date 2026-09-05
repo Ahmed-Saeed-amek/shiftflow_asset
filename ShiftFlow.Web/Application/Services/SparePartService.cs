@@ -25,9 +25,22 @@ public class SparePartService : ISparePartService
             throw new InvalidOperationException("One or more selected assets were not found.");
     }
 
+    // Unlike every other named catalog entity (Team, AssetCategory, Zone, OrderType, Vendor,
+    // MaintenanceActionType), SparePart had no uniqueness check at all — two spare parts with the
+    // identical Name/Sku were trivially creatable (confirmed live), leaving fix-report pickers with
+    // indistinguishable duplicate entries.
+    private async Task EnsureNameNotDuplicateAsync(SparePart part)
+    {
+        if (await _db.SpareParts.AnyAsync(p => p.Id != part.Id && p.Name == part.Name))
+            throw new InvalidOperationException($"A spare part named '{part.Name}' already exists.");
+        if (!string.IsNullOrWhiteSpace(part.Sku) && await _db.SpareParts.AnyAsync(p => p.Id != part.Id && p.Sku == part.Sku))
+            throw new InvalidOperationException($"A spare part with SKU '{part.Sku}' already exists.");
+    }
+
     public async Task<SparePart> CreateAsync(SparePart part, List<int> assetIds, string userId)
     {
         await EnsureAssetsExistAsync(assetIds);
+        await EnsureNameNotDuplicateAsync(part);
         part.CreatedDate = DateTime.UtcNow;
         _db.SpareParts.Add(part);
         await _db.SaveChangesAsync(); // need part.Id before inserting links
@@ -41,6 +54,7 @@ public class SparePartService : ISparePartService
     public async Task UpdateAsync(SparePart part, List<int> assetIds, string userId)
     {
         await EnsureAssetsExistAsync(assetIds);
+        await EnsureNameNotDuplicateAsync(part);
         var existing = await _db.SpareParts.Include(p => p.AssetLinks).FirstOrDefaultAsync(p => p.Id == part.Id)
             ?? throw new InvalidOperationException("Spare part not found.");
         existing.Name = part.Name; existing.NameAr = part.NameAr; existing.Sku = part.Sku;

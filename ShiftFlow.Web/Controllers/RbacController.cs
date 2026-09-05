@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 
 namespace ShiftFlow.Web.Controllers;
 
@@ -17,19 +18,22 @@ public class RbacController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
+    private readonly ILanguageService _loc;
 
     public RbacController(
         IPermissionService permissions,
         RoleManager<ApplicationRole> roleManager,
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext db,
-        IAuditService audit)
+        IAuditService audit,
+        ILanguageService loc)
     {
         _permissions = permissions;
         _roleManager = roleManager;
         _userManager = userManager;
         _db = db;
         _audit = audit;
+        _loc = loc;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -51,7 +55,7 @@ public class RbacController : Controller
 
         if (await _roleManager.RoleExistsAsync(roleName))
         {
-            TempData["Error"] = $"Role '{roleName}' already exists.";
+            TempData["Error"] = _loc.T("Role '{0}' already exists.", roleName);
             return RedirectToAction(nameof(Index));
         }
 
@@ -60,7 +64,7 @@ public class RbacController : Controller
         if (result.Succeeded)
         {
             await _audit.LogAsync("Create", "Role", role.Id, CurrentUserId, newValue: roleName);
-            TempData["Success"] = $"Role '{roleName}' created.";
+            TempData["Success"] = _loc.T("Role '{0}' created.", roleName);
         }
         else
             TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));

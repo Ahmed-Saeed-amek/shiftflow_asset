@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -16,9 +17,10 @@ public class VendorsController : Controller
     private readonly ApplicationDbContext _db;
     private readonly IVendorService _vendorService;
     private readonly UserManager<ApplicationUser> _userManager;
-    public VendorsController(ApplicationDbContext db, IVendorService vendorService, UserManager<ApplicationUser> userManager)
+    private readonly ILanguageService _loc;
+    public VendorsController(ApplicationDbContext db, IVendorService vendorService, UserManager<ApplicationUser> userManager, ILanguageService loc)
     {
-        _db = db; _vendorService = vendorService; _userManager = userManager;
+        _db = db; _vendorService = vendorService; _userManager = userManager; _loc = loc;
     }
 
     [Authorize(Policy = PermissionCatalog.VendorView)]
@@ -94,7 +96,7 @@ public class VendorsController : Controller
         }
         if (await _db.Vendors.AnyAsync(v => v.Name == vm.Name))
         {
-            TempData["Error"] = $"A vendor named '{vm.Name}' already exists.";
+            TempData["Error"] = _loc.T("A vendor named '{0}' already exists.", vm.Name);
             return RedirectToAction(nameof(Index));
         }
         var userId = _userManager.GetUserId(User)!;
@@ -117,7 +119,7 @@ public class VendorsController : Controller
         }
         if (await _db.Vendors.AnyAsync(v => v.Id != vm.Id && v.Name == vm.Name))
         {
-            TempData["Error"] = $"A vendor named '{vm.Name}' already exists.";
+            TempData["Error"] = _loc.T("A vendor named '{0}' already exists.", vm.Name);
             return RedirectToAction(nameof(Index));
         }
         var userId = _userManager.GetUserId(User)!;

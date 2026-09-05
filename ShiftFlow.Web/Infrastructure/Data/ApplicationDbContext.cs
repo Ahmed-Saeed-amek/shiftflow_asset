@@ -427,7 +427,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.Property(p => p.NameAr).HasMaxLength(200);
             e.Property(p => p.Sku).HasMaxLength(100);
             e.Property(p => p.UnitCost).HasColumnType("decimal(12,2)");
-            e.HasIndex(p => p.Name);
+            // Unlike every other named catalog entity, SparePart had no DB-level uniqueness at all —
+            // two spare parts with the identical Name/Sku were trivially creatable (confirmed live).
+            // Sku's index is filtered so multiple parts can still leave it blank (NULL) without
+            // colliding, matching how a real unique constraint with nullable columns behaves.
+            e.HasIndex(p => p.Name).IsUnique();
+            e.HasIndex(p => p.Sku).IsUnique().HasFilter("[Sku] IS NOT NULL");
         });
         b.Entity<SparePartAsset>(e =>
         {
