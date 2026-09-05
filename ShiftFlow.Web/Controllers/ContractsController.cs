@@ -98,11 +98,13 @@ public class ContractsController : Controller
         ViewBag.SelectedAssetChips = contract.AssetLinks
             .Select(l => new AssetChip { Id = l.AssetId, Label = $"{l.Asset!.AssetTag} — {l.Asset.Name}" }).ToList();
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
+        var linkedAssetIds = contract.AssetLinks.Select(l => l.AssetId).ToList();
         return View(new ContractViewModel
         {
             Id = contract.Id, VendorId = contract.VendorId, ContractType = contract.ContractType, ContractNumber = contract.ContractNumber,
             StartDate = contract.StartDate, EndDate = contract.EndDate, Cost = contract.Cost, Notes = contract.Notes,
-            AssetIds = contract.AssetLinks.Select(l => l.AssetId).ToList(),
+            AssetIds = linkedAssetIds,
+            OriginalAssetIds = linkedAssetIds,
             PmCadence = contract.PmCadence,
         });
     }
@@ -119,7 +121,7 @@ public class ContractsController : Controller
                 Id = vm.Id, VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
                 StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
                 PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
-            }, vm.AssetIds ?? [], userId);
+            }, vm.AssetIds ?? [], vm.OriginalAssetIds ?? [], userId);
             TempData["Success"] = "Contract updated.";
             return RedirectToAction(nameof(Index));
         }

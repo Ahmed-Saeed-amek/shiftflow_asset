@@ -96,7 +96,10 @@ public interface IVendorService
 public interface IContractService
 {
     Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId);
-    Task UpdateAsync(Contract contract, List<int> assetIds, string userId);
+    /// <summary>originalAssetIds is the linked-asset snapshot the edit form was loaded with; the
+    /// call is rejected if the contract's actual linked assets no longer match it (someone else
+    /// changed them concurrently), instead of silently discarding their change.</summary>
+    Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, string userId);
     /// <summary>Picks the vendor from the asset's most recently-started contract that's currently active (EndDate null or in the future); falls back to the most recent contract overall; null if the asset has no contracts.</summary>
     Task<Vendor?> GetDerivedVendorAsync(int assetId);
     Task<Dictionary<int, Vendor?>> GetDerivedVendorsAsync(IEnumerable<int> assetIds);

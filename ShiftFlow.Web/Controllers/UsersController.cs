@@ -360,7 +360,22 @@ public class UsersController : Controller
             CreatedDate = DateTime.UtcNow,
         };
 
-        var result = await _um.CreateAsync(user, tempPassword);
+        IdentityResult result;
+        try
+        {
+            result = await _um.CreateAsync(user, tempPassword);
+        }
+        catch (DbUpdateException)
+        {
+            // UserManager.CreateAsync's own uniqueness check is a plain SELECT before the insert —
+            // it catches a duplicate email/username submitted normally, but not two concurrent
+            // Create submissions racing each other: both can pass that check and one hits the DB's
+            // unique index (AspNetUsers.UserNameIndex) directly, raising an unhandled
+            // DbUpdateException instead of the clean validation error a non-racing duplicate gets.
+            ModelState.AddModelError("", "A user with this email already exists.");
+            await LoadVB();
+            return View(vm);
+        }
         if (!result.Succeeded)
         {
             foreach (var e in result.Errors) ModelState.AddModelError("", e.Description);
@@ -689,7 +704,18 @@ public class UsersController : Controller
         // (AccountController.ExternalLoginCallback's account-creation branch). Their first
         // "Sign in with Microsoft" auto-links via that same controller's existing
         // email-match branch — no separate linking logic needed here.
-        var result = await _um.CreateAsync(user);
+        IdentityResult result;
+        try
+        {
+            result = await _um.CreateAsync(user);
+        }
+        catch (DbUpdateException)
+        {
+            // Same TOCTOU as Create above: the FindByEmailAsync check and this insert aren't
+            // atomic — two concurrent imports of the same directory user can both pass the check.
+            TempData["Error"] = $"'{email}' is already an app user.";
+            return RedirectToAction(nameof(Index));
+        }
         if (!result.Succeeded)
         {
             TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));

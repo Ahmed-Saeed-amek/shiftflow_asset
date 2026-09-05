@@ -4,6 +4,13 @@
         <form method="post">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
+            @* Snapshot of the linked assets this form was loaded with (Edit only) — lets
+               ContractService.UpdateAsync detect a concurrent edit instead of silently discarding
+               it. Empty/absent on Create, where there's nothing to compare against yet. *@
+            @foreach (var originalAssetId in Model.OriginalAssetIds ?? new List<int>())
+            {
+                <input type="hidden" name="OriginalAssetIds" value="@originalAssetId" />
+            }
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">

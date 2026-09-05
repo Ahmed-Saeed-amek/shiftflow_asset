@@ -51,10 +51,19 @@ public class ContractService : IContractService
         return contract;
     }
 
-    public async Task UpdateAsync(Contract contract, List<int> assetIds, string userId)
+    public async Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, string userId)
     {
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
+        // Same lost-update race rounds 19-20 fixed for Team membership and RBAC permissions: this
+        // diffs the posted asset list against whatever is live in ContractAssets right now, with no
+        // check that the editor's page snapshot is still current — a concurrent edit's asset link
+        // gets silently deleted by an unrelated save (confirmed live: Admin B's Notes-only edit
+        // erased an asset Admin A had just added). originalAssetIds is the snapshot the edit form
+        // was loaded with; reject the submit if it no longer matches what's actually linked.
+        var currentAssetIds = existing.AssetLinks.Select(l => l.AssetId).ToHashSet();
+        if (!currentAssetIds.SetEquals(originalAssetIds.Distinct()))
+            throw new InvalidOperationException("This contract's linked assets were changed by someone else since you opened this page. Reload and try again.");
         // Only newly-added links are checked for retirement — a contract that already had an asset
         // linked before it was retired shouldn't have every unrelated future edit (e.g. changing
         // Cost) blocked until someone remembers to unlink it.

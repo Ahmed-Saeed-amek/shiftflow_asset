@@ -72,6 +72,10 @@ public class ContractViewModel : IValidatableObject
     public decimal? Cost { get; set; }
     public string? Notes { get; set; }
     public List<int>? AssetIds { get; set; }
+    /// <summary>Snapshot of AssetIds the edit form was loaded with — lets ContractService.UpdateAsync
+    /// detect a concurrent edit (someone else changed the linked assets since this page loaded)
+    /// instead of silently discarding their change. Null/unused on Create.</summary>
+    public List<int>? OriginalAssetIds { get; set; }
     /// <summary>Recurrence cadence, required only when ContractType == "Preventive Maintenance".</summary>
     public string? PmCadence { get; set; }
 
