@@ -61,7 +61,7 @@
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "Assets", new { id = a.Id })'">
                             <td class="small font-monospace">@a.AssetTag</td>
                             <td>@a.Name</td>
-                            <td class="small">@a.Category?.Name</td>
+                            <td class="small">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
                             <td><partial name="_StatusBadge" model="@a.Status" /></td>
                         </tr>
                     }

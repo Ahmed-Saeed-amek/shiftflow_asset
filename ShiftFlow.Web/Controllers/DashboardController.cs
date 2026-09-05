@@ -16,10 +16,11 @@ public class DashboardController : Controller
     private readonly IDashboardService _dash;
     private readonly UserManager<ApplicationUser> _um;
     private readonly ApplicationDbContext _db;
+    private readonly ShiftFlow.Web.Localization.ILanguageService _loc;
 
-    public DashboardController(IDashboardService dash, UserManager<ApplicationUser> um, ApplicationDbContext db)
+    public DashboardController(IDashboardService dash, UserManager<ApplicationUser> um, ApplicationDbContext db, ShiftFlow.Web.Localization.ILanguageService loc)
     {
-        _dash = dash; _um = um; _db = db;
+        _dash = dash; _um = um; _db = db; _loc = loc;
     }
 
     public async Task<IActionResult> Index()
@@ -62,29 +63,31 @@ public class DashboardController : Controller
     /// dashboard reflects actual recent activity rather than one order type.</summary>
     private async Task<List<MyWorkOrderRow>> BuildRecentOrdersAsync()
     {
-        var inspectionRows = await _db.InspectionOrders.AsNoTracking()
+        var inspectionRows = (await _db.InspectionOrders.AsNoTracking()
             .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
             .OrderByDescending(o => o.CreatedAt).Take(6)
+            .ToListAsync())
             .Select(o => new MyWorkOrderRow
             {
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
                 AssignedToLabel = o.AssignedToUser != null ? o.AssignedToUser.FullName
-                    : o.AssignedToTeam != null ? "Team: " + o.AssignedToTeam.Name : null,
+                    : o.AssignedToTeam != null ? _loc.T("Team") + ": " + o.AssignedToTeam.Name : null,
             })
-            .ToListAsync();
+            .ToList();
 
-        var maintenanceRows = await _db.MaintenanceOrders.AsNoTracking()
+        var maintenanceRows = (await _db.MaintenanceOrders.AsNoTracking()
             .Include(m => m.AssignedToUser).Include(m => m.AssignedToTeam)
             .OrderByDescending(m => m.CreatedDate).Take(6)
+            .ToListAsync())
             .Select(m => new MyWorkOrderRow
             {
                 Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
                 Status = m.Status, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
                 AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName
-                    : m.AssignedToTeam != null ? "Team: " + m.AssignedToTeam.Name : null,
+                    : m.AssignedToTeam != null ? _loc.T("Team") + ": " + m.AssignedToTeam.Name : null,
             })
-            .ToListAsync();
+            .ToList();
 
         var workOrderRows = await _db.WorkOrders.AsNoTracking()
             .Include(w => w.AssignedToUser).Include(w => w.Vendor)

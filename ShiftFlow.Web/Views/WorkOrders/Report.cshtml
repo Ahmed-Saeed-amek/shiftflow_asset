@@ -14,7 +14,7 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label small">@Loc.T("Category")</label>
-                    <input type="text" class="form-control" value="@asset.Category?.Name" disabled />
+                    <input type="text" class="form-control" value="@(asset.Category is { } reportCat ? Loc.LocalizedName(reportCat.Name, reportCat.NameAr) : null)" disabled />
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small">@Loc.T("Action Type")</label>
@@ -50,12 +50,14 @@
     const categoryId = @asset.CategoryId;
     const selectedActionTypeId = @Html.Raw(Model.ActionTypeId > 0 ? Model.ActionTypeId.ToString() : "null");
     const selectedCauseId = @Html.Raw(Model.CauseId > 0 ? Model.CauseId.ToString() : "null");
+    const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
+    const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
     function fillSelect(sel, items, selectedId) {
         sel.innerHTML = '<option value="">—</option>';
         items.forEach(i => {
             const opt = document.createElement('option');
-            opt.value = i.id; opt.textContent = i.name;
+            opt.value = i.id; opt.textContent = localName(i);
             if (selectedId && i.id === selectedId) opt.selected = true;
             sel.appendChild(opt);
         });

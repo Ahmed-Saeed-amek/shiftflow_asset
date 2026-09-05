@@ -153,8 +153,8 @@
                 </div>
                 <div class="card-body">
                     <dl class="row small mb-0 gy-2">
-                        <dt class="col-5 text-muted fw-normal">@Loc.T("Action Type")</dt><dd class="col-7 text-end mb-0">@Model.ActionType.Name</dd>
-                        <dt class="col-5 text-muted fw-normal">@Loc.T("Cause")</dt><dd class="col-7 text-end mb-0">@Model.Cause?.Name</dd>
+                        <dt class="col-5 text-muted fw-normal">@Loc.T("Action Type")</dt><dd class="col-7 text-end mb-0">@Loc.LocalizedName(Model.ActionType.Name, Model.ActionType.NameAr)</dd>
+                        <dt class="col-5 text-muted fw-normal">@Loc.T("Cause")</dt><dd class="col-7 text-end mb-0">@(Model.Cause is { } woCause ? Loc.LocalizedName(woCause.Name, woCause.NameAr) : null)</dd>
                         <dt class="col-5 text-muted fw-normal">@Loc.T("Reported By")</dt><dd class="col-7 text-end mb-0">@Model.CreatedByUser?.FullName</dd>
                     </dl>
                 </div>

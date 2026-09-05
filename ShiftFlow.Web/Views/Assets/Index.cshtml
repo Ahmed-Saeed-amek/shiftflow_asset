@@ -87,7 +87,7 @@
                     <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = a.Id })'">
                         <td class="small text-muted font-monospace"><span class="d-inline-block text-truncate" style="max-width:160px" title="@a.AssetTag">@a.AssetTag</span></td>
                         <td><span class="d-inline-block text-truncate" style="max-width:320px" title="@a.Name">@a.Name</span></td>
-                        <td class="d-none d-lg-table-cell">@a.Category?.Name</td>
+                        <td class="d-none d-lg-table-cell">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
                         <td class="small d-none d-xl-table-cell">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@a.Status" /></td>
                         <td onclick="event.stopPropagation()">

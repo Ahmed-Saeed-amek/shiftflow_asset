@@ -35,7 +35,7 @@
                         <option value="">—</option>
                         @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
                         {
-                            <option value="@c.Id" selected="@(ViewBag.SelectedParentCategoryId as int? == c.Id)">@c.Name</option>
+                            <option value="@c.Id" selected="@(ViewBag.SelectedParentCategoryId as int? == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
                         }
                     </select>
                 </div>
@@ -100,12 +100,14 @@
 <script>
 (function () {
     const noneLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("None")));
+    const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
+    const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
     function fillSelect(sel, items, selectedId) {
         sel.innerHTML = '<option value="">—</option>';
         items.forEach(i => {
             const opt = document.createElement('option');
-            opt.value = i.id; opt.textContent = i.name;
+            opt.value = i.id; opt.textContent = localName(i);
             if (selectedId && i.id === selectedId) opt.selected = true;
             sel.appendChild(opt);
         });

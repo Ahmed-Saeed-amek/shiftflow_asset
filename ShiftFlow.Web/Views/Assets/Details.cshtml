@@ -27,7 +27,7 @@
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Status")</span><partial name="_StatusBadge" model="@Model.Status" /></div>
-                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Category")</span><span class="small fw-semibold">@Model.Category?.Name</span></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Category")</span><span class="small fw-semibold">@(Model.Category is { } modelCat ? Loc.LocalizedName(modelCat.Name, modelCat.NameAr) : null)</span></div>
                 <div class="d-flex justify-content-between py-1 border-bottom">
                     <span class="text-muted small">@Loc.T("Zone")</span>
                     <span class="small fw-semibold">

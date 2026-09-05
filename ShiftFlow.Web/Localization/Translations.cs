@@ -2146,6 +2146,10 @@ public static class Translations
         Ar["Total Parts Cost"] = "إجمالي تكلفة القطع";
         Ar["Unscoped actions apply everywhere; a specific category (or subcategory) limits this action to just that one."] = "الإجراءات غير المقيدة تنطبق في كل مكان؛ تحديد فئة (أو فئة فرعية) يقصر هذا الإجراء على تلك الفئة فقط.";
         Ar["— None (create as New) —"] = "— بدون (إنشاء كجديد) —";
+
+        // ── RBAC Permission.Category values (Loc.T(group.Key) in Rbac views) ──
+        Ar["Teams"] = "الفرق";
+        Ar["Inspection Orders"] = "أوامر المعاينة";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>

@@ -57,7 +57,7 @@ public class OrdersController : Controller
                 OrderTypeColor = o.OrderType?.Color ?? "#6c757d",
                 AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? _loc.T("asset") : _loc.T("assets")),
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
-                AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
+                AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"{_loc.T("Team")}: {o.AssignedToTeam.Name}" : null),
             }));
         }
         // overdue is an Inspection-only concept (DueDate + Status != Done) - a request for the
@@ -74,7 +74,7 @@ public class OrdersController : Controller
                 OrderTypeColor = m.OrderType?.Color ?? "#6c757d",
                 AssetLabel = m.Asset?.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
                 DetailsController = "MaintenanceOrders",
-                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToTeam != null ? $"Team: {m.AssignedToTeam.Name}" : null),
+                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToTeam != null ? $"{_loc.T("Team")}: {m.AssignedToTeam.Name}" : null),
             }));
         }
 

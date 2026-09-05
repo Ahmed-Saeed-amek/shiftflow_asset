@@ -3,7 +3,7 @@
     var category = (AssetCategory)ViewBag.Category;
     ViewData["Title"] = Loc.T("Manage Actions");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Manage Actions"),Subtitle=category.Name})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Manage Actions"),Subtitle=Loc.LocalizedName(category.Name, category.NameAr)})" />
 
 <div class="row g-3">
     @foreach (var actionType in Model)
