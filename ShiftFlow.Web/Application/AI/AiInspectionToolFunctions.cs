@@ -135,11 +135,17 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         }
         // The AI tool always creates the full "tracks defect outcome" order type (was the hardcoded
         // "Inspection" kind) rather than a lighter type like Quick Check — falls back to any active
-        // type if that one was renamed/deactivated.
+        // type if that one was renamed/deactivated. Must exclude IsDirectFix types: this always
+        // calls InspectionOrderService.CreateAsync, which only makes sense for a survey-style
+        // (IsDirectFix=false) type — a Direct Fix type here would create an InspectionOrder row
+        // whose OrderType.IsDirectFix is true, violating the invariant every other IsDirectFix-aware
+        // path (OrderTypesController, RecurringOrderSchedulerService) relies on.
         var orderTypeId = await _db.OrderTypes
-            .Where(t => t.IsActive)
+            .Where(t => t.IsActive && !t.IsDirectFix)
             .OrderByDescending(t => t.TracksDefectOutcome).ThenBy(t => t.SortOrder)
             .Select(t => t.Id).FirstOrDefaultAsync(ct);
+        if (orderTypeId == 0)
+            throw new InvalidOperationException("No active inspection-style order type is configured.");
         var order = await _orders.CreateAsync(orderTypeId, description, assignedToUserId, assignedToTeamId, resolvedAssetIds, dueDate, userId);
         return new { success = true, id = order.Id, orderNumber = order.OrderNumber };
     }
@@ -152,7 +158,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         // InspectionOrder.Manage. Without the same check here, any holder of the broad permission
         // could ask the assistant to report outcomes on an item from an order assigned to someone
         // else entirely, which the equivalent UI action would 403.
-        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
+        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder).ThenInclude(o => o.OrderType)
             .FirstOrDefaultAsync(i => i.Id == itemId, ct)
             ?? throw new InvalidOperationException("Inspection item not found.");
         var order = item.InspectionRun.InspectionOrder;
@@ -167,9 +173,13 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         {
             if (actionTypeId == null || causeId == null)
                 throw new InvalidOperationException("Action Type and Cause are required to report a defect.");
+            // Mirrors InspectionOrdersController.UpdateItem — without this, a defect reported via the
+            // AI assistant creates a Work Order that bypasses vendor confirmation even when the
+            // order's OrderType.RequiresVendor is set, unlike the identical action through the UI.
             var wo = await _workOrders.ReportAsync(new WorkOrder
             {
                 AssetId = item.AssetId, ActionTypeId = actionTypeId, CauseId = causeId, Notes = notes,
+                RequiresVendorResponse = order.OrderType?.RequiresVendor ?? false,
             }, userId);
             workOrderId = wo.Id;
         }

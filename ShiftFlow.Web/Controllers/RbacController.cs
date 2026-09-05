@@ -127,6 +127,7 @@ public class RbacController : Controller
 
         int changed = 0;
         var errors  = new List<string>();
+        var selfSkipped = false;
 
         foreach (var userId in userIds)
         {
@@ -147,17 +148,30 @@ public class RbacController : Controller
                 }
             }
 
-            foreach (var role in removeRoles)
+            // Unlike UsersController.ToggleActive (which blocks deactivating your own account), this
+            // action had no self-protection — a manager bulk-removing a role from a selected group
+            // who is themselves in that group (or is the last holder of the role granting
+            // RbacManage) could strip their own access to this very page with no confirmation or way
+            // back except direct DB surgery. Skip role *removal* for the caller's own id; additions
+            // still apply normally since those can't lock anyone out.
+            if (userId == CurrentUserId && removeRoles.Count > 0)
             {
-                if (await _userManager.IsInRoleAsync(user, role))
+                selfSkipped = true;
+            }
+            else
+            {
+                foreach (var role in removeRoles)
                 {
-                    var r = await _userManager.RemoveFromRoleAsync(user, role);
-                    if (r.Succeeded)
+                    if (await _userManager.IsInRoleAsync(user, role))
                     {
-                        changed++;
-                        await _audit.LogAsync("RemoveRole", "User", userId, CurrentUserId, oldValue: role);
+                        var r = await _userManager.RemoveFromRoleAsync(user, role);
+                        if (r.Succeeded)
+                        {
+                            changed++;
+                            await _audit.LogAsync("RemoveRole", "User", userId, CurrentUserId, oldValue: role);
+                        }
+                        else errors.AddRange(r.Errors.Select(e => e.Description));
                     }
-                    else errors.AddRange(r.Errors.Select(e => e.Description));
                 }
             }
 
@@ -167,6 +181,8 @@ public class RbacController : Controller
 
         if (errors.Count > 0)
             TempData["Error"] = string.Join("; ", errors.Distinct());
+        else if (selfSkipped)
+            TempData["Success"] = $"Roles updated for {userIds.Count} user(s). {changed} change(s) applied. Role removal was skipped for your own account to prevent locking yourself out.";
         else
             TempData["Success"] = $"Roles updated for {userIds.Count} user(s). {changed} change(s) applied.";
 
