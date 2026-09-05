@@ -237,7 +237,7 @@ public class RbacController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveRolePermissions(string roleId, List<string> granted)
+    public async Task<IActionResult> SaveRolePermissions(string roleId, List<string> granted, List<string>? originalGranted)
     {
         var role = await _roleManager.FindByIdAsync(roleId);
         if (role is null) return NotFound();
@@ -246,6 +246,17 @@ public class RbacController : Controller
         var currentlyGranted = (await _permissions.GetRolePermissionsAsync(roleId))
             .Select(rp => rp.PermissionName)
             .ToHashSet();
+
+        // Same lost-update race round 19 fixed for Team membership: this diffs the posted list
+        // against whatever is live in the DB right now, with no check that the submitting admin's
+        // page actually reflected that state — a concurrent grant/revoke by someone else gets
+        // silently treated as "unchecked" and wiped out. Reject a stale submit instead (confirmed
+        // live: Admin B's save erased Admin A's just-added grant with no error).
+        if (originalGranted != null && !currentlyGranted.SetEquals(originalGranted.Distinct()))
+        {
+            TempData["Error"] = "This role's permissions were changed by someone else since you opened this page. Reload and try again.";
+            return RedirectToAction(nameof(RolePermissions), new { roleId });
+        }
 
         granted ??= [];
 
@@ -308,7 +319,8 @@ public class RbacController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveUserPermissions(string userId, List<string> allowList, List<string> denyList)
+    public async Task<IActionResult> SaveUserPermissions(string userId, List<string> allowList, List<string> denyList,
+        List<string>? originalAllowList, List<string>? originalDenyList)
     {
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null) return NotFound();
@@ -318,6 +330,20 @@ public class RbacController : Controller
 
         var allPerms = PermissionCatalog.All;
         var existingOverrides = await _permissions.GetUserPermissionOverridesAsync(userId);
+
+        // Same lost-update race fixed for Team membership (round 19) and role permissions above —
+        // reject a submit whose snapshot of what was actually in effect no longer matches the DB.
+        if (originalAllowList != null && originalDenyList != null)
+        {
+            var currentAllow = existingOverrides.Where(o => o.IsGranted).Select(o => o.PermissionName).ToHashSet();
+            var currentDeny = existingOverrides.Where(o => !o.IsGranted).Select(o => o.PermissionName).ToHashSet();
+            if (!currentAllow.SetEquals(originalAllowList.Distinct()) || !currentDeny.SetEquals(originalDenyList.Distinct()))
+            {
+                TempData["Error"] = "This user's permission overrides were changed by someone else since you opened this page. Reload and try again.";
+                return RedirectToAction(nameof(UserPermissions), new { userId });
+            }
+        }
+
         var changes = new List<string>();
 
         foreach (var perm in allPerms)

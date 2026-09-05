@@ -48,6 +48,17 @@
 
 <form method="post" asp-action="SaveUserPermissions" asp-route-userId="@user.Id">
     @Html.AntiForgeryToken()
+    @* Snapshot of the overrides actually in effect right now — lets SaveUserPermissions detect a
+       concurrent edit (someone else changed this user's overrides since this page loaded) instead
+       of silently discarding their change the way the round-19 Team-membership bug did. *@
+    @foreach (var perm in allowOverrides)
+    {
+        <input type="hidden" name="originalAllowList" value="@perm" />
+    }
+    @foreach (var perm in denyOverrides)
+    {
+        <input type="hidden" name="originalDenyList" value="@perm" />
+    }
 
     <div class="row g-3 mb-4">
         @foreach (var group in groups)
