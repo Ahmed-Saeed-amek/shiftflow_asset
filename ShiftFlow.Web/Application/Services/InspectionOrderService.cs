@@ -207,7 +207,7 @@ public class InspectionOrderService : IInspectionOrderService
             .Select(r => r.InspectionOrderId).FirstAsync();
         var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
-        if (order.Status is "Done" or "PendingApproval")
+        if (order.Status is "Done" or "PendingApproval" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");
 
         item.Outcome = outcome;
@@ -259,7 +259,7 @@ public class InspectionOrderService : IInspectionOrderService
             .Select(r => r.InspectionOrderId).FirstAsync();
         var order = await _db.InspectionOrders.FindAsync(orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
-        if (order.Status == "Done")
+        if (order.Status is "Done" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");
 
         // Deliberately does not touch Outcome/InspectedByUserId/InspectedAt/WorkOrderId, or the
