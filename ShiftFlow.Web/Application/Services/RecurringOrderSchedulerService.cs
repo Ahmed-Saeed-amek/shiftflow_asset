@@ -69,6 +69,15 @@ public class RecurringOrderSchedulerService : BackgroundService
         foreach (var schedule in schedules)
         {
             if (schedule.OrderType is not { IsActive: true }) continue;
+            // RequiresVendor types route through IWorkOrderService (see OrdersController.Create),
+            // which this generator doesn't support — RecurringOrdersController blocks creating new
+            // schedules for one, but skip defensively in case an old/invalid row still exists rather
+            // than silently mis-generating a plain MaintenanceOrder/InspectionOrder for it.
+            if (schedule.OrderType.RequiresVendor)
+            {
+                _logger.LogWarning("Recurring Order: schedule {ScheduleId} is for a RequiresVendor order type, which this generator doesn't support — skipping.", schedule.Id);
+                continue;
+            }
             var effectiveEnd = schedule.EndDate ?? today;
             var dueSoFar = RecurrenceCalculator.ComputeOccurrenceDueDates(schedule.StartDate, effectiveEnd, schedule.Cadence)
                 .Where(d => d <= today).ToList();

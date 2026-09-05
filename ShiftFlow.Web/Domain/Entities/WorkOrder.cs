@@ -19,6 +19,13 @@ public class WorkOrder
     public DateTime CreatedDate{get;set;}=DateTime.UtcNow;
     public DateTime? ClosedDate{get;set;}
 
+    /// <summary>The OrderType this work order was created as, when it originated from the unified
+    /// Orders/Create screen (a RequiresVendor type) or a RecurringOrder schedule for one — null for
+    /// work orders reported directly via Assets/Report Action or generated from a Preventive
+    /// Maintenance contract, neither of which goes through the OrderType catalog. Lets
+    /// OrderTypesController.Delete's "in use" guard see vendor-routed work orders too.</summary>
+    public int? OrderTypeId{get;set;} public virtual OrderType? OrderType{get;set;}
+
     /// <summary>Set only when this work order originated from an employee's Report Action (Stage starts at "Draft"). Null for admin-created work orders.</summary>
     public int? ActionTypeId{get;set;} public virtual AssetActionType? ActionType{get;set;}
     public int? CauseId{get;set;} public virtual AssetActionCause? Cause{get;set;}

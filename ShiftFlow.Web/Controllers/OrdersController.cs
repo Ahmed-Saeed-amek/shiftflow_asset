@@ -185,13 +185,24 @@ public class OrdersController : Controller
                 // common single-asset case, or the Orders list with a count for a real batch.
                 if (orderType.RequiresVendor)
                 {
+                    // WorkOrder has no team-assignment concept (unlike InspectionOrder/
+                    // MaintenanceOrder) — a TeamOnly/Either type that resolves to a team here would
+                    // otherwise silently create an unassigned work order with the team picked in the
+                    // UI simply discarded. Require an employee instead of letting that happen quietly.
+                    if (string.IsNullOrWhiteSpace(assignedToUserId))
+                    {
+                        ModelState.AddModelError("", "This order type requires a vendor, which needs an individual employee assignee — team assignment isn't supported for vendor-routed work orders yet.");
+                        await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
+                        return View(vm);
+                    }
                     WorkOrder? first = null;
                     foreach (var assetId in assetIds)
                     {
                         var wo = await _workOrders.CreateAsync(new WorkOrder
                         {
                             AssetId = assetId,
-                            AssignedToUserId = string.IsNullOrWhiteSpace(assignedToUserId) ? null : assignedToUserId,
+                            AssignedToUserId = assignedToUserId,
+                            OrderTypeId = orderType.Id,
                             Description = null, RequiresVendorResponse = true,
                         }, CurrentUserId);
                         first ??= wo;

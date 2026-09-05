@@ -128,6 +128,15 @@
         approvalCb.disabled = requiresVendor;
         if (requiresVendor) approvalCb.checked = false;
         document.getElementById('otRequiresApprovalHint').style.display = requiresVendor ? '' : 'none';
+
+        // A vendor-required type creates a WorkOrder, which has no team-assignment concept —
+        // force Employee-only so a team pick at Orders/Create time is never silently discarded.
+        // (Left enabled, not disabled — a disabled <select> doesn't post its value at all, which
+        // would submit no AssignmentMode and fall back to the "Either" model default instead.)
+        const assignmentSel = document.getElementById('otAssignmentMode');
+        assignmentSel.classList.toggle('bg-light', requiresVendor);
+        if (requiresVendor) assignmentSel.value = 'EmployeeOnly';
+        [...assignmentSel.options].forEach(o => { if (o.value !== 'EmployeeOnly') o.disabled = requiresVendor; });
     }
 
     function openCreate() {

@@ -272,6 +272,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(w => w.CauseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(w => w.BlockReason).WithMany()
                 .HasForeignKey(w => w.BlockReasonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(w => w.OrderType).WithMany()
+                .HasForeignKey(w => w.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(w => w.SourceContract).WithMany()
                 .HasForeignKey(w => w.SourceContractId).OnDelete(DeleteBehavior.Restrict);
             // Prevents the PM generator from ever double-creating the same (contract, asset, due date)

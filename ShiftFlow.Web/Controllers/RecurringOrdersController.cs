@@ -35,8 +35,10 @@ public class RecurringOrdersController : Controller
             .Include(r => r.AssignedToTeam)
             .OrderByDescending(r => r.CreatedDate)
             .ToListAsync();
+        // RequiresVendor types are excluded too — the scheduler creates a plain MaintenanceOrder/
+        // InspectionOrder per OrderType.IsDirectFix, with no WorkOrder+vendor pipeline support yet.
         ViewBag.OrderTypes = await _db.OrderTypes
-            .Where(t => t.IsActive && !t.AllowsMultipleAssets)
+            .Where(t => t.IsActive && !t.AllowsMultipleAssets && !t.RequiresVendor)
             .OrderBy(t => t.SortOrder).ToListAsync();
         ViewBag.Teams = await _db.Teams.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
         return View(schedules);
@@ -99,6 +101,11 @@ public class RecurringOrdersController : Controller
         if (orderType == null || orderType.AllowsMultipleAssets)
         {
             TempData["Error"] = "Select a single-asset order type.";
+            return false;
+        }
+        if (orderType.RequiresVendor)
+        {
+            TempData["Error"] = "Vendor-required order types can't be scheduled yet — the recurring generator doesn't support the Work Order/vendor pipeline.";
             return false;
         }
         if (await _db.Assets.AnyAsync(a => a.Id == vm.AssetId && a.Status == "Retired"))

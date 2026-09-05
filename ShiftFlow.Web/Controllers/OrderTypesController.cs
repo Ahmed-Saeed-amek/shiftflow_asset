@@ -34,6 +34,14 @@ public class OrderTypesController : Controller
             TempData["Error"] = "Name and prefix are required.";
             return RedirectToAction(nameof(Index));
         }
+        // WorkOrder (what a RequiresVendor type actually creates) has no team-assignment concept —
+        // TeamOnly/Either here would let an admin configure a type that silently drops the team an
+        // employee picks at Orders/Create time.
+        if (vm.RequiresVendor && vm.AssignmentMode != "EmployeeOnly")
+        {
+            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a team — team assignment isn't supported for vendor-routed work orders yet.";
+            return RedirectToAction(nameof(Index));
+        }
         if (await _db.OrderTypes.AnyAsync(t => t.Prefix == vm.Prefix))
         {
             TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
@@ -60,6 +68,11 @@ public class OrderTypesController : Controller
         if (!ModelState.IsValid || !OrderType.AssignmentModes.Contains(vm.AssignmentMode))
         {
             TempData["Error"] = "Name and prefix are required.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (vm.RequiresVendor && vm.AssignmentMode != "EmployeeOnly")
+        {
+            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a team — team assignment isn't supported for vendor-routed work orders yet.";
             return RedirectToAction(nameof(Index));
         }
         var type = await _db.OrderTypes.FindAsync(vm.Id);
@@ -92,7 +105,8 @@ public class OrderTypesController : Controller
 
         var inUse = await _db.InspectionOrders.AnyAsync(o => o.OrderTypeId == id)
             || await _db.MaintenanceOrders.AnyAsync(m => m.OrderTypeId == id)
-            || await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == id);
+            || await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == id)
+            || await _db.WorkOrders.AnyAsync(w => w.OrderTypeId == id);
         if (inUse)
         {
             TempData["Error"] = $"'{type.Name}' has orders or a recurring schedule using it — deactivate it instead of deleting.";
