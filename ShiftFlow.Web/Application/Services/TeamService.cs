@@ -31,6 +31,13 @@ public class TeamService : ITeamService
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Team name is required.");
+        // Unlike every other named catalog entity in this app (AssetCategories, Zones,
+        // MaintenanceActionTypes, OrderTypes, Vendors...), Team has no uniqueness check at all —
+        // app-level or DB-level — so two teams with the identical name were trivially creatable
+        // (confirmed live: two sequential Create posts with the same name both succeeded). Assigning
+        // work by team name then has no way to tell which underlying team (and members) got picked.
+        if (await _db.Teams.AnyAsync(t => t.Name == name))
+            throw new InvalidOperationException($"A team named '{name}' already exists.");
         // A stale multi-select value or a raw/tampered POST with a non-existent user id otherwise
         // hits the DB's FK constraint on TeamMembers.UserId and raises an unhandled
         // DbUpdateException — Edit already guards the equivalent path (SetMembersAsync) with a
@@ -63,6 +70,8 @@ public class TeamService : ITeamService
         var team = await _db.Teams.FindAsync(teamId) ?? throw new InvalidOperationException("Team not found.");
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Team name is required.");
+        if (await _db.Teams.AnyAsync(t => t.Id != teamId && t.Name == name))
+            throw new InvalidOperationException($"A team named '{name}' already exists.");
 
         team.Name = name;
         team.NameAr = nameAr;

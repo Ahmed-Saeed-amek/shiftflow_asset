@@ -82,6 +82,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasKey(t => t.Id);
             e.Property(t => t.Name).HasMaxLength(200).IsRequired();
             e.Property(t => t.NameAr).HasMaxLength(200);
+            // Unlike every other named catalog entity (AssetCategories, Zones, OrderTypes, Vendors),
+            // Team had no DB-level uniqueness backing its app-level check — two identically-named
+            // teams were trivially creatable (confirmed live). This is the last line of defense
+            // against a genuine race between two concurrent Create requests.
+            e.HasIndex(t => t.Name).IsUnique();
             e.HasOne(t => t.CreatedByUser).WithMany()
                 .HasForeignKey(t => t.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
