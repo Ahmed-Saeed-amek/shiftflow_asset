@@ -265,12 +265,37 @@ public class InspectionOrderService : IInspectionOrderService
             ?? throw new InvalidOperationException("Inspection order not found.");
         if (order.Status is "Done" or "Cancelled")
             throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
-
         var oldStatus = order.Status;
-        order.Status = "Cancelled";
-        order.ClosedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+
+        // Claim the transition atomically — a manager's Cancel and an assignee's item-outcome update
+        // (which can independently drive the order to Done/PendingApproval via
+        // UpdateInspectionItemAsync) could otherwise both pass the in-memory status check above,
+        // and whichever SaveChanges lands last silently overwrites the other's result. Same race
+        // class MaintenanceOrderService.CancelAsync/CompleteAsync already guard against.
+        var closedAt = DateTime.UtcNow;
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "Cancelled")
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, "Cancelled").SetProperty(o => o.ClosedAt, closedAt));
+        if (claimed == 0) throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
+
         await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: oldStatus, newValue: "Cancelled", details: reason);
+    }
+
+    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
+    {
+        var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
+        if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed inspection order can't be reassigned.");
+        var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
+        var hasTeam = assignedToTeamId.HasValue;
+        if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
+            throw new InvalidOperationException("Selected employee not found.");
+
+        var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
+        order.AssignedToUserId = hasUser ? assignedToUserId : null;
+        order.AssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Reassign", "InspectionOrder", order.Id.ToString(), managerUserId,
+            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
     }
 
     public async Task<byte[]> ExportToExcelAsync()

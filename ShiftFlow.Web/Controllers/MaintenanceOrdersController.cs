@@ -45,6 +45,7 @@ public class MaintenanceOrdersController : Controller
 
         ViewBag.IsManager = isManager;
         ViewBag.IsAssignee = isAssignee || isTeamMember;
+        if (isManager) ViewBag.Teams = await _teams.GetAllAsync();
         return View(order);
     }
 
@@ -93,6 +94,25 @@ public class MaintenanceOrdersController : Controller
         {
             await _orders.CancelAsync(id, reason, CurrentUserId);
             TempData["Success"] = "Maintenance order cancelled.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Manager-only recovery path for an order whose sole assignee has since been
+    /// deactivated (Complete has no manager override — it's gated on being the current assignee or
+    /// a member of the assigned Team) — moves the order to a different employee or Team instead of
+    /// leaving the work permanently un-actionable.</summary>
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
+    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToTeamId)
+    {
+        try
+        {
+            await _orders.ReassignAsync(id, assignedToUserId, assignedToTeamId, CurrentUserId);
+            TempData["Success"] = "Maintenance order reassigned.";
         }
         catch (InvalidOperationException ex)
         {

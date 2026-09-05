@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Authorization;
 
 namespace ShiftFlow.Application.AI;
 
@@ -12,15 +13,17 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     private readonly IDashboardService _dashboard;
     private readonly IWorkOrderService _workOrders;
     private readonly ApplicationDbContext _db;
+    private readonly IPermissionService _permissions;
 
     public AiInspectionToolFunctions(IInspectionOrderService orders, ITeamService teams,
-        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db)
+        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db, IPermissionService permissions)
     {
         _orders = orders;
         _teams = teams;
         _dashboard = dashboard;
         _workOrders = workOrders;
         _db = db;
+        _permissions = permissions;
     }
 
     private static object OrderSummary(InspectionOrder o) => new
@@ -143,11 +146,25 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
 
     public async Task<object> ReportInspectionOutcomeAsync(int itemId, string outcome, string? notes, int? actionTypeId, int? causeId, string userId, CancellationToken ct)
     {
+        // InspectionOrderReport is a broad role permission (Engineer/Technician/etc.), not a
+        // per-order grant — the human path (InspectionOrdersController.UpdateItem) additionally
+        // requires the caller be the order's assignee, a member of its assigned team, or hold
+        // InspectionOrder.Manage. Without the same check here, any holder of the broad permission
+        // could ask the assistant to report outcomes on an item from an order assigned to someone
+        // else entirely, which the equivalent UI action would 403.
+        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
+            .FirstOrDefaultAsync(i => i.Id == itemId, ct)
+            ?? throw new InvalidOperationException("Inspection item not found.");
+        var order = item.InspectionRun.InspectionOrder;
+        var isManager = await _permissions.HasPermissionAsync(userId, PermissionCatalog.InspectionOrderManage);
+        var isAssignee = order.AssignedToUserId == userId;
+        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
+        if (!isManager && !isAssignee && !isTeamMember)
+            throw new InvalidOperationException("This inspection order isn't assigned to you.");
+
         int? workOrderId = null;
         if (outcome == "Defective")
         {
-            var item = await _db.InspectionRunAssets.FindAsync([itemId], ct)
-                ?? throw new InvalidOperationException("Inspection item not found.");
             if (actionTypeId == null || causeId == null)
                 throw new InvalidOperationException("Action Type and Cause are required to report a defect.");
             var wo = await _workOrders.ReportAsync(new WorkOrder

@@ -184,11 +184,39 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
         if (order.Status != "Open") throw new InvalidOperationException("Only an open maintenance order can be cancelled.");
 
-        order.Status = "Cancelled";
-        order.ClosedDate = DateTime.UtcNow;
+        // Claim the transition atomically — same race CompleteAsync already guards against: a
+        // manager's Cancel and the assignee's Complete could otherwise both pass the in-memory
+        // Status=="Open" check above, and whichever SaveChanges lands last silently overwrites the
+        // other's result (confirmed live: a concurrent Complete+Cancel pair left the order
+        // "Cancelled" in the DB while the audit log also showed a completed transition moments
+        // earlier — contradictory state, and any parts/stock the Complete side decremented stayed
+        // decremented even though the order ended up Cancelled instead of Done).
+        var closedDate = DateTime.UtcNow;
+        var claimed = await _db.MaintenanceOrders.Where(m => m.Id == orderId && m.Status == "Open")
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.Status, "Cancelled").SetProperty(m => m.ClosedDate, closedDate));
+        if (claimed == 0) throw new InvalidOperationException("Only an open maintenance order can be cancelled.");
+
         if (!await HasOtherOpenWorkAsync(order.AssetId, order.Id)) await SetAssetStatusAsync(order.AssetId, "Working");
         await _db.SaveChangesAsync();
         await _audit.LogAsync("Cancel", "MaintenanceOrder", order.Id.ToString(), userId, oldValue: "Open", newValue: "Cancelled", details: reason);
+    }
+
+    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
+    {
+        var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
+        if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed maintenance order can't be reassigned.");
+        var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
+        var hasTeam = assignedToTeamId.HasValue;
+        if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
+            throw new InvalidOperationException("Selected employee not found.");
+
+        var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
+        order.AssignedToUserId = hasUser ? assignedToUserId : null;
+        order.AssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Reassign", "MaintenanceOrder", order.Id.ToString(), managerUserId,
+            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
     }
 
     public async Task<MaintenanceOrder?> GetByIdAsync(int id) =>

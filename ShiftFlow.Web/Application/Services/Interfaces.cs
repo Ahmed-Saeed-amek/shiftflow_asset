@@ -49,6 +49,11 @@ public interface IInspectionOrderService
     Task CancelAsync(int orderId, string? reason, string userId);
     /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — PendingApproval -> Done.</summary>
     Task ApproveAsync(int orderId, string managerUserId);
+    /// <summary>Manager-only re-assignment to a different employee or Team — the only way to recover
+    /// an order whose sole assignee has since been deactivated, since report/complete actions are
+    /// otherwise gated on being the current assignee or a member of the assigned Team with no
+    /// manager override. Exactly one of assignedToUserId/assignedToTeamId must be set.</summary>
+    Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId);
     Task<byte[]> ExportToExcelAsync();
 }
 
@@ -182,6 +187,11 @@ public interface IMaintenanceOrderService
     Task ApproveAsync(int orderId, string managerUserId);
     /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
+    /// <summary>Manager-only re-assignment to a different employee or Team — the only way to recover
+    /// an order whose sole assignee has since been deactivated, since Complete is otherwise gated on
+    /// being the current assignee or a member of the assigned Team with no manager override. Exactly
+    /// one of assignedToUserId/assignedToTeamId must be set.</summary>
+    Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId);
     Task<MaintenanceOrder?> GetByIdAsync(int id);
     Task<List<MaintenanceOrder>> GetAllAsync(string? status, string? search);
     Task<byte[]> ExportToExcelAsync();

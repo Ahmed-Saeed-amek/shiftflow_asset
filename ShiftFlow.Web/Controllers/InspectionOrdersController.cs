@@ -60,6 +60,7 @@ public class InspectionOrdersController : Controller
         if (!isManager && !isAssignee && !isTeamMember)
             return Forbid();
 
+        if (isManager) ViewBag.Teams = await _teams.GetAllAsync();
         return View(order);
     }
 
@@ -169,6 +170,24 @@ public class InspectionOrdersController : Controller
         {
             await _orders.CancelAsync(id, reason, CurrentUserId);
             TempData["Success"] = "Inspection order cancelled.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Manager-only recovery path for an order whose sole assignee has since been
+    /// deactivated (UpdateItem has no manager override for the assignee/team-member gate) — moves
+    /// the order to a different employee or Team instead of leaving it permanently un-actionable.</summary>
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
+    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToTeamId)
+    {
+        try
+        {
+            await _orders.ReassignAsync(id, assignedToUserId, assignedToTeamId, CurrentUserId);
+            TempData["Success"] = "Inspection order reassigned.";
         }
         catch (InvalidOperationException ex)
         {

@@ -95,6 +95,14 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
                         _logger.LogWarning(ex, "Preventive Maintenance: occurrence for contract {ContractId}, asset {AssetId}, due {DueDate} was not created (likely already generated).",
                             contract.Id, link.AssetId, dueDate);
                     }
+                    catch (InvalidOperationException ex)
+                    {
+                        // e.g. the asset was retired after being linked to this contract — log and
+                        // move on rather than letting one bad asset link block every other link's
+                        // occurrences this tick (and every tick thereafter).
+                        _logger.LogWarning(ex, "Preventive Maintenance: occurrence for contract {ContractId}, asset {AssetId}, due {DueDate} failed: {Message}",
+                            contract.Id, link.AssetId, dueDate, ex.Message);
+                    }
                 }
             }
         }

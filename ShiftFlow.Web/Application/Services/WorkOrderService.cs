@@ -423,6 +423,11 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> CreatePreventiveMaintenanceOccurrenceAsync(int assetId, int vendorId, int sourceContractId, DateTime scheduledDate, string? contractNumber, string systemUserId)
     {
+        // Same guard as CreateAsync/ReportAsync — without it, retiring an asset still linked to an
+        // active PM contract doesn't stop this background generator from opening new "Sent to
+        // Vendor" work orders against it indefinitely (and re-flipping Asset.Status back to
+        // "Maintenance" every time it does).
+        await EnsureAssetNotRetiredAsync(assetId);
         var contractLabel = string.IsNullOrWhiteSpace(contractNumber) ? sourceContractId.ToString() : contractNumber;
         var wo = new WorkOrder
         {

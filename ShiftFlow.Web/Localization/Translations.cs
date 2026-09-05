@@ -2150,6 +2150,77 @@ public static class Translations
         // ── RBAC Permission.Category values (Loc.T(group.Key) in Rbac views) ──
         Ar["Teams"] = "الفرق";
         Ar["Inspection Orders"] = "أوامر المعاينة";
+
+        // ── Round-4 QA audit: TempData Success/Error flash messages with no Arabic entry ──
+        Ar["Action type added."] = "تمت إضافة نوع الإجراء.";
+        Ar["Action type updated."] = "تم تحديث نوع الإجراء.";
+        Ar["Cause added."] = "تمت إضافة السبب.";
+        Ar["Cause updated."] = "تم تحديث السبب.";
+        Ar["Asset created."] = "تم إنشاء الأصل.";
+        Ar["Asset updated."] = "تم تحديث الأصل.";
+        Ar["Inspection order approved and closed."] = "تمت الموافقة على أمر المعاينة وإغلاقه.";
+        Ar["Inspection order cancelled."] = "تم إلغاء أمر المعاينة.";
+        Ar["Inspection order reassigned."] = "تمت إعادة إسناد أمر المعاينة.";
+        Ar["Name is required."] = "الاسم مطلوب.";
+        Ar["Maintenance action created."] = "تم إنشاء إجراء الصيانة.";
+        Ar["Maintenance action updated."] = "تم تحديث إجراء الصيانة.";
+        Ar["Maintenance order approved and closed."] = "تمت الموافقة على أمر الصيانة وإغلاقه.";
+        Ar["Maintenance order cancelled."] = "تم إلغاء أمر الصيانة.";
+        Ar["Maintenance order reassigned."] = "تمت إعادة إسناد أمر الصيانة.";
+        Ar["Name and prefix are required."] = "الاسم والبادئة مطلوبان.";
+        Ar["Order type created."] = "تم إنشاء نوع الأمر.";
+        Ar["Order type updated."] = "تم تحديث نوع الأمر.";
+        Ar["Order type deleted."] = "تم حذف نوع الأمر.";
+        Ar["Role name cannot be empty."] = "لا يمكن أن يكون اسم الدور فارغًا.";
+        Ar["Role not found."] = "الدور غير موجود.";
+        Ar["No users selected."] = "لم يتم تحديد أي مستخدمين.";
+        Ar["Recurring order schedule created."] = "تم إنشاء الجدول الزمني المتكرر.";
+        Ar["Recurring order schedule updated."] = "تم تحديث الجدول الزمني المتكرر.";
+        Ar["Select a single-asset order type."] = "اختر نوع أمر بأصل واحد.";
+        Ar["This asset is retired and can't be scheduled for new orders."] = "هذا الأصل متقاعد ولا يمكن جدولة أوامر جديدة له.";
+        Ar["Asset location created."] = "تم إنشاء موضع الأصل.";
+        Ar["Asset location updated."] = "تم تحديث موضع الأصل.";
+        Ar["You cannot delete your own account."] = "لا يمكنك حذف حسابك الخاص.";
+        Ar["User not found."] = "المستخدم غير موجود.";
+        Ar["You cannot deactivate your own account."] = "لا يمكنك إلغاء تفعيل حسابك الخاص.";
+        Ar["Missing required fields for import."] = "حقول مطلوبة مفقودة للاستيراد.";
+        Ar["Team updated."] = "تم تحديث الفريق.";
+        Ar["This asset is retired and can't have new work orders opened against it."] = "هذا الأصل متقاعد ولا يمكن فتح أوامر عمل جديدة له.";
+        Ar["Accepted."] = "تم القبول.";
+        Ar["Employee assignment updated."] = "تم تحديث إسناد الموظف.";
+        Ar["Fix report submitted."] = "تم إرسال تقرير الإصلاح.";
+        Ar["Work order advanced without waiting on the vendor."] = "تم دفع أمر العمل قدمًا دون انتظار المورد.";
+        Ar["Work order force-closed."] = "تم إغلاق أمر العمل إجباريًا.";
+        Ar["Report rejected."] = "تم رفض التقرير.";
+        Ar["Sent to vendor."] = "تم الإرسال إلى المورد.";
+        Ar["Resent to vendor."] = "أُعيد الإرسال إلى المورد.";
+        Ar["Work order closed."] = "تم إغلاق أمر العمل.";
+        Ar["Priority updated."] = "تم تحديث الأولوية.";
+        Ar["This vendor already has a login."] = "هذا المورد لديه بيانات دخول بالفعل.";
+        Ar["An email is required to create a login."] = "البريد الإلكتروني مطلوب لإنشاء بيانات دخول.";
+        Ar["Login created."] = "تم إنشاء بيانات الدخول.";
+        Ar["Password reset."] = "تمت إعادة تعيين كلمة المرور.";
+        Ar["Name and status are required, and email must be valid."] = "الاسم والحالة مطلوبان، ويجب أن يكون البريد الإلكتروني صحيحًا.";
+        Ar["Vendor created."] = "تم إنشاء المورد.";
+        Ar["Vendor updated."] = "تم تحديث المورد.";
+        Ar["Spare part created."] = "تم إنشاء قطعة الغيار.";
+        Ar["Spare part updated."] = "تم تحديث قطعة الغيار.";
+        Ar["Stock updated."] = "تم تحديث المخزون.";
+        Ar["Block reason created."] = "تم إنشاء سبب الحظر.";
+        Ar["Block reason updated."] = "تم تحديث سبب الحظر.";
+
+        // ── Round-4 fixes: new validation messages and the Reassign feature ──
+        Ar["A vendor-required order type can only be assigned to an employee, not a team — team assignment isn't supported for vendor-routed work orders yet."] = "لا يمكن إسناد نوع الأمر الذي يتطلب موردًا إلا لموظف وليس لفريق — الإسناد إلى فريق غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورد.";
+        Ar["Vendor-required order types can't be scheduled yet — the recurring generator doesn't support the Work Order/vendor pipeline."] = "لا يمكن جدولة أنواع الأوامر التي تتطلب موردًا بعد — لا يدعم المولّد المتكرر مسار أمر العمل/المورد.";
+        Ar["This maintenance order isn't assigned to you."] = "أمر الصيانة هذا غير مسند إليك.";
+        Ar["This inspection order isn't assigned to you."] = "أمر المعاينة هذا غير مسند إليك.";
+        Ar["Select exactly one assignee — a single employee or a Team."] = "اختر جهة إسناد واحدة فقط — موظف واحد أو فريق.";
+        Ar["Selected employee not found."] = "الموظف المحدد غير موجود.";
+        Ar["A closed maintenance order can't be reassigned."] = "لا يمكن إعادة إسناد أمر صيانة مغلق.";
+        Ar["A closed inspection order can't be reassigned."] = "لا يمكن إعادة إسناد أمر معاينة مغلق.";
+        Ar["Use this if the current assignee's account has been deactivated and the order needs to move to someone else."] = "استخدم هذا إذا تم إلغاء تفعيل حساب المُسنَد إليه الحالي وتحتاج نقل الأمر إلى شخص آخر.";
+        Ar["Reassign"] = "إعادة إسناد";
+        Ar["— or select a team —"] = "— أو اختر فريقًا —";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>
