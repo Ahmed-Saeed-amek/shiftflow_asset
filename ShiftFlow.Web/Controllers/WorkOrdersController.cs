@@ -62,9 +62,12 @@ public class WorkOrdersController : Controller
         if (wo == null) return NotFound();
         // UserAssetScope restricts which assets a user can see — AssetsController enforces this
         // uniformly for every viewer, so a Work Order for an out-of-scope asset must 404 the same
-        // way the asset's own Details page does, not leak its full history to any WorkOrder.View holder.
+        // way the asset's own Details page does, not leak its full history to any WorkOrder.View
+        // holder. Exempted for the order's own assigned employee — a scope narrowed/added *after*
+        // assignment must not lock them out of viewing (and finishing) their own already-assigned
+        // work; scope restricts new discovery, not access already legitimately granted.
         var userId = _userManager.GetUserId(User)!;
-        if (wo.Asset != null && !await _scope.IsInScopeAsync(wo.Asset, userId)) return NotFound();
+        if (wo.AssignedToUserId != userId && wo.Asset != null && !await _scope.IsInScopeAsync(wo.Asset, userId)) return NotFound();
         ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.CurrentUserId = userId;
         return View(wo);

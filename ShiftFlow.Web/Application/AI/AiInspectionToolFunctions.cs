@@ -64,9 +64,12 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — InspectionOrdersController.Details enforces this (round 12)
         // with no manager exception, so this tool must too, or the AI assistant becomes a
-        // scope-bypass side channel for a scoped manager.
+        // scope-bypass side channel for a scoped manager. Exempted for the order's own assignee/
+        // team member (same as the controller) — a scope narrowed/added after assignment must not
+        // lock them out of viewing their own already-assigned work.
+        var isAssigneeOrTeamMember = order.AssignedToUserId == userId || isTeamMember;
         var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
-        if (assetIds.Count > 0)
+        if (!isAssigneeOrTeamMember && assetIds.Count > 0)
         {
             var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).CountAsync(a => assetIds.Contains(a.Id));
             if (inScopeCount != assetIds.Count) return new { error = "not_found", message = "Inspection order not found." };

@@ -147,7 +147,11 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var isAssignee = order.AssignedToUserId == employeeUserId;
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, employeeUserId);
         if (!isAssignee && !isTeamMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
-        await EnsureOrderInScopeAsync(order.AssetId, employeeUserId);
+        // No scope check here: the assignee/team-member check above already confirms this is the
+        // order's own legitimate assignee — a scope narrowed/added after assignment must not lock
+        // them out of finishing their own already-assigned work (scope restricts new discovery of
+        // work, not access already legitimately granted; see EnsureOrderInScopeAsync's callers below,
+        // which are all manager-only actions where the strict scope check is intentional).
         if (order.Status != "Open") throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
 
         var requiresApproval = order.OrderType?.RequiresApproval ?? false;

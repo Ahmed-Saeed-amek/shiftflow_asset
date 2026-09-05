@@ -65,12 +65,17 @@ public class InspectionOrdersController : Controller
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — AssetsController enforces this uniformly for every viewer,
         // with no manager exception, so this must too or a scoped manager can view an out-of-scope
-        // asset's full inspection history just by knowing an order ID.
-        var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
-        if (assetIds.Count > 0)
+        // asset's full inspection history just by knowing an order ID. Exempted for the order's own
+        // assignee/team member — a scope narrowed/added after assignment must not lock them out of
+        // viewing (and reporting on) their own already-assigned work.
+        if (!isAssignee && !isTeamMember)
         {
-            var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), CurrentUserId)).CountAsync(a => assetIds.Contains(a.Id));
-            if (inScopeCount != assetIds.Count) return NotFound();
+            var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
+            if (assetIds.Count > 0)
+            {
+                var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), CurrentUserId)).CountAsync(a => assetIds.Contains(a.Id));
+                if (inScopeCount != assetIds.Count) return NotFound();
+            }
         }
 
         if (isManager) ViewBag.Teams = await _teams.GetAllAsync();

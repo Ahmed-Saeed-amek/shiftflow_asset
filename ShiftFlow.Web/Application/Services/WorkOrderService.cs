@@ -53,6 +53,18 @@ public class WorkOrderService : IWorkOrderService
         await EnsureAssetInScopeAsync(assetId, userId);
     }
 
+    // Used only by the assignee's own actions (EmployeeFix/AdvanceWithoutVendor) — a scope narrowed
+    // or added *after* a Work Order was already assigned must not silently lock the legitimate
+    // assignee out of finishing their own already-assigned work; scope restricts what a user can
+    // newly see/take on, not access already legitimately granted. Manager-only actions (Accept,
+    // AssignEmployee, ForceClose, etc.) keep the strict, unconditional check above.
+    private async Task EnsureWorkOrderActionableAsync(int workOrderId, string userId)
+    {
+        var assignedToUserId = await _db.WorkOrders.Where(w => w.Id == workOrderId).Select(w => w.AssignedToUserId).FirstOrDefaultAsync();
+        if (assignedToUserId == userId) return;
+        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
+    }
+
     public async Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId)
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
@@ -358,7 +370,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
-        await EnsureWorkOrderInScopeAsync(workOrderId, employeeUserId);
+        await EnsureWorkOrderActionableAsync(workOrderId, employeeUserId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This work order isn't assigned to you.");
@@ -393,7 +405,11 @@ public class WorkOrderService : IWorkOrderService
     /// reported the fix.</summary>
     public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
     {
-        await EnsureWorkOrderInScopeAsync(workOrderId, userId);
+        // A manager acting outside their own scope is still blocked (round 13); the assigned
+        // employee retains access to their own already-assigned work regardless of a scope
+        // narrowed/added afterward (see EnsureWorkOrderActionableAsync).
+        if (isManager) await EnsureWorkOrderInScopeAsync(workOrderId, userId);
+        else await EnsureWorkOrderActionableAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");

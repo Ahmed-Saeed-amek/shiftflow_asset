@@ -39,11 +39,27 @@ public class UserAssetScopesController : Controller
     {
         if (await _db.UserAssetScopes.AnyAsync(s => s.UserId == vm.UserId))
             ModelState.AddModelError(nameof(vm.UserId), _loc.T("This user already has a scope assigned — edit or remove it first."));
+        await ValidateScopeReferencesAsync(vm);
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         _db.UserAssetScopes.Add(new UserAssetScope { UserId = vm.UserId, ZoneId = vm.ZoneId, LocationCategoryId = vm.LocationCategoryId, CategoryId = vm.CategoryId });
         await _db.SaveChangesAsync();
         TempData["Success"] = _loc.T("Scope assigned.");
         return RedirectToAction(nameof(Index));
+    }
+
+    // A stale dropdown value or a raw/tampered POST with a non-existent ZoneId/LocationCategoryId/
+    // CategoryId otherwise hits the DB's Restrict FK constraints at SaveChangesAsync and raises an
+    // unhandled DbUpdateException, leaking the full EF/SqlClient stack trace, error number, and
+    // table/column names to the client — same bug class as the FK checks already added elsewhere
+    // (RecurringOrdersController.ValidateAsync, ContractService, employee/vendor/team assignment).
+    private async Task ValidateScopeReferencesAsync(UserAssetScopeViewModel vm)
+    {
+        if (vm.ZoneId.HasValue && !await _db.Zones.AnyAsync(z => z.Id == vm.ZoneId))
+            ModelState.AddModelError(nameof(vm.ZoneId), _loc.T("Selected zone not found."));
+        if (vm.LocationCategoryId.HasValue && !await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
+            ModelState.AddModelError(nameof(vm.LocationCategoryId), _loc.T("Selected location type not found."));
+        if (vm.CategoryId.HasValue && !await _db.AssetCategories.AnyAsync(c => c.Id == vm.CategoryId))
+            ModelState.AddModelError(nameof(vm.CategoryId), _loc.T("Selected category not found."));
     }
 
     public async Task<IActionResult> Edit(int id)
@@ -59,6 +75,7 @@ public class UserAssetScopesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(UserAssetScopeViewModel vm)
     {
+        await ValidateScopeReferencesAsync(vm);
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         var scope = await _db.UserAssetScopes.FindAsync(vm.Id);
         if (scope == null) return NotFound();

@@ -47,8 +47,10 @@ public class MaintenanceOrdersController : Controller
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — AssetsController enforces this uniformly for every viewer,
         // with no manager exception, so this must too or a scoped manager can view an out-of-scope
-        // asset's maintenance history just by knowing an order ID.
-        if (order.Asset != null && !await _scope.IsInScopeAsync(order.Asset, CurrentUserId)) return NotFound();
+        // asset's maintenance history just by knowing an order ID. Exempted for the order's own
+        // assignee/team member — a scope narrowed/added after assignment must not lock them out of
+        // viewing (and completing) their own already-assigned work.
+        if (!isAssignee && !isTeamMember && order.Asset != null && !await _scope.IsInScopeAsync(order.Asset, CurrentUserId)) return NotFound();
 
         ViewBag.IsManager = isManager;
         ViewBag.IsAssignee = isAssignee || isTeamMember;

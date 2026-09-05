@@ -227,7 +227,14 @@ public class InspectionOrderService : IInspectionOrderService
             .Select(r => r.InspectionOrderId).FirstAsync();
         var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
-        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
+        // A scope narrowed/added after the order was assigned must not lock the legitimate
+        // assignee/team member out of reporting on their own already-assigned work — scope
+        // restricts new discovery, not access already legitimately granted (same exemption as
+        // MaintenanceOrderService.CompleteAsync). A manager reporting on someone else's order (via
+        // the AI assistant or a direct call) still gets the strict check.
+        var isAssigneeOrTeamMember = order.AssignedToUserId == updatedByUserId
+            || (order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, updatedByUserId));
+        if (!isAssigneeOrTeamMember && !await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
             throw new InvalidOperationException("Inspection item not found.");
         if (order.Status is "Done" or "PendingApproval" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");

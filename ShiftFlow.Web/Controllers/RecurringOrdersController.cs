@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
@@ -19,9 +20,10 @@ public class RecurringOrdersController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
-    public RecurringOrdersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+    private readonly IAssetScopeService _scope;
+    public RecurringOrdersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IAssetScopeService scope)
     {
-        _db = db; _userManager = userManager;
+        _db = db; _userManager = userManager; _scope = scope;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -125,6 +127,15 @@ public class RecurringOrdersController : Controller
         if (await _db.Assets.AnyAsync(a => a.Id == vm.AssetId && a.Status == "Retired"))
         {
             TempData["Error"] = "This asset is retired and can't be scheduled for new orders.";
+            return false;
+        }
+        // Same UserAssetScope enforcement round 11 added to manual Order creation — without it, a
+        // scoped OrderType.Manage holder (e.g. a scoped OperationsManager) could schedule a
+        // recurring order against an asset they can't even view via AssetsController, and the
+        // scheduler would then keep auto-generating real orders against it indefinitely.
+        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), CurrentUserId)).AnyAsync(a => a.Id == vm.AssetId))
+        {
+            TempData["Error"] = "Asset not found.";
             return false;
         }
         return true;
