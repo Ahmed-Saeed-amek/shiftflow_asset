@@ -39,6 +39,12 @@ public class OrderType
     /// specifically to make "TeamOnly"/"Either" meaningful for direct-fix types too, not just survey ones.</summary>
     public string AssignmentMode { get; set; } = "Either";
     public static readonly string[] AssignmentModes = ["EmployeeOnly", "TeamOnly", "Either"];
+    /// <summary>Adds an extra manager sign-off gate before an order of this type can finalize —
+    /// MaintenanceOrder/InspectionOrder completion lands at "PendingApproval" instead of "Done"
+    /// until a manager explicitly approves it. Has no additional effect for a RequiresVendor type:
+    /// the WorkOrder vendor pipeline already has an equivalent gate (Fixed - Pending Confirmation
+    /// -> Confirm -> Closed), so this flag is disabled in the UI when RequiresVendor is checked.</summary>
+    public bool RequiresApproval { get; set; }
 }
 
 /// <summary>A fixed, hand-picked 20-color categorical palette (good contrast on a white badge

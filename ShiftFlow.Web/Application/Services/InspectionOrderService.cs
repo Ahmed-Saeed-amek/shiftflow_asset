@@ -160,9 +160,9 @@ public class InspectionOrderService : IInspectionOrderService
 
         var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
             .Select(r => r.InspectionOrderId).FirstAsync();
-        var order = await _db.InspectionOrders.FindAsync(orderId)
+        var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
-        if (order.Status == "Done")
+        if (order.Status is "Done" or "PendingApproval")
             throw new InvalidOperationException("This inspection order is already closed.");
 
         item.Outcome = outcome;
@@ -184,12 +184,25 @@ public class InspectionOrderService : IInspectionOrderService
         var stillPending = await _db.InspectionRunAssets.AnyAsync(i => i.InspectionRunId == runId && i.Outcome == "Pending");
         if (!stillPending)
         {
-            order.Status = "Done";
-            order.ClosedAt = DateTime.UtcNow;
+            var requiresApproval = order.OrderType?.RequiresApproval ?? false;
+            order.Status = requiresApproval ? "PendingApproval" : "Done";
+            if (!requiresApproval) order.ClosedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
 
         await _audit.LogAsync("UpdateInspectionItem", "InspectionRunAsset", itemId.ToString(), updatedByUserId, newValue: outcome);
+    }
+
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — the only
+    /// way a PendingApproval order can actually finalize to Done.</summary>
+    public async Task ApproveAsync(int orderId, string managerUserId)
+    {
+        var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
+        if (order.Status != "PendingApproval") throw new InvalidOperationException("This order isn't awaiting approval.");
+        order.Status = "Done";
+        order.ClosedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Approve", "InspectionOrder", order.Id.ToString(), managerUserId, oldValue: "PendingApproval", newValue: "Done");
     }
 
     public async Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId)

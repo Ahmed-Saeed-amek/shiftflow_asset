@@ -59,8 +59,25 @@ public class MaintenanceOrdersController : Controller
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
-            await _orders.CompleteAsync(id, vm.CompletedDate, parts, CurrentUserId);
-            TempData["Success"] = "Fix reported — maintenance order closed.";
+            var order = await _orders.CompleteAsync(id, vm.CompletedDate, parts, CurrentUserId);
+            TempData["Success"] = order.Status == "PendingApproval"
+                ? "Fix reported — awaiting manager approval before it closes."
+                : "Fix reported — maintenance order closed.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
+    public async Task<IActionResult> Approve(int id)
+    {
+        try
+        {
+            await _orders.ApproveAsync(id, CurrentUserId);
+            TempData["Success"] = "Maintenance order approved and closed.";
         }
         catch (InvalidOperationException ex)
         {

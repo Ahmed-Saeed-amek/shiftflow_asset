@@ -47,6 +47,8 @@ public interface IInspectionOrderService
     /// order's completion status.</summary>
     Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
     Task CancelAsync(int orderId, string? reason, string userId);
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — PendingApproval -> Done.</summary>
+    Task ApproveAsync(int orderId, string managerUserId);
     Task<byte[]> ExportToExcelAsync();
 }
 
@@ -173,6 +175,8 @@ public interface IMaintenanceOrderService
     /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
     Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — PendingApproval -> Done.</summary>
+    Task ApproveAsync(int orderId, string managerUserId);
     /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
     Task<MaintenanceOrder?> GetByIdAsync(int id);

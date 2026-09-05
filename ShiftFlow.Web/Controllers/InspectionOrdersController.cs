@@ -151,6 +151,21 @@ public class InspectionOrdersController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
+    public async Task<IActionResult> Approve(int id)
+    {
+        try
+        {
+            await _orders.ApproveAsync(id, CurrentUserId);
+            TempData["Success"] = "Inspection order approved and closed.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
     public async Task<IActionResult> Cancel(int id, string? reason)
     {
         try

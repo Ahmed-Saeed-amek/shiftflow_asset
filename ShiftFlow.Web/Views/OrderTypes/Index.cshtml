@@ -26,7 +26,7 @@
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
-                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"), @(t.AllowsMultipleAssets ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.AssignmentMode)))'>
+                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"), @(t.AllowsMultipleAssets ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.AssignmentMode)), @(t.RequiresApproval ? "true" : "false"))'>
                                 @Loc.T("Edit")
                             </button>
                         </td>
@@ -71,7 +71,7 @@
                                 <label class="form-check-label small" for="otTracksDefect">@Loc.T("Tracks defect outcome (Action Type + Cause required on Defective)")</label>
                             </div>
                             <div class="form-check">
-                                <input type="checkbox" name="RequiresVendor" id="otRequiresVendor" class="form-check-input" value="true" />
+                                <input type="checkbox" name="RequiresVendor" id="otRequiresVendor" class="form-check-input" value="true" onchange="applyVendorGate()" />
                                 <label class="form-check-label small" for="otRequiresVendor">@Loc.T("Requires vendor (routes through the Work Order vendor pipeline)")</label>
                             </div>
                             <div class="form-check">
@@ -81,6 +81,11 @@
                             <div class="form-check">
                                 <input type="checkbox" name="AllowsMultipleAssets" id="otAllowsMultiple" class="form-check-input" value="true" />
                                 <label class="form-check-label small" for="otAllowsMultiple">@Loc.T("Allows multiple assets per order (independent of Direct Fix — a direct-fix type creates one order per selected asset)")</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="RequiresApproval" id="otRequiresApproval" class="form-check-input" value="true" />
+                                <label class="form-check-label small" for="otRequiresApproval">@Loc.T("Requires manager approval before closing")</label>
+                                <div class="form-text" id="otRequiresApprovalHint" style="display:none">@Loc.T("Redundant here — a vendor-routed order already needs a manager's Confirm step before it closes.")</div>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" name="IsActive" id="otIsActive" class="form-check-input" value="true" checked />
@@ -112,6 +117,14 @@
     const jsNewOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Order Type")));
     const jsEditOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Order Type")));
 
+    function applyVendorGate() {
+        const requiresVendor = document.getElementById('otRequiresVendor').checked;
+        const approvalCb = document.getElementById('otRequiresApproval');
+        approvalCb.disabled = requiresVendor;
+        if (requiresVendor) approvalCb.checked = false;
+        document.getElementById('otRequiresApprovalHint').style.display = requiresVendor ? '' : 'none';
+    }
+
     function openCreate() {
         document.getElementById('orderTypeModalTitle').textContent = jsNewOrderType;
         document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Create")');
@@ -125,10 +138,12 @@
         document.getElementById('otIsDirectFix').checked = false;
         document.getElementById('otAllowsMultiple').checked = false;
         document.getElementById('otAssignmentMode').value = 'Either';
+        document.getElementById('otRequiresApproval').checked = false;
         document.getElementById('otIsActive').checked = true;
+        applyVendorGate();
     }
 
-    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive, isDirectFix, allowsMultiple, assignmentMode) {
+    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive, isDirectFix, allowsMultiple, assignmentMode, requiresApproval) {
         document.getElementById('orderTypeModalTitle').textContent = jsEditOrderType;
         document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Edit")');
         document.getElementById('otId').value = id;
@@ -142,6 +157,8 @@
         document.getElementById('otIsDirectFix').checked = isDirectFix;
         document.getElementById('otAllowsMultiple').checked = allowsMultiple;
         document.getElementById('otAssignmentMode').value = assignmentMode || 'Either';
+        document.getElementById('otRequiresApproval').checked = requiresApproval;
+        applyVendorGate();
     }
 </script>
 }

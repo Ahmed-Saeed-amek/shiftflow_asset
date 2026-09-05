@@ -22,7 +22,10 @@ public class MaintenanceOrder
     public int? OrderTypeId{get;set;} public virtual OrderType? OrderType{get;set;}
 
     public string Status{get;set;}="Open";
-    public static readonly string[] Statuses = ["Open", "Done", "Cancelled"];
+    /// <summary>PendingApproval only exists when OrderType.RequiresApproval is true — the employee's
+    /// fix report lands here instead of straight at Done, and only a manager's Approve action moves
+    /// it on. Otherwise the lifecycle is exactly Open -> Done (or Cancelled) as before.</summary>
+    public static readonly string[] Statuses = ["Open", "PendingApproval", "Done", "Cancelled"];
 
     /// <summary>Set by the assigned employee when they complete the fix (Status -> "Done").</summary>
     public string? FixDescription{get;set;}

@@ -348,6 +348,7 @@ public class OrderTypeViewModel
     public int SortOrder { get; set; }
     public bool AllowsMultipleAssets { get; set; }
     [Required] public string AssignmentMode { get; set; } = "Either";
+    public bool RequiresApproval { get; set; }
 }
 
 public class VendorFixViewModel

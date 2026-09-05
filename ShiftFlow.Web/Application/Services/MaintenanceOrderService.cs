@@ -83,7 +83,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
 
     public async Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
-        var order = await _db.MaintenanceOrders.Include(m => m.Parts).FirstOrDefaultAsync(m => m.Id == orderId)
+        var order = await _db.MaintenanceOrders.Include(m => m.Parts).Include(m => m.OrderType).FirstOrDefaultAsync(m => m.Id == orderId)
             ?? throw new InvalidOperationException("Maintenance order not found.");
         // Same "assignee or team member" rule as InspectionOrder — a Team-assigned order can be
         // completed by any member, not just whoever happens to be recorded as AssignedToUserId
@@ -127,13 +127,26 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         }
         order.Cost = totalCost;
 
-        order.Status = "Done";
-        order.ClosedDate = DateTime.UtcNow;
+        var requiresApproval = order.OrderType?.RequiresApproval ?? false;
+        order.Status = requiresApproval ? "PendingApproval" : "Done";
+        order.ClosedDate = requiresApproval ? null : DateTime.UtcNow;
         if (!await HasOtherOpenWorkAsync(order.AssetId, order.Id)) await SetAssetStatusAsync(order.AssetId, "Working");
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
-        await _audit.LogAsync("Complete", "MaintenanceOrder", order.Id.ToString(), employeeUserId, oldValue: "Open", newValue: "Done");
+        await _audit.LogAsync("Complete", "MaintenanceOrder", order.Id.ToString(), employeeUserId, oldValue: "Open", newValue: order.Status);
         return order;
+    }
+
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — the only
+    /// way a PendingApproval order can actually finalize to Done.</summary>
+    public async Task ApproveAsync(int orderId, string managerUserId)
+    {
+        var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
+        if (order.Status != "PendingApproval") throw new InvalidOperationException("This order isn't awaiting approval.");
+        order.Status = "Done";
+        order.ClosedDate = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync("Approve", "MaintenanceOrder", order.Id.ToString(), managerUserId, oldValue: "PendingApproval", newValue: "Done");
     }
 
     public async Task CancelAsync(int orderId, string? reason, string userId)

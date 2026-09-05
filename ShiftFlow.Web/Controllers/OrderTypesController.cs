@@ -46,6 +46,7 @@ public class OrderTypesController : Controller
             TracksDefectOutcome = vm.TracksDefectOutcome, RequiresVendor = vm.RequiresVendor,
             IsDirectFix = vm.IsDirectFix, IsActive = vm.IsActive, SortOrder = vm.SortOrder,
             AllowsMultipleAssets = vm.AllowsMultipleAssets, AssignmentMode = vm.AssignmentMode,
+            RequiresApproval = vm.RequiresApproval,
             Color = OrderTypeColors.NextColor(usedColors),
         });
         await _db.SaveChangesAsync();
@@ -72,6 +73,7 @@ public class OrderTypesController : Controller
         type.TracksDefectOutcome = vm.TracksDefectOutcome; type.RequiresVendor = vm.RequiresVendor;
         type.IsDirectFix = vm.IsDirectFix; type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
         type.AllowsMultipleAssets = vm.AllowsMultipleAssets; type.AssignmentMode = vm.AssignmentMode;
+        type.RequiresApproval = vm.RequiresApproval;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));

@@ -1610,6 +1610,9 @@ public static class Translations
         Ar["Multiple"] = "متعددة";
         Ar["Single"] = "واحدة";
         Ar["Assets"] = "الأصول";
+        Ar["PendingApproval"] = "بانتظار الموافقة";
+        Ar["Pending Approval"] = "بانتظار الموافقة";
+        Ar["Approve"] = "الموافقة";
         Ar["— Select a category —"] = "— اختر فئة —";
         Ar["Most Used"] = "الأكثر استخدامًا";
         Ar["By Asset"] = "حسب الأصل";
