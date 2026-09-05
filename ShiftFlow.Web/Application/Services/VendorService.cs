@@ -18,14 +18,22 @@ public class VendorService : IVendorService
         return vendor;
     }
 
+    // Every editable field is saved, but the audit entry used to hard-code Status alone as
+    // old/new — an edit that changed ContactName/Phone/Email/Specialization/Name without also
+    // touching Status produced a byte-identical, useless audit row (same defect class as
+    // AssetService.UpdateAsync, fixed separately).
+    private static string Snapshot(Vendor v) =>
+        $"{v.Name}, Contact: {v.ContactName ?? "—"}, Phone: {v.Phone ?? "—"}, Email: {v.Email ?? "—"}, Specialization: {v.Specialization ?? "—"}, Status: {v.Status}";
+
     public async Task UpdateAsync(Vendor vendor, string userId)
     {
         var existing = await _db.Vendors.FindAsync(vendor.Id) ?? throw new InvalidOperationException("Vendor not found.");
-        var oldStatus = existing.Status;
+        var oldValue = Snapshot(existing);
         existing.Name = vendor.Name; existing.NameAr = vendor.NameAr; existing.ContactName = vendor.ContactName;
         existing.Phone = vendor.Phone; existing.Email = vendor.Email; existing.Specialization = vendor.Specialization;
         existing.Status = vendor.Status;
+        var newValue = Snapshot(existing);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Update", "Vendor", existing.Id.ToString(), userId, oldValue: oldStatus, newValue: existing.Status);
+        await _audit.LogAsync("Update", "Vendor", existing.Id.ToString(), userId, oldValue: oldValue, newValue: newValue);
     }
 }

@@ -47,7 +47,7 @@ public class VendorsController : Controller
         if (vendor.UserId != null) { TempData["Error"] = "This vendor already has a login."; return RedirectToAction(nameof(Details), new { id = vendorId }); }
         if (string.IsNullOrWhiteSpace(email)) { TempData["Error"] = "An email is required to create a login."; return RedirectToAction(nameof(Details), new { id = vendorId }); }
 
-        var tempPassword = $"Vendor1{Guid.NewGuid():N}"[..12].ToUpperInvariant().Insert(4, "ab");
+        var tempPassword = ShiftFlow.Web.Services.TempPasswordGenerator.Generate();
         var user = new ApplicationUser { UserName = email, Email = email, FullName = vendor.Name, IsActive = true, EmailConfirmed = true };
         var result = await _userManager.CreateAsync(user, tempPassword);
         if (!result.Succeeded)
@@ -70,7 +70,7 @@ public class VendorsController : Controller
         var vendor = await _db.Vendors.Include(v => v.User).FirstOrDefaultAsync(v => v.Id == vendorId);
         if (vendor?.User == null) return NotFound();
 
-        var tempPassword = $"Vendor1{Guid.NewGuid():N}"[..12].ToUpperInvariant().Insert(4, "ab");
+        var tempPassword = ShiftFlow.Web.Services.TempPasswordGenerator.Generate();
         var token = await _userManager.GeneratePasswordResetTokenAsync(vendor.User);
         var result = await _userManager.ResetPasswordAsync(vendor.User, token, tempPassword);
         if (!result.Succeeded)

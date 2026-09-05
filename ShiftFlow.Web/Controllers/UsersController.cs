@@ -498,34 +498,7 @@ public class UsersController : Controller
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static string GenerateTempPassword()
-    {
-        // Produces e.g. "Sf@mK7xP2nQa" — satisfies uppercase, lowercase, digit, special
-        const string lower = "abcdefghijkmnpqrstuvwxyz";
-        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        const string digits = "23456789";
-        const string special = "@#!$";
-
-        Span<char> pwd = stackalloc char[12];
-        pwd[0] = Pick(upper);
-        pwd[1] = Pick(lower);
-        pwd[2] = Pick(digits);
-        pwd[3] = Pick(special);
-        const string all = lower + upper + digits + special;
-        for (int i = 4; i < 12; i++) pwd[i] = Pick(all);
-
-        // Shuffle
-        for (int i = 11; i > 0; i--)
-        {
-            int j = RandomNumberGenerator.GetInt32(i + 1);
-            (pwd[i], pwd[j]) = (pwd[j], pwd[i]);
-        }
-
-        return new string(pwd);
-
-        static char Pick(string chars) =>
-            chars[RandomNumberGenerator.GetInt32(chars.Length)];
-    }
+    private static string GenerateTempPassword() => ShiftFlow.Web.Services.TempPasswordGenerator.Generate();
 
     [HttpPost, Authorize(Policy = PermissionCatalog.UserManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)
