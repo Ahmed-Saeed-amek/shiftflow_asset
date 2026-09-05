@@ -1,0 +1,190 @@
+@model List<RecurringOrder>
+@using ShiftFlow.Domain.Entities
+@{
+    ViewData["Title"] = Loc.T("Recurring Orders");
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
+    var teams = (List<Team>)ViewBag.Teams;
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#recurringModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Schedule") + "</button>";
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Recurring Orders"),Subtitle=Loc.T("Auto-generates a new order on a repeating cadence — single-asset order types only"),ActionsHtml=actionsHtml})" />
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Order Type")</th><th>@Loc.T("Asset")</th><th class="d-none d-md-table-cell">@Loc.T("Assign To")</th><th class="d-none d-lg-table-cell">@Loc.T("Cadence")</th><th class="d-none d-lg-table-cell">@Loc.T("Start Date")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var r in Model)
+                {
+                    <tr>
+                        <td>@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</td>
+                        <td class="small">@(r.Asset?.AssetTag ?? "—")</td>
+                        <td class="small d-none d-md-table-cell">@(r.AssignedToUser?.FullName ?? (r.AssignedToTeam != null ? Loc.T("Team") + ": " + r.AssignedToTeam.Name : "—"))</td>
+                        <td class="small d-none d-lg-table-cell">@Loc.T(r.Cadence)</td>
+                        <td class="small d-none d-lg-table-cell">@r.StartDate.ToString("yyyy-MM-dd")@(r.EndDate.HasValue ? " – " + r.EndDate.Value.ToString("yyyy-MM-dd") : "")</td>
+                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recurringModal"
+                                    onclick='openEdit(@r.Id, @r.OrderTypeId, @r.AssetId, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.AssignedToUserId)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.AssignedToTeamId)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.Cadence)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.StartDate.ToString("yyyy-MM-dd"))), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.EndDate?.ToString("yyyy-MM-dd"))), @(r.IsActive ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.Asset?.AssetTag)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.AssignedToUser?.FullName)))'>
+                                @Loc.T("Edit")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="recurringModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="recurringForm" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="roId" value="0" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recurringModalTitle">@Loc.T("New Schedule")</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        @if (orderTypes.Count == 0)
+                        {
+                            <div class="col-12"><div class="alert alert-warning small mb-0">@Loc.T("No single-asset order types available — set an Order Type's Assets to \"Single\" in the Order Types catalog first.")</div></div>
+                        }
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Order Type")</label>
+                            <select name="OrderTypeId" id="roOrderTypeId" class="form-select" required>
+                                @foreach (var t in orderTypes)
+                                {
+                                    <option value="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">@Loc.T("Asset")</label>
+                            <partial name="_AssetSinglePicker" model="@(new AssetSinglePickerModel{Name="AssetId"})" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label d-block small">@Loc.T("Assign To")</label>
+                            <div class="btn-group btn-group-sm mb-2" role="group" id="roAssigneeToggle">
+                                <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeUser" value="User" checked />
+                                <label class="btn btn-outline-secondary" for="roAssigneeUser">@Loc.T("Employee")</label>
+                                <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeTeam" value="Team" />
+                                <label class="btn btn-outline-secondary" for="roAssigneeTeam">@Loc.T("Team")</label>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6" id="roAssigneeUserRow">
+                                    <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId"})" />
+                                </div>
+                                <div class="col-md-6 d-none" id="roAssigneeTeamRow">
+                                    <select name="AssignedToTeamId" id="roAssignedToTeamId" class="form-select">
+                                        <option value="">@Loc.T("Select a team")</option>
+                                        @foreach (var t in teams)
+                                        {
+                                            <option value="@t.Id">@t.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Cadence")</label>
+                            <select name="Cadence" id="roCadence" class="form-select">
+                                @foreach (var c in RecurringOrder.Cadences)
+                                {
+                                    <option value="@c">@Loc.T(c)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4 pt-1">
+                                <input type="checkbox" name="IsActive" id="roIsActive" class="form-check-input" value="true" checked />
+                                <input type="hidden" name="IsActive" value="false" />
+                                <label class="form-check-label small" for="roIsActive">@Loc.T("Active")</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("Start Date")</label>
+                            <input type="date" name="StartDate" id="roStartDate" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">@Loc.T("End Date (optional)")</label>
+                            <input type="date" name="EndDate" id="roEndDate" class="form-control" />
+                            <div class="form-text">@Loc.T("Leave blank for an open-ended schedule — occurrences generate up to today until you set an end date or deactivate it.")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc.T("Cancel")</button>
+                    <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const jsNewSchedule = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Schedule")));
+    const jsEditSchedule = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Schedule")));
+
+    function applyRoAssigneeType() {
+        const showUser = document.getElementById('roAssigneeUser').checked;
+        document.getElementById('roAssigneeUserRow').classList.toggle('d-none', !showUser);
+        document.getElementById('roAssigneeTeamRow').classList.toggle('d-none', showUser);
+    }
+    document.querySelectorAll('input[name="roAssigneeType"]').forEach(r => r.addEventListener('change', applyRoAssigneeType));
+
+    function setAssetPicker(assetId, label) {
+        const wrap = document.querySelector('#recurringForm .asset-picker');
+        wrap.querySelector('[data-ap-value]').value = assetId ?? '';
+        wrap.querySelector('[data-ap-search]').value = label ?? '';
+    }
+    function setEmployeePicker(userId, label) {
+        const wrap = document.querySelector('#recurringForm .employee-picker');
+        wrap.querySelector('[data-ep-value]').value = userId ?? '';
+        wrap.querySelector('[data-ep-search]').value = label ?? '';
+    }
+
+    function openCreate() {
+        document.getElementById('recurringModalTitle').textContent = jsNewSchedule;
+        document.getElementById('recurringForm').setAttribute('action', '@Url.Action("Create")');
+        document.getElementById('roId').value = 0;
+        document.getElementById('roCadence').value = 'Monthly';
+        document.getElementById('roIsActive').checked = true;
+        document.getElementById('roStartDate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('roEndDate').value = '';
+        setAssetPicker('', '');
+        setEmployeePicker('', '');
+        document.getElementById('roAssignedToTeamId').value = '';
+        document.getElementById('roAssigneeUser').checked = true;
+        applyRoAssigneeType();
+    }
+
+    function openEdit(id, orderTypeId, assetId, assignedToUserId, assignedToTeamId, cadence, startDate, endDate, isActive, assetLabel, userLabel) {
+        document.getElementById('recurringModalTitle').textContent = jsEditSchedule;
+        document.getElementById('recurringForm').setAttribute('action', '@Url.Action("Edit")');
+        document.getElementById('roId').value = id;
+        document.getElementById('roOrderTypeId').value = orderTypeId;
+        setAssetPicker(assetId, assetLabel);
+        document.getElementById('roCadence').value = cadence;
+        document.getElementById('roStartDate').value = startDate;
+        document.getElementById('roEndDate').value = endDate || '';
+        document.getElementById('roIsActive').checked = isActive;
+        if (assignedToTeamId) {
+            document.getElementById('roAssigneeTeam').checked = true;
+            document.getElementById('roAssignedToTeamId').value = assignedToTeamId;
+            setEmployeePicker('', '');
+        } else {
+            document.getElementById('roAssigneeUser').checked = true;
+            setEmployeePicker(assignedToUserId, userLabel);
+            document.getElementById('roAssignedToTeamId').value = '';
+        }
+        applyRoAssigneeType();
+    }
+</script>
+}

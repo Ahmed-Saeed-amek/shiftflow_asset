@@ -35,7 +35,7 @@ public class DashboardKpis{public int TotalEngineers{get;set;}public int OpenIns
 public interface IInspectionOrderService
 {
     Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
-        List<int>? assetIds, DateTime? dueDate, string createdByUserId);
+        List<int>? assetIds, DateTime? dueDate, string createdByUserId, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null);
     Task<InspectionOrder?> GetByIdAsync(int id);
     Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
     Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue = false);
@@ -171,7 +171,7 @@ public interface IMaintenanceOrderService
     /// <summary>Admin/manager assigns an employee or a Team to fix an asset in-house — no vendor, no
     /// Work Order. Exactly one of assignedToUserId/assignedToTeamId must be set. Sets Asset.Status
     /// to "Maintenance" (unless Retired).</summary>
-    Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null);
+    Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null);
     /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
     Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);

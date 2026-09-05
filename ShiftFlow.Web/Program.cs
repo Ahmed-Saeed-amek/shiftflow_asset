@@ -168,6 +168,7 @@ builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<ISparePartService, SparePartService>();
 builder.Services.AddScoped<IAssetScopeService, AssetScopeService>();
 builder.Services.AddHostedService<PreventiveMaintenanceSchedulerService>();
+builder.Services.AddHostedService<RecurringOrderSchedulerService>();
 
 // AI Assistant (Rased pattern: OpenAI direct key preferred, Azure OpenAI fallback)
 builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));

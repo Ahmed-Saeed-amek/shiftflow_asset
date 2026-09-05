@@ -21,7 +21,7 @@ public class InspectionOrderService : IInspectionOrderService
     }
 
     public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
-        List<int>? assetIds, DateTime? dueDate, string createdByUserId)
+        List<int>? assetIds, DateTime? dueDate, string createdByUserId, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
         var orderType = await _db.OrderTypes.FirstOrDefaultAsync(t => t.Id == orderTypeId && t.IsActive)
             ?? throw new InvalidOperationException("Invalid order type.");
@@ -51,6 +51,8 @@ public class InspectionOrderService : IInspectionOrderService
             CreatedAt = DateTime.UtcNow,
             DueDate = dueDate,
             Status = "Open",
+            SourceRecurringOrderId = sourceRecurringOrderId,
+            ScheduledDate = scheduledDate,
             InspectionRun = new InspectionRun
             {
                 ZoneId = singleZoneId,

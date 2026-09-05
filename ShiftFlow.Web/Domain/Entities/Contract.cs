@@ -23,27 +23,10 @@ public class Contract
 
     /// <summary>Every due date from startDate to endDate (inclusive) stepping by cadence. The first occurrence
     /// is startDate itself. Used identically by the background generator and the Details-page schedule view
-    /// so both always agree on what's due.</summary>
-    public static List<DateTime> ComputeOccurrenceDueDates(DateTime startDate, DateTime endDate, string cadence)
-    {
-        var dates = new List<DateTime>();
-        var current = startDate.Date;
-        var end = endDate.Date;
-        while (current <= end)
-        {
-            dates.Add(current);
-            current = cadence switch
-            {
-                "Weekly" => current.AddDays(7),
-                "Monthly" => current.AddMonths(1),
-                "Quarterly" => current.AddMonths(3),
-                "Semi-Annual" => current.AddMonths(6),
-                "Annual" => current.AddYears(1),
-                _ => throw new InvalidOperationException($"Unknown PM cadence: {cadence}"),
-            };
-        }
-        return dates;
-    }
+    /// so both always agree on what's due. Thin wrapper — date math is shared with RecurringOrder's
+    /// scheduler via RecurrenceCalculator.</summary>
+    public static List<DateTime> ComputeOccurrenceDueDates(DateTime startDate, DateTime endDate, string cadence) =>
+        RecurrenceCalculator.ComputeOccurrenceDueDates(startDate, endDate, cadence);
 }
 
 /// <summary>Join table — a contract can cover many assets, an asset can be covered by many contracts.</summary>

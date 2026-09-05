@@ -45,6 +45,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
     public DbSet<MaintenanceOrderPart> MaintenanceOrderParts => Set<MaintenanceOrderPart>();
     public DbSet<OrderType> OrderTypes => Set<OrderType>();
+    public DbSet<RecurringOrder> RecurringOrders => Set<RecurringOrder>();
     public DbSet<SparePart> SpareParts => Set<SparePart>();
     public DbSet<SparePartAsset> SparePartAssets => Set<SparePartAsset>();
 
@@ -110,6 +111,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(o => o.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.OrderType).WithMany()
                 .HasForeignKey(o => o.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(o => o.SourceRecurringOrder).WithMany()
+                .HasForeignKey(o => o.SourceRecurringOrderId).OnDelete(DeleteBehavior.Restrict);
+            // Prevents RecurringOrderSchedulerService from ever double-creating the same
+            // (schedule, due date) occurrence — same pattern as WorkOrder's PM dedup index.
+            e.HasIndex(o => new { o.SourceRecurringOrderId, o.ScheduledDate })
+                .IsUnique()
+                .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_InspectionOrder_ExactlyOneAssignee",
@@ -319,9 +327,37 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.OrderType).WithMany()
                 .HasForeignKey(m => m.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.SourceRecurringOrder).WithMany()
+                .HasForeignKey(m => m.SourceRecurringOrderId).OnDelete(DeleteBehavior.Restrict);
+            // Prevents RecurringOrderSchedulerService from ever double-creating the same
+            // (schedule, due date) occurrence — same pattern as WorkOrder's PM dedup index.
+            e.HasIndex(m => new { m.SourceRecurringOrderId, m.ScheduledDate })
+                .IsUnique()
+                .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_MaintenanceOrder_ExactlyOneAssignee",
+                "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
+        });
+        b.Entity<RecurringOrder>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Cadence).HasMaxLength(20).IsRequired();
+            e.HasIndex(r => r.IsActive);
+            e.HasOne(r => r.OrderType).WithMany()
+                .HasForeignKey(r => r.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Asset).WithMany()
+                .HasForeignKey(r => r.AssetId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.AssignedToUser).WithMany()
+                .HasForeignKey(r => r.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.AssignedToTeam).WithMany()
+                .HasForeignKey(r => r.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.CreatedByUser).WithMany()
+                .HasForeignKey(r => r.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            // Exactly one of AssignedToUserId/AssignedToTeamId must be set — same rule as
+            // InspectionOrder/MaintenanceOrder, enforced in RecurringOrdersController.
+            e.ToTable(tb => tb.HasCheckConstraint(
+                "CK_RecurringOrder_ExactlyOneAssignee",
                 "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
         });
         b.Entity<OrderType>(e =>

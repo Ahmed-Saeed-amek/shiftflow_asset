@@ -351,6 +351,19 @@ public class OrderTypeViewModel
     public bool RequiresApproval { get; set; }
 }
 
+public class RecurringOrderViewModel
+{
+    public int Id { get; set; }
+    [Required] public int OrderTypeId { get; set; }
+    [Required] public int AssetId { get; set; }
+    public string? AssignedToUserId { get; set; }
+    public int? AssignedToTeamId { get; set; }
+    [Required] public string Cadence { get; set; } = "Monthly";
+    [Required] public DateTime StartDate { get; set; } = DateTime.UtcNow.Date;
+    public DateTime? EndDate { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 public class VendorFixViewModel
 {
     public DateTime? CompletionDate { get; set; }

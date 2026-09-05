@@ -30,7 +30,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == assetId && m.Id != excludeMaintenanceOrderId && m.Status == "Open")
         || await _db.WorkOrders.AnyAsync(w => w.AssetId == assetId && OpenWorkOrderStages.Contains(w.Stage));
 
-    public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null)
+    public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
@@ -50,6 +50,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             CreatedDate = DateTime.UtcNow,
             Status = "Open",
             OrderTypeId = orderTypeId,
+            SourceRecurringOrderId = sourceRecurringOrderId,
+            ScheduledDate = scheduledDate,
         };
         _db.MaintenanceOrders.Add(order);
         await SetAssetStatusAsync(assetId, "Maintenance");
