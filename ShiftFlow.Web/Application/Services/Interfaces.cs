@@ -72,8 +72,11 @@ public interface IAssetService
     Task<Asset> CreateAsync(Asset asset, string userId);
     Task UpdateAsync(Asset asset, string userId);
     Task DeleteAsync(int id, string userId);
-    Task<byte[]> ExportToExcelAsync();
-    Task<byte[]> ExportToPdfAsync();
+    /// <summary>Both exports respect the caller's UserAssetScope (Zone/LocationCategory/Category),
+    /// same as Assets/Index — a scoped user must not be able to pull the full, unscoped inventory
+    /// just by hitting the export link directly instead of the (correctly scoped) list page.</summary>
+    Task<byte[]> ExportToExcelAsync(string userId);
+    Task<byte[]> ExportToPdfAsync(string userId);
 }
 
 public interface IVendorService

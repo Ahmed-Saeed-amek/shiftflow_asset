@@ -82,6 +82,16 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
             return RedirectToAction(nameof(Index));
         }
+        // IsDirectFix decides which table (InspectionOrders vs MaintenanceOrders) every order or
+        // recurring schedule under this type lives in — flipping it after the fact doesn't move any
+        // existing rows, so RecurringOrderSchedulerService (which re-derives the target table from
+        // the type's *current* IsDirectFix on every tick) would start looking in the wrong table for
+        // a schedule's already-generated occurrences and re-attempt generating duplicates.
+        if (type.IsDirectFix != vm.IsDirectFix && await IsInUseAsync(vm.Id))
+        {
+            TempData["Error"] = $"'{type.Name}' has orders or a recurring schedule using it — Direct Fix can't be changed on an in-use type.";
+            return RedirectToAction(nameof(Index));
+        }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;
         type.TracksDefectOutcome = vm.TracksDefectOutcome; type.RequiresVendor = vm.RequiresVendor;
         type.IsDirectFix = vm.IsDirectFix; type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
@@ -103,11 +113,7 @@ public class OrderTypesController : Controller
         var type = await _db.OrderTypes.FindAsync(id);
         if (type == null) return NotFound();
 
-        var inUse = await _db.InspectionOrders.AnyAsync(o => o.OrderTypeId == id)
-            || await _db.MaintenanceOrders.AnyAsync(m => m.OrderTypeId == id)
-            || await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == id)
-            || await _db.WorkOrders.AnyAsync(w => w.OrderTypeId == id);
-        if (inUse)
+        if (await IsInUseAsync(id))
         {
             TempData["Error"] = $"'{type.Name}' has orders or a recurring schedule using it — deactivate it instead of deleting.";
             return RedirectToAction(nameof(Index));
@@ -118,4 +124,10 @@ public class OrderTypesController : Controller
         TempData["Success"] = "Order type deleted.";
         return RedirectToAction(nameof(Index));
     }
+
+    private async Task<bool> IsInUseAsync(int orderTypeId) =>
+        await _db.InspectionOrders.AnyAsync(o => o.OrderTypeId == orderTypeId)
+        || await _db.MaintenanceOrders.AnyAsync(m => m.OrderTypeId == orderTypeId)
+        || await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == orderTypeId)
+        || await _db.WorkOrders.AnyAsync(w => w.OrderTypeId == orderTypeId);
 }

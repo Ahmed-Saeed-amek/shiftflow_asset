@@ -75,16 +75,32 @@ public class InspectionOrderService : IInspectionOrderService
     /// query with no atomic guard — a stale/leftover count (e.g. after older rows were hard-deleted
     /// by the pre-fix Cancel behavior, or two concurrent creates) can compute a seq that collides
     /// with a still-existing row's number, hitting the unique index and raising a raw, unhandled
-    /// DbUpdateException all the way to the client (confirmed live). Same fix as
-    /// WorkOrderService.SaveWithUniqueNumberRetryAsync: retry with a freshly recomputed number on
-    /// that specific failure instead of making the count itself atomic.</summary>
+    /// DbUpdateException all the way to the client (confirmed live). Worse, COUNT(*) itself goes
+    /// permanently stale the moment any row for the year is ever hard-deleted — it then recomputes
+    /// the exact same already-used number on every retry attempt and can never get past the gap.
+    /// The seq counter is shared across every prefix for the year (matching the existing numbering
+    /// scheme, not per-prefix), so the "highest existing seq" must be read across all of them —
+    /// find it from the numeric suffix of every InspectionOrder's OrderNumber that year rather than
+    /// a plain count, and advance it by the attempt number on retry so a genuine concurrent-insert
+    /// race still makes progress.</summary>
     private async Task SaveWithUniqueNumberRetryAsync(InspectionOrder order, string prefix)
     {
+        var year = order.CreatedAt.Year;
+        var suffix = $"-{year}-";
+        var existingNumbers = await _db.InspectionOrders
+            .Where(o => o.CreatedAt.Year == year)
+            .Select(o => o.OrderNumber)
+            .ToListAsync();
+        var nextSeq = existingNumbers.Count == 0 ? 1
+            : existingNumbers.Select(n =>
+            {
+                var idx = n.IndexOf(suffix, StringComparison.Ordinal);
+                return idx >= 0 && int.TryParse(n.AsSpan(idx + suffix.Length), out var s) ? s : 0;
+            }).Max() + 1;
+
         for (var attempt = 0; ; attempt++)
         {
-            var year = order.CreatedAt.Year;
-            var seq = await _db.InspectionOrders.CountAsync(o => o.CreatedAt.Year == year) + 1;
-            order.OrderNumber = $"{prefix}-{year}-{seq:D4}";
+            order.OrderNumber = $"{prefix}-{year}-{nextSeq + attempt:D4}";
             try
             {
                 await _db.SaveChangesAsync();
@@ -92,7 +108,7 @@ public class InspectionOrderService : IInspectionOrderService
             }
             catch (DbUpdateException) when (attempt < 4)
             {
-                // Duplicate OrderNumber from a stale count or a concurrent insert — recompute and retry.
+                // Concurrent insert claimed this number first — advance to the next one and retry.
             }
         }
     }

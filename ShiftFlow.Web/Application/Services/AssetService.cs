@@ -14,7 +14,9 @@ public class AssetService : IAssetService
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly IContractService _contractService;
-    public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService) { _db = db; _audit = audit; _contractService = contractService; }
+    private readonly IAssetScopeService _scopeService;
+    public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService, IAssetScopeService scopeService)
+    { _db = db; _audit = audit; _contractService = contractService; _scopeService = scopeService; }
 
     public async Task<Asset> CreateAsync(Asset asset, string userId)
     {
@@ -47,16 +49,20 @@ public class AssetService : IAssetService
         await _audit.LogAsync("Delete", "Asset", id.ToString(), userId, oldValue: asset.AssetTag);
     }
 
-    private async Task<List<Asset>> GetExportRowsAsync() =>
-        await _db.Assets.Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory)
-            .OrderBy(a => a.AssetTag).ToListAsync();
+    private async Task<List<Asset>> GetExportRowsAsync(string userId)
+    {
+        var query = await _scopeService.ApplyScopeAsync(
+            _db.Assets.Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory),
+            userId);
+        return await query.OrderBy(a => a.AssetTag).ToListAsync();
+    }
 
     private static string ZoneLabel(Asset a) =>
         a.Zone == null ? "" : $"{a.Zone.Name} ({a.Zone.LocationCategory?.Name})";
 
-    public async Task<byte[]> ExportToExcelAsync()
+    public async Task<byte[]> ExportToExcelAsync(string userId)
     {
-        var assets = await GetExportRowsAsync();
+        var assets = await GetExportRowsAsync(userId);
         var vendors = await _contractService.GetDerivedVendorsAsync(assets.Select(a => a.Id));
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();
@@ -82,9 +88,9 @@ public class AssetService : IAssetService
         return await pkg.GetAsByteArrayAsync();
     }
 
-    public async Task<byte[]> ExportToPdfAsync()
+    public async Task<byte[]> ExportToPdfAsync(string userId)
     {
-        var assets = await GetExportRowsAsync();
+        var assets = await GetExportRowsAsync(userId);
         var vendors = await _contractService.GetDerivedVendorsAsync(assets.Select(a => a.Id));
         using var ms = new MemoryStream();
         using (var writer = new PdfWriter(ms))

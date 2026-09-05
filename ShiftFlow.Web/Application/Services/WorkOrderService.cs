@@ -67,16 +67,25 @@ public class WorkOrderService : IWorkOrderService
     /// concurrently could compute the same seq and both try to insert the same number, hitting
     /// the unique index and raising a raw, unhandled DbUpdateException all the way to the client
     /// (confirmed live: a concurrent InspectionOrders/UpdateItem pair produced exactly this SQL
-    /// exception leak). Retry with a freshly recomputed number on that specific failure instead of
-    /// trying to make the count itself atomic, since a handful of retries is far simpler than a
-    /// real sequence object and the collision is rare enough that a retry loop is plenty.</summary>
+    /// exception leak). Worse, COUNT(*) itself goes permanently stale the moment any row for the
+    /// year is ever hard-deleted (or never committed) — it then recomputes the exact same
+    /// already-used number on every retry attempt and can never get past the gap. Base the
+    /// sequence on the highest existing number for the year instead of a count, and advance it by
+    /// the attempt number on retry so a genuine concurrent-insert race still makes progress.</summary>
     private async Task SaveWithUniqueNumberRetryAsync(WorkOrder workOrder)
     {
+        var year = workOrder.CreatedDate.Year;
+        var prefix = $"WO-{year}-";
+        var existingNumbers = await _db.WorkOrders
+            .Where(w => w.WorkOrderNumber.StartsWith(prefix))
+            .Select(w => w.WorkOrderNumber)
+            .ToListAsync();
+        var nextSeq = existingNumbers.Count == 0 ? 1
+            : existingNumbers.Select(n => int.TryParse(n.AsSpan(prefix.Length), out var s) ? s : 0).Max() + 1;
+
         for (var attempt = 0; ; attempt++)
         {
-            var year = workOrder.CreatedDate.Year;
-            var seq = await _db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
-            workOrder.WorkOrderNumber = $"WO-{year}-{seq:D4}";
+            workOrder.WorkOrderNumber = $"{prefix}{nextSeq + attempt:D4}";
             try
             {
                 await _db.SaveChangesAsync();
@@ -84,7 +93,7 @@ public class WorkOrderService : IWorkOrderService
             }
             catch (DbUpdateException) when (attempt < 4)
             {
-                // Duplicate WorkOrderNumber from a concurrent insert — recompute and retry.
+                // Concurrent insert claimed this number first — advance to the next one and retry.
                 // The entity stays tracked as Added after a failed SaveChanges, so the next
                 // attempt just retries the same insert with a new number.
             }
@@ -414,12 +423,9 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> CreatePreventiveMaintenanceOccurrenceAsync(int assetId, int vendorId, int sourceContractId, DateTime scheduledDate, string? contractNumber, string systemUserId)
     {
-        var year = DateTime.UtcNow.Year;
-        var seq = await _db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
         var contractLabel = string.IsNullOrWhiteSpace(contractNumber) ? sourceContractId.ToString() : contractNumber;
         var wo = new WorkOrder
         {
-            WorkOrderNumber = $"WO-{year}-{seq:D4}",
             AssetId = assetId,
             VendorId = vendorId,
             SourceContractId = sourceContractId,
@@ -434,7 +440,7 @@ public class WorkOrderService : IWorkOrderService
         wo.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
         _db.WorkOrders.Add(wo);
         await SetAssetStatusAsync(assetId, "Maintenance");
-        await _db.SaveChangesAsync();
+        await SaveWithUniqueNumberRetryAsync(wo);
         await _audit.LogAsync("AutoGeneratePM", "WorkOrder", wo.Id.ToString(), systemUserId,
             newValue: wo.WorkOrderNumber, details: $"Contract #{sourceContractId}, due {scheduledDate:yyyy-MM-dd}");
         return wo;

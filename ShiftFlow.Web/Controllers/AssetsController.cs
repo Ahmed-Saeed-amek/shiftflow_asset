@@ -230,14 +230,14 @@ public class AssetsController : Controller
     [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
     public async Task<IActionResult> ExportExcel()
     {
-        var bytes = await _assetService.ExportToExcelAsync();
+        var bytes = await _assetService.ExportToExcelAsync(_userManager.GetUserId(User)!);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Assets_{DateTime.Today:yyyyMMdd}.xlsx");
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
     public async Task<IActionResult> ExportPdf()
     {
-        var bytes = await _assetService.ExportToPdfAsync();
+        var bytes = await _assetService.ExportToPdfAsync(_userManager.GetUserId(User)!);
         return File(bytes, "application/pdf", $"Assets_{DateTime.Today:yyyyMMdd}.pdf");
     }
 

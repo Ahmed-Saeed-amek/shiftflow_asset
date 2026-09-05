@@ -60,17 +60,29 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         return order;
     }
 
-    /// <summary>Same fix as WorkOrderService/InspectionOrderService's identically-named helper —
-    /// OrderNumber "MO-{year}-{seq:D4}" was a plain COUNT-then-use query with no atomic guard,
-    /// which can collide with a still-existing row's number and raise a raw unhandled
-    /// DbUpdateException. Retry with a freshly recomputed number on that specific failure.</summary>
+    /// <summary>Same fix as WorkOrderService/InspectionOrderService's identically-named helper.
+    /// OrderNumber "MO-{year}-{seq:D4}" used to be COUNT(*)+1, which is wrong the moment a row is
+    /// ever hard-deleted (or a batch create's retry loop backs off) and leaves a gap: COUNT stays
+    /// permanently one short of the real next sequence, so it recomputes the exact same colliding
+    /// number on every retry attempt and can never actually get past the gap (confirmed live — a
+    /// deleted test row left every subsequent create's COUNT+1 permanently landing on an
+    /// already-used number, 500ing on a unique-index violation). Base the sequence on the highest
+    /// existing number for the year instead of a count, and advance it by the attempt number on
+    /// retry so a genuine concurrent-insert race still makes progress each time.</summary>
     private async Task SaveWithUniqueNumberRetryAsync(MaintenanceOrder order)
     {
+        var year = order.CreatedDate.Year;
+        var prefix = $"MO-{year}-";
+        var existingNumbers = await _db.MaintenanceOrders
+            .Where(m => m.OrderNumber.StartsWith(prefix))
+            .Select(m => m.OrderNumber)
+            .ToListAsync();
+        var nextSeq = existingNumbers.Count == 0 ? 1
+            : existingNumbers.Select(n => int.TryParse(n.AsSpan(prefix.Length), out var s) ? s : 0).Max() + 1;
+
         for (var attempt = 0; ; attempt++)
         {
-            var year = order.CreatedDate.Year;
-            var seq = await _db.MaintenanceOrders.CountAsync(m => m.CreatedDate.Year == year) + 1;
-            order.OrderNumber = $"MO-{year}-{seq:D4}";
+            order.OrderNumber = $"{prefix}{nextSeq + attempt:D4}";
             try
             {
                 await _db.SaveChangesAsync();
@@ -78,7 +90,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             }
             catch (DbUpdateException) when (attempt < 4)
             {
-                // Duplicate OrderNumber from a stale count or a concurrent insert — recompute and retry.
+                // Concurrent insert claimed this number first — advance to the next one and retry.
             }
         }
     }
@@ -95,7 +107,9 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         if (!isAssignee && !isTeamMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
         if (order.Status != "Open") throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
 
-        order.CompletedDate = completedDate;
+        var requiresApproval = order.OrderType?.RequiresApproval ?? false;
+        var newStatus = requiresApproval ? "PendingApproval" : "Done";
+        var closedDate = requiresApproval ? (DateTime?)null : DateTime.UtcNow;
 
         // Same pattern as WorkOrderService.ApplyPartsAsync: validate compatibility, decrement stock
         // atomically per part, snapshot Name/UnitCost from the catalog, all inside one transaction
@@ -103,6 +117,23 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         // is entirely derived from the parts used — there's no manually-typed cost field anymore.
         var validParts = parts.Where(p => p.Quantity > 0).ToList();
         await using var tx = await _db.Database.BeginTransactionAsync();
+
+        // Claim the Open -> Done/PendingApproval transition atomically before touching parts/stock —
+        // same race WorkOrderService's fix flows already guard against (EmployeeFixAsync/VendorFixAsync/
+        // AdvanceWithoutVendorAsync all claim their stage transition before calling ApplyPartsAsync).
+        // Without this, two concurrent Completes on the same order both pass the in-memory
+        // Status=="Open" check above and each decrement stock for their own parts list — confirmed
+        // live: two concurrent submissions both "succeeded", stock was decremented for both parts
+        // lists (double the intended amount), and Cost ended up reflecting only whichever writer's
+        // SaveChanges landed last, silently understating the true parts cost.
+        var claimed = await _db.MaintenanceOrders.Where(m => m.Id == orderId && m.Status == "Open")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.Status, newStatus)
+                .SetProperty(m => m.ClosedDate, closedDate)
+                .SetProperty(m => m.CompletedDate, completedDate));
+        if (claimed == 0) throw new InvalidOperationException("This maintenance order isn't awaiting a fix.");
+        order.Status = newStatus; order.ClosedDate = closedDate; order.CompletedDate = completedDate;
+
         _db.MaintenanceOrderParts.RemoveRange(order.Parts);
         var totalCost = 0m;
         if (validParts.Count > 0)
@@ -129,9 +160,6 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         }
         order.Cost = totalCost;
 
-        var requiresApproval = order.OrderType?.RequiresApproval ?? false;
-        order.Status = requiresApproval ? "PendingApproval" : "Done";
-        order.ClosedDate = requiresApproval ? null : DateTime.UtcNow;
         if (!await HasOtherOpenWorkAsync(order.AssetId, order.Id)) await SetAssetStatusAsync(order.AssetId, "Working");
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
