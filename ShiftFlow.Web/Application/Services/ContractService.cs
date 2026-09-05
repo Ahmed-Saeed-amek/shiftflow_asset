@@ -21,17 +21,23 @@ public class ContractService : IContractService
     // message - confirmed live on both.
     private const decimal MaxCost = 9_999_999_999.99m;
 
-    private async Task ValidateAsync(Contract contract)
+    private async Task ValidateAsync(Contract contract, List<int> assetIds)
     {
         if (contract.Cost is { } cost && (cost < 0 || cost > MaxCost))
             throw new InvalidOperationException($"Cost must be between 0 and {MaxCost:N2}.");
         if (!await _db.Vendors.AnyAsync(v => v.Id == contract.VendorId))
             throw new InvalidOperationException("Selected vendor not found.");
+        // Every other order-creation path (Inspection/Maintenance/WorkOrder) blocks new work
+        // against a Retired asset — a Contract linking one is a dangling, misleading association
+        // (it can still surface via GetDerivedVendorAsync/GetActiveServiceVendorsAsync) since no
+        // order can ever actually be opened against that asset.
+        if (assetIds.Count > 0 && await _db.Assets.AnyAsync(a => assetIds.Contains(a.Id) && a.Status == "Retired"))
+            throw new InvalidOperationException("One or more selected assets are retired and can't be linked to a contract.");
     }
 
     public async Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId)
     {
-        await ValidateAsync(contract);
+        await ValidateAsync(contract, assetIds);
         contract.CreatedDate = DateTime.UtcNow;
         contract.AssetLinks = assetIds.Select(id => new ContractAsset { AssetId = id }).ToList();
         _db.Contracts.Add(contract);
@@ -42,15 +48,19 @@ public class ContractService : IContractService
 
     public async Task UpdateAsync(Contract contract, List<int> assetIds, string userId)
     {
-        await ValidateAsync(contract);
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
+        // Only newly-added links are checked for retirement — a contract that already had an asset
+        // linked before it was retired shouldn't have every unrelated future edit (e.g. changing
+        // Cost) blocked until someone remembers to unlink it.
+        var newlyAddedIds = assetIds.Where(id => !existing.AssetLinks.Any(l => l.AssetId == id)).ToList();
+        await ValidateAsync(contract, newlyAddedIds);
         existing.VendorId = contract.VendorId; existing.ContractType = contract.ContractType; existing.ContractNumber = contract.ContractNumber;
         existing.StartDate = contract.StartDate; existing.EndDate = contract.EndDate; existing.Cost = contract.Cost; existing.Notes = contract.Notes;
         existing.PmCadence = contract.PmCadence;
 
         var toRemove = existing.AssetLinks.Where(l => !assetIds.Contains(l.AssetId)).ToList();
-        var toAdd = assetIds.Where(id => !existing.AssetLinks.Any(l => l.AssetId == id)).Select(id => new ContractAsset { ContractId = existing.Id, AssetId = id });
+        var toAdd = newlyAddedIds.Select(id => new ContractAsset { ContractId = existing.Id, AssetId = id });
         _db.ContractAssets.RemoveRange(toRemove);
         _db.ContractAssets.AddRange(toAdd);
 

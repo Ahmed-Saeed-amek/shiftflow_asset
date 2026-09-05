@@ -44,6 +44,13 @@ public class InspectionOrderService : IInspectionOrderService
         if (hasUser == hasTeam)
             throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
         ValidateAssignmentMode(orderType.AssignmentMode, hasUser, hasTeam);
+        // A nonexistent user/team ID (stale form repost, hallucinated AI tool argument) otherwise
+        // reaches an unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync —
+        // same bug class as the VendorId existence check already added elsewhere (ContractService).
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
+            throw new InvalidOperationException("Selected employee not found.");
+        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
+            throw new InvalidOperationException("Selected team not found.");
 
         var resolvedAssetIds = assetIds ?? [];
         if (resolvedAssetIds.Count == 0)
@@ -305,6 +312,8 @@ public class InspectionOrderService : IInspectionOrderService
         ValidateAssignmentMode(assignmentMode, hasUser, hasTeam);
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
             throw new InvalidOperationException("Selected employee not found.");
+        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
+            throw new InvalidOperationException("Selected team not found.");
 
         var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
         order.AssignedToUserId = hasUser ? assignedToUserId : null;
