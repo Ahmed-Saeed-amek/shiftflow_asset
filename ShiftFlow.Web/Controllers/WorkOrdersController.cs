@@ -18,9 +18,10 @@ public class WorkOrdersController : Controller
     private readonly IWorkOrderService _workOrderService;
     private readonly IContractService _contractService;
     private readonly UserManager<ApplicationUser> _userManager;
-    public WorkOrdersController(ApplicationDbContext db, IWorkOrderService workOrderService, IContractService contractService, UserManager<ApplicationUser> userManager)
+    private readonly IAssetScopeService _scope;
+    public WorkOrdersController(ApplicationDbContext db, IWorkOrderService workOrderService, IContractService contractService, UserManager<ApplicationUser> userManager, IAssetScopeService scope)
     {
-        _db = db; _workOrderService = workOrderService; _contractService = contractService; _userManager = userManager;
+        _db = db; _workOrderService = workOrderService; _contractService = contractService; _userManager = userManager; _scope = scope;
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
@@ -41,6 +42,7 @@ public class WorkOrdersController : Controller
     {
         var wo = await _db.WorkOrders
             .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
+            .Include(w => w.Asset).ThenInclude(a => a!.Category)
             .Include(w => w.Vendor).Include(w => w.CreatedByUser).Include(w => w.AssignedToUser)
             .Include(w => w.ActionType).Include(w => w.Cause)
             .Include(w => w.BlockReason)
@@ -49,8 +51,13 @@ public class WorkOrdersController : Controller
             .Include(w => w.StageEvents).ThenInclude(s => s.ChangedByUser)
             .FirstOrDefaultAsync(w => w.Id == id);
         if (wo == null) return NotFound();
+        // UserAssetScope restricts which assets a user can see — AssetsController enforces this
+        // uniformly for every viewer, so a Work Order for an out-of-scope asset must 404 the same
+        // way the asset's own Details page does, not leak its full history to any WorkOrder.View holder.
+        var userId = _userManager.GetUserId(User)!;
+        if (wo.Asset != null && !await _scope.IsInScopeAsync(wo.Asset, userId)) return NotFound();
         ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
-        ViewBag.CurrentUserId = _userManager.GetUserId(User);
+        ViewBag.CurrentUserId = userId;
         return View(wo);
     }
 

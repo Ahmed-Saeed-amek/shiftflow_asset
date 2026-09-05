@@ -17,13 +17,15 @@ public class InspectionOrdersController : Controller
     private readonly ITeamService _teams;
     private readonly IWorkOrderService _workOrderService;
     private readonly ApplicationDbContext _db;
+    private readonly IAssetScopeService _scope;
 
-    public InspectionOrdersController(IInspectionOrderService orders, ITeamService teams, IWorkOrderService workOrderService, ApplicationDbContext db)
+    public InspectionOrdersController(IInspectionOrderService orders, ITeamService teams, IWorkOrderService workOrderService, ApplicationDbContext db, IAssetScopeService scope)
     {
         _orders = orders;
         _teams = teams;
         _workOrderService = workOrderService;
         _db = db;
+        _scope = scope;
     }
 
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
@@ -59,6 +61,17 @@ public class InspectionOrdersController : Controller
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
         if (!isManager && !isAssignee && !isTeamMember)
             return Forbid();
+
+        // UserAssetScope restricts which assets a user can see even when they'd otherwise have
+        // access via role/assignment — AssetsController enforces this uniformly for every viewer,
+        // with no manager exception, so this must too or a scoped manager can view an out-of-scope
+        // asset's full inspection history just by knowing an order ID.
+        var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
+        if (assetIds.Count > 0)
+        {
+            var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), CurrentUserId)).CountAsync(a => assetIds.Contains(a.Id));
+            if (inScopeCount != assetIds.Count) return NotFound();
+        }
 
         if (isManager) ViewBag.Teams = await _teams.GetAllAsync();
         return View(order);

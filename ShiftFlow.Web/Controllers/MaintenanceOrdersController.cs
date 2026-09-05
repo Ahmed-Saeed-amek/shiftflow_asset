@@ -19,10 +19,11 @@ public class MaintenanceOrdersController : Controller
     private readonly IMaintenanceOrderService _orders;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITeamService _teams;
+    private readonly IAssetScopeService _scope;
 
-    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager, ITeamService teams)
+    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager, ITeamService teams, IAssetScopeService scope)
     {
-        _orders = orders; _userManager = userManager; _teams = teams;
+        _orders = orders; _userManager = userManager; _teams = teams; _scope = scope;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -42,6 +43,12 @@ public class MaintenanceOrdersController : Controller
         var isAssignee = order.AssignedToUserId == CurrentUserId;
         var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
         if (!isManager && !isAssignee && !isTeamMember) return Forbid();
+
+        // UserAssetScope restricts which assets a user can see even when they'd otherwise have
+        // access via role/assignment — AssetsController enforces this uniformly for every viewer,
+        // with no manager exception, so this must too or a scoped manager can view an out-of-scope
+        // asset's maintenance history just by knowing an order ID.
+        if (order.Asset != null && !await _scope.IsInScopeAsync(order.Asset, CurrentUserId)) return NotFound();
 
         ViewBag.IsManager = isManager;
         ViewBag.IsAssignee = isAssignee || isTeamMember;

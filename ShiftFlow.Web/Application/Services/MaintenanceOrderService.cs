@@ -57,8 +57,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         // A nonexistent user/team ID (stale form repost, hallucinated AI tool argument) otherwise
         // reaches an unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync —
         // same bug class as the VendorId existence check already added elsewhere (ContractService).
-        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
-            throw new InvalidOperationException("Selected employee not found.");
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
+            throw new InvalidOperationException("Selected employee not found or is inactive.");
         if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
             throw new InvalidOperationException("Selected team not found.");
         if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
@@ -241,8 +241,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var hasTeam = assignedToTeamId.HasValue;
         if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
         await ValidateAssignmentModeAsync(order.OrderTypeId, hasUser, hasTeam);
-        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
-            throw new InvalidOperationException("Selected employee not found.");
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
+            throw new InvalidOperationException("Selected employee not found or is inactive.");
         if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
             throw new InvalidOperationException("Selected team not found.");
 
@@ -266,6 +266,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     public async Task<MaintenanceOrder?> GetByIdAsync(int id) =>
         await _db.MaintenanceOrders
             .Include(m => m.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
+            .Include(m => m.Asset).ThenInclude(a => a!.Category)
             .Include(m => m.AssignedToUser)
             .Include(m => m.AssignedToTeam)
             .Include(m => m.CreatedByUser)
