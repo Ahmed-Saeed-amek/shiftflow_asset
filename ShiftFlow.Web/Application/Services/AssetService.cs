@@ -18,8 +18,20 @@ public class AssetService : IAssetService
     public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService, IAssetScopeService scopeService)
     { _db = db; _audit = audit; _contractService = contractService; _scopeService = scopeService; }
 
+    // The Edit/Create form's assignee dropdown already excludes deactivated users, but that's
+    // UI-only — a direct POST with a stale/tampered id otherwise saves an Asset "assigned" to
+    // someone who no longer has any access, unlike MaintenanceOrderService/WorkOrderService, which
+    // both explicitly validate the target user exists (and here, is still active) before saving.
+    private async Task EnsureAssigneeIsActiveAsync(string? assignedToUserId)
+    {
+        if (assignedToUserId is null) return;
+        if (!await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
+            throw new InvalidOperationException("Selected employee not found or is inactive.");
+    }
+
     public async Task<Asset> CreateAsync(Asset asset, string userId)
     {
+        await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         asset.CreatedByUserId = userId;
         asset.CreatedDate = DateTime.UtcNow;
         _db.Assets.Add(asset);
@@ -30,6 +42,7 @@ public class AssetService : IAssetService
 
     public async Task UpdateAsync(Asset asset, string userId)
     {
+        await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         var existing = await _db.Assets.FindAsync(asset.Id) ?? throw new InvalidOperationException("Asset not found.");
         var oldStatus = existing.Status;
         existing.Name = asset.Name; existing.NameAr = asset.NameAr; existing.CategoryId = asset.CategoryId;

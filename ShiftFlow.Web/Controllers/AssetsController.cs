@@ -147,6 +147,12 @@ public class AssetsController : Controller
             await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
             return View(vm);
         }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
+        }
         TempData["Success"] = "Asset created.";
         return RedirectToAction(nameof(Index));
     }
@@ -179,12 +185,21 @@ public class AssetsController : Controller
         // vm.Id itself, so the scope check here is a direct existence check against the scoped
         // queryable rather than routing the whole update through it.
         if (!await (await ScopedAssetsAsync(userId)).AnyAsync(a => a.Id == vm.Id)) return NotFound();
-        await _assetService.UpdateAsync(new Asset
+        try
         {
-            Id = vm.Id, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
-            Model = vm.Model, SerialNumber = vm.SerialNumber, Manufacturer = vm.Manufacturer, Sku = vm.Sku, Status = vm.Status,
-            AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
-        }, userId);
+            await _assetService.UpdateAsync(new Asset
+            {
+                Id = vm.Id, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
+                Model = vm.Model, SerialNumber = vm.SerialNumber, Manufacturer = vm.Manufacturer, Sku = vm.Sku, Status = vm.Status,
+                AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
+            }, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
+        }
         TempData["Success"] = "Asset updated.";
         return RedirectToAction(nameof(Index));
     }

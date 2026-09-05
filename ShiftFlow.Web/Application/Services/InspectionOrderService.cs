@@ -12,12 +12,14 @@ public class InspectionOrderService : IInspectionOrderService
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly ITeamService _teams;
+    private readonly IAssetScopeService _scope;
 
-    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, ITeamService teams)
+    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, ITeamService teams, IAssetScopeService scope)
     {
         _db = db;
         _audit = audit;
         _teams = teams;
+        _scope = scope;
     }
 
     /// <summary>Re-derives the same AssignmentMode rule OrdersController.Create already enforces for
@@ -61,6 +63,15 @@ public class InspectionOrderService : IInspectionOrderService
         // own manual-create path, not every caller of this method.
         if (await _db.Assets.AnyAsync(a => resolvedAssetIds.Contains(a.Id) && a.Status == "Retired"))
             throw new InvalidOperationException("One or more selected assets are retired and can't have new orders opened against them.");
+        // AssetsController routes every single-asset read through ScopedAssetsAsync so a
+        // UserAssetScope-restricted user can't view an out-of-scope asset — but this method (reached
+        // directly by OrdersController.Create, the AI assistant, and the recurring scheduler) had no
+        // equivalent check, so that same user could still open an inspection order against an asset
+        // they can't view, just by knowing/guessing its ID.
+        var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), createdByUserId))
+            .CountAsync(a => resolvedAssetIds.Contains(a.Id));
+        if (inScopeCount != resolvedAssetIds.Count)
+            throw new InvalidOperationException("One or more selected assets were not found.");
 
         // Provenance only (not used for resolution): if every picked asset happens to share one
         // Zone, record it so Zone-scoped reporting/display can rely on it; else left null.
@@ -210,6 +221,18 @@ public class InspectionOrderService : IInspectionOrderService
         if (order.Status is "Done" or "PendingApproval" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");
 
+        // Everything below runs inside one transaction so a concurrent Cancel racing this method
+        // rolls the whole thing back — not just the final status flip — instead of leaving the
+        // item's Outcome saved against an order that ended up Cancelled. Same race class
+        // CancelAsync/ReassignAsync already guard against, extended to cover this method too (a
+        // cancelled order's assignee could otherwise still report outcomes and silently flip the
+        // order back to Done — confirmed live).
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "PendingApproval" && o.Status != "Cancelled")
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, o => o.Status == "Open" ? "InProgress" : o.Status));
+        if (claimed == 0) throw new InvalidOperationException("This inspection order is already closed.");
+
         item.Outcome = outcome;
         item.InspectedByUserId = updatedByUserId;
         item.InspectedAt = DateTime.UtcNow;
@@ -220,9 +243,6 @@ public class InspectionOrderService : IInspectionOrderService
         foreach (var maintenanceActionTypeId in maintenanceActionTypeIds ?? [])
             _db.InspectionItemMaintenanceActions.Add(new InspectionItemMaintenanceAction { InspectionRunAssetId = itemId, MaintenanceActionTypeId = maintenanceActionTypeId });
 
-        if (order.Status == "Open")
-            order.Status = "InProgress";
-
         await _db.SaveChangesAsync();
 
         var runId = item.InspectionRunId;
@@ -230,11 +250,14 @@ public class InspectionOrderService : IInspectionOrderService
         if (!stillPending)
         {
             var requiresApproval = order.OrderType?.RequiresApproval ?? false;
-            order.Status = requiresApproval ? "PendingApproval" : "Done";
-            if (!requiresApproval) order.ClosedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
+            var newStatus = requiresApproval ? "PendingApproval" : "Done";
+            var closedAt = requiresApproval ? (DateTime?)null : DateTime.UtcNow;
+            var claimedFinal = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "PendingApproval" && o.Status != "Cancelled")
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, newStatus).SetProperty(o => o.ClosedAt, closedAt));
+            if (claimedFinal == 0) throw new InvalidOperationException("This inspection order is already closed.");
         }
 
+        await tx.CommitAsync();
         await _audit.LogAsync("UpdateInspectionItem", "InspectionRunAsset", itemId.ToString(), updatedByUserId, newValue: outcome);
     }
 

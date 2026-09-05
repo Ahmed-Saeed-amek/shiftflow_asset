@@ -14,7 +14,8 @@ public class WorkOrderService : IWorkOrderService
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly ISparePartService _spareParts;
-    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts) { _db = db; _audit = audit; _spareParts = spareParts; }
+    private readonly IAssetScopeService _scope;
+    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IAssetScopeService scope) { _db = db; _audit = audit; _spareParts = spareParts; _scope = scope; }
 
     // The Assets/Details "New Work Order"/"Report Action" buttons are now hidden for a Retired
     // asset, but that's UI-only — enforce it here too (both CreateAsync and ReportAsync route
@@ -26,9 +27,23 @@ public class WorkOrderService : IWorkOrderService
             throw new InvalidOperationException("This asset is retired and can't have new work orders opened against it.");
     }
 
+    // AssetsController's Details/Edit/etc. all route through ScopedAssetsAsync so a UserAssetScope-
+    // restricted user can't even see an out-of-scope asset — but WorkOrdersController.Create/Report
+    // loaded the asset directly, so that same user could still open a Work Order against an asset
+    // they can't view, just by knowing/guessing its ID. Checked here so no caller (controller, the
+    // AI assistant, or anything else that reaches this service) can bypass it.
+    private async Task EnsureAssetInScopeAsync(int assetId, string userId)
+    {
+        var asset = await _db.Assets.Include(a => a.Zone).Include(a => a.Category).FirstOrDefaultAsync(a => a.Id == assetId)
+            ?? throw new InvalidOperationException("Asset not found.");
+        if (!await _scope.IsInScopeAsync(asset, userId))
+            throw new InvalidOperationException("Asset not found.");
+    }
+
     public async Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId)
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
+        await EnsureAssetInScopeAsync(workOrder.AssetId, userId);
         workOrder.Stage = "New";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
@@ -42,6 +57,7 @@ public class WorkOrderService : IWorkOrderService
     public async Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId)
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
+        await EnsureAssetInScopeAsync(workOrder.AssetId, userId);
         // A non-existent ActionTypeId/CauseId (e.g. a stale dropdown value) used to reach an
         // unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync - which,
         // worse, isn't even a duplicate-key error, so the retry loop there just failed the same

@@ -13,7 +13,8 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     private readonly IAuditService _audit;
     private readonly ISparePartService _spareParts;
     private readonly ITeamService _teams;
-    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, ITeamService teams) { _db = db; _audit = audit; _spareParts = spareParts; _teams = teams; }
+    private readonly IAssetScopeService _scope;
+    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, ITeamService teams, IAssetScopeService scope) { _db = db; _audit = audit; _spareParts = spareParts; _teams = teams; _scope = scope; }
 
     // Stages/statuses (across both entities) that mean "this asset still has open work" —
     // checked before restoring Asset.Status to "Working" so a second, unrelated issue on the
@@ -62,6 +63,13 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             throw new InvalidOperationException("Selected team not found.");
         if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
             throw new InvalidOperationException("This asset is retired and can't have new orders opened against it.");
+        // AssetsController routes every single-asset read through ScopedAssetsAsync so a
+        // UserAssetScope-restricted user can't view an out-of-scope asset — but this method (reached
+        // directly by OrdersController.Create, the AI assistant, and the recurring scheduler) had no
+        // equivalent check, so that same user could still open a maintenance order against an asset
+        // they can't view, just by knowing/guessing its ID.
+        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), createdByUserId)).AnyAsync(a => a.Id == assetId))
+            throw new InvalidOperationException("Asset not found.");
 
         var order = new MaintenanceOrder
         {
