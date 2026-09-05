@@ -40,18 +40,34 @@ public class AssetService : IAssetService
         return asset;
     }
 
+    // Every editable field is saved, but the audit entry used to hard-code Status alone as
+    // old/new — an edit that reassigned the asset to a different zone, category, or employee
+    // without also touching Status produced a byte-identical old/new pair, silently dropping the
+    // one piece of context (who/where it moved from and to) the audit trail exists to capture
+    // (confirmed live: a Zone-only change logged "Maintenance" -> "Maintenance").
+    private async Task<string> SnapshotAsync(Asset a)
+    {
+        var zoneName = await _db.Zones.Where(z => z.Id == a.ZoneId).Select(z => z.Name).FirstOrDefaultAsync();
+        var categoryName = await _db.AssetCategories.Where(c => c.Id == a.CategoryId).Select(c => c.Name).FirstOrDefaultAsync();
+        var assigneeName = a.AssignedToUserId != null
+            ? await _db.Users.Where(u => u.Id == a.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
+            : null;
+        return $"{a.Name}, Category: {categoryName ?? "—"}, Zone: {zoneName ?? "—"}, Status: {a.Status}, Assigned to: {assigneeName ?? "—"}";
+    }
+
     public async Task UpdateAsync(Asset asset, string userId)
     {
         await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         var existing = await _db.Assets.FindAsync(asset.Id) ?? throw new InvalidOperationException("Asset not found.");
-        var oldStatus = existing.Status;
+        var oldValue = await SnapshotAsync(existing);
         existing.Name = asset.Name; existing.NameAr = asset.NameAr; existing.CategoryId = asset.CategoryId;
         existing.ZoneId = asset.ZoneId; existing.Model = asset.Model; existing.SerialNumber = asset.SerialNumber;
         existing.Manufacturer = asset.Manufacturer; existing.Sku = asset.Sku; existing.Status = asset.Status; existing.AssignedToUserId = asset.AssignedToUserId;
         existing.PurchaseDate = asset.PurchaseDate; existing.WarrantyExpiry = asset.WarrantyExpiry; existing.Notes = asset.Notes;
         existing.UpdatedByUserId = userId; existing.UpdatedDate = DateTime.UtcNow;
+        var newValue = await SnapshotAsync(existing);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Update", "Asset", existing.Id.ToString(), userId, oldValue: oldStatus, newValue: existing.Status);
+        await _audit.LogAsync("Update", "Asset", existing.Id.ToString(), userId, oldValue: oldValue, newValue: newValue);
     }
 
     public async Task DeleteAsync(int id, string userId)

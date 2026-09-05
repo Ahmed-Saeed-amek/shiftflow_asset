@@ -449,8 +449,23 @@ public class UsersController : Controller
         if (!string.Equals(user.Email, vm.Email, StringComparison.OrdinalIgnoreCase))
         {
             // UserName mirrors Email throughout this app (see Create above) — both must move
-            // together, and SetEmailAsync/SetUserNameAsync run through Identity's own uniqueness
-            // validation so a duplicate address fails cleanly instead of corrupting the login.
+            // together. SetEmailAsync and SetUserNameAsync are two independent calls that each
+            // commit immediately (RequireUniqueEmail isn't enabled, so SetEmailAsync never fails on
+            // a duplicate — only SetUserNameAsync's unique-index check can reject it), so a
+            // SetUserNameAsync failure previously left Email already changed and committed while
+            // UserName stayed on the old value — a permanently desynced account, silently, behind
+            // what looked like a clean validation failure (confirmed live: 5 of 6 accounts edited to
+            // the same duplicate email each ended up with a new Email but their original UserName).
+            // Pre-checking availability, then wrapping both calls in one transaction so a failure
+            // rolls back whichever one already committed, closes both the everyday case and the
+            // narrower concurrent-race case.
+            var existingWithName = await _um.FindByNameAsync(vm.Email);
+            if (existingWithName != null && existingWithName.Id != user.Id)
+            {
+                ModelState.AddModelError(nameof(vm.Email), "This email is already in use by another account.");
+                return View(vm);
+            }
+            await using var tx = await _db.Database.BeginTransactionAsync();
             var emailResult = await _um.SetEmailAsync(user, vm.Email);
             if (emailResult.Succeeded) emailResult = await _um.SetUserNameAsync(user, vm.Email);
             if (!emailResult.Succeeded)
@@ -458,6 +473,7 @@ public class UsersController : Controller
                 foreach (var e in emailResult.Errors) ModelState.AddModelError("", e.Description);
                 return View(vm);
             }
+            await tx.CommitAsync();
         }
 
         user.FullName = vm.FullName;
