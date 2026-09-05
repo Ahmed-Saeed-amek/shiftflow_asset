@@ -20,6 +20,19 @@ public class InspectionOrderService : IInspectionOrderService
         _teams = teams;
     }
 
+    /// <summary>Re-derives the same AssignmentMode rule OrdersController.Create already enforces for
+    /// the manual-create path — every other caller (RecurringOrderSchedulerService, and now
+    /// ReassignAsync) reaches this service directly, so the check belongs here too or it's silently
+    /// bypassable (confirmed live for Reassign: an EmployeeOnly-typed order could be reassigned to a
+    /// Team with no error).</summary>
+    private static void ValidateAssignmentMode(string? mode, bool hasUser, bool hasTeam)
+    {
+        if (mode == "EmployeeOnly" && hasTeam)
+            throw new InvalidOperationException("This order type can only be assigned to an employee, not a team.");
+        if (mode == "TeamOnly" && hasUser)
+            throw new InvalidOperationException("This order type can only be assigned to a team, not an employee.");
+    }
+
     public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
         List<int>? assetIds, DateTime? dueDate, string createdByUserId, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
@@ -30,6 +43,7 @@ public class InspectionOrderService : IInspectionOrderService
         var hasTeam = assignedToTeamId.HasValue;
         if (hasUser == hasTeam)
             throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        ValidateAssignmentMode(orderType.AssignmentMode, hasUser, hasTeam);
 
         var resolvedAssetIds = assetIds ?? [];
         if (resolvedAssetIds.Count == 0)
@@ -287,6 +301,8 @@ public class InspectionOrderService : IInspectionOrderService
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
         if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        var assignmentMode = await _db.OrderTypes.Where(t => t.Id == order.OrderTypeId).Select(t => t.AssignmentMode).FirstOrDefaultAsync();
+        ValidateAssignmentMode(assignmentMode, hasUser, hasTeam);
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
             throw new InvalidOperationException("Selected employee not found.");
 

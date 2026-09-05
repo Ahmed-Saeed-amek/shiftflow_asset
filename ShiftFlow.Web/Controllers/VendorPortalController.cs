@@ -27,10 +27,14 @@ public class VendorPortalController : Controller
         _db = db; _workOrderService = workOrderService; _userManager = userManager; _loc = loc;
     }
 
+    /// <summary>Returns null (every caller then Forbid()s) for a suspended vendor too, not just a
+    /// missing login — Vendor.Status was previously only checked at the point a new WorkOrder gets
+    /// assigned to a vendor, so suspending one blocked new work but never actually logged them out
+    /// of a portal session or stopped them acting on work already assigned before suspension.</summary>
     private async Task<int?> GetMyVendorIdAsync()
     {
         var userId = _userManager.GetUserId(User);
-        return await _db.Vendors.Where(v => v.UserId == userId).Select(v => (int?)v.Id).FirstOrDefaultAsync();
+        return await _db.Vendors.Where(v => v.UserId == userId && v.Status == "Active").Select(v => (int?)v.Id).FirstOrDefaultAsync();
     }
 
     public async Task<IActionResult> Index(string? stage, string? q)

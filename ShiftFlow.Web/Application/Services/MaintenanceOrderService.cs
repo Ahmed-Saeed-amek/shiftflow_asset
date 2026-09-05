@@ -30,12 +30,29 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == assetId && m.Id != excludeMaintenanceOrderId && m.Status == "Open")
         || await _db.WorkOrders.AnyAsync(w => w.AssetId == assetId && OpenWorkOrderStages.Contains(w.Stage));
 
+    /// <summary>Re-derives the same AssignmentMode rule OrdersController.Create already enforces for
+    /// the manual-create path — every OTHER caller (RecurringOrderSchedulerService, and now
+    /// ReassignAsync) reaches CreateAsync/updates the assignee directly, so the check belongs here
+    /// too or it's silently bypassable (confirmed live for Reassign: an EmployeeOnly-typed order
+    /// could be reassigned to a Team with no error). orderTypeId null (legacy rows with no catalog
+    /// entry) skips the check — there's no AssignmentMode to enforce.</summary>
+    private async Task ValidateAssignmentModeAsync(int? orderTypeId, bool hasUser, bool hasTeam)
+    {
+        if (orderTypeId == null) return;
+        var mode = await _db.OrderTypes.Where(t => t.Id == orderTypeId).Select(t => t.AssignmentMode).FirstOrDefaultAsync();
+        if (mode == "EmployeeOnly" && hasTeam)
+            throw new InvalidOperationException("This order type can only be assigned to an employee, not a team.");
+        if (mode == "TeamOnly" && hasUser)
+            throw new InvalidOperationException("This order type can only be assigned to a team, not an employee.");
+    }
+
     public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
         if (hasUser == hasTeam)
             throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        await ValidateAssignmentModeAsync(orderTypeId, hasUser, hasTeam);
         if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
             throw new InvalidOperationException("This asset is retired and can't have new orders opened against it.");
 
@@ -208,6 +225,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasTeam = assignedToTeamId.HasValue;
         if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        await ValidateAssignmentModeAsync(order.OrderTypeId, hasUser, hasTeam);
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId))
             throw new InvalidOperationException("Selected employee not found.");
 

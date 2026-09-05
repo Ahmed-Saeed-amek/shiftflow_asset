@@ -92,6 +92,18 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"'{type.Name}' has orders or a recurring schedule using it — Direct Fix can't be changed on an in-use type.";
             return RedirectToAction(nameof(Index));
         }
+        // AssignmentMode is re-validated at the service layer on every create/reassign, so flipping
+        // it can no longer corrupt data — but a RecurringOrder created under the old mode would
+        // start failing every scheduler tick with an unhelpful "wrong assignee" error instead of
+        // ever generating again. AllowsMultipleAssets has the same "stuck schedule" problem the
+        // other way: RecurringOrder assumes single-asset at creation time. Block both on an in-use
+        // type rather than leave an admin wondering why a schedule silently stopped producing orders.
+        if ((type.AssignmentMode != vm.AssignmentMode || type.AllowsMultipleAssets != vm.AllowsMultipleAssets)
+            && await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == vm.Id))
+        {
+            TempData["Error"] = $"'{type.Name}' has a recurring schedule using it — Assign To and Assets can't be changed while a schedule references it.";
+            return RedirectToAction(nameof(Index));
+        }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;
         type.TracksDefectOutcome = vm.TracksDefectOutcome; type.RequiresVendor = vm.RequiresVendor;
         type.IsDirectFix = vm.IsDirectFix; type.IsActive = vm.IsActive; type.SortOrder = vm.SortOrder;
