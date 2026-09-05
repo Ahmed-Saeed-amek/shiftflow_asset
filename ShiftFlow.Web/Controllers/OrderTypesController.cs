@@ -78,4 +78,30 @@ public class OrderTypesController : Controller
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>Only ever hard-deletes a type with zero orders/schedules referencing it (checked up
+    /// front, not just caught as a DB error) — InspectionOrder/MaintenanceOrder/RecurringOrder all
+    /// have a Restrict FK to OrderTypeId, so any order ever created under this type would otherwise
+    /// leave a dangling reference. A type that's actually been used should be deactivated instead
+    /// (the IsActive checkbox on Edit), which already hides it from the Orders/Create picker.</summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var type = await _db.OrderTypes.FindAsync(id);
+        if (type == null) return NotFound();
+
+        var inUse = await _db.InspectionOrders.AnyAsync(o => o.OrderTypeId == id)
+            || await _db.MaintenanceOrders.AnyAsync(m => m.OrderTypeId == id)
+            || await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == id);
+        if (inUse)
+        {
+            TempData["Error"] = $"'{type.Name}' has orders or a recurring schedule using it — deactivate it instead of deleting.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        _db.OrderTypes.Remove(type);
+        await _db.SaveChangesAsync();
+        TempData["Success"] = "Order type deleted.";
+        return RedirectToAction(nameof(Index));
+    }
 }

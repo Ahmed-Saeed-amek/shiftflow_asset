@@ -24,11 +24,16 @@
                         <td class="small d-none d-xl-table-cell">@(t.AllowsMultipleAssets ? Loc.T("Multiple") : Loc.T("Single"))</td>
                         <td class="small d-none d-xl-table-cell">@Loc.T(t.AssignmentMode)</td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
-                        <td>
+                        <td class="text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
                                     onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"), @(t.AllowsMultipleAssets ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.AssignmentMode)), @(t.RequiresApproval ? "true" : "false"))'>
                                 @Loc.T("Edit")
                             </button>
+                            <form method="post" asp-action="Delete" asp-route-id="@t.Id" class="d-inline"
+                                  onsubmit="return confirm('@Loc.T("Delete this order type? Only allowed if no orders or schedules use it.")')">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
                         </td>
                     </tr>
                 }
