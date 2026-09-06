@@ -17,6 +17,17 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(5);
 
+    // Round 26 capped ComputeOccurrenceDueDates at 2000 occurrences, but that only bounds the date
+    // dimension — this loop nests assets *outside* dates, so the real per-tick blast radius is
+    // occurrences x linked-assets. A PM contract near that cap linked to a few hundred assets (one
+    // click via the asset picker's "add all in category") generates hundreds of thousands of
+    // WorkOrder/AuditLog inserts synchronously in a single tick (confirmed live: 105 occurrences x
+    // 3 assets = 315 WorkOrders from one tick). Capping WorkOrders created per contract per tick
+    // spreads a large backlog across multiple 5-minute ticks instead — safe because this method is
+    // idempotent and re-derives what's still missing every time, so nothing generated this tick is
+    // lost, just deferred.
+    private const int MaxOccurrencesGeneratedPerContractPerTick = 200;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PreventiveMaintenanceSchedulerService> _logger;
 
@@ -78,15 +89,24 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
                 .ToListAsync(ct);
             var generatedSet = alreadyGenerated.Select(g => (g.AssetId, g.ScheduledDate!.Value.Date)).ToHashSet();
 
+            var generatedThisTickForContract = 0;
             foreach (var link in contract.AssetLinks)
             {
+                if (generatedThisTickForContract >= MaxOccurrencesGeneratedPerContractPerTick) break;
                 foreach (var dueDate in dueSoFar)
                 {
+                    if (generatedThisTickForContract >= MaxOccurrencesGeneratedPerContractPerTick)
+                    {
+                        _logger.LogWarning("Preventive Maintenance: contract {ContractId} has more than {Max} occurrences still to generate — deferring the rest to the next tick.",
+                            contract.Id, MaxOccurrencesGeneratedPerContractPerTick);
+                        break;
+                    }
                     if (generatedSet.Contains((link.AssetId, dueDate))) continue;
                     try
                     {
                         await workOrderService.CreatePreventiveMaintenanceOccurrenceAsync(
                             link.AssetId, contract.VendorId, contract.Id, dueDate, contract.ContractNumber, systemUserId);
+                        generatedThisTickForContract++;
                     }
                     catch (DbUpdateException ex)
                     {
