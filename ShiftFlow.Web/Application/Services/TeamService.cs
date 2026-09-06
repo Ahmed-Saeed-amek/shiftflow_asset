@@ -93,8 +93,21 @@ public class TeamService : ITeamService
     private async Task<string?> NameOfAsync(string? uid) => uid == null ? null
         : await _db.Users.Where(u => u.Id == uid).Select(u => u.FullName).FirstOrDefaultAsync();
 
+    // Unlike every other caller that touches TeamMembers (Create's initial-members check, Edit's
+    // SetMembersAsync), these two had no existence check on either id at all — the only caller is
+    // the AI assistant tool (addTeamMember/removeTeamMember in AiInspectionToolFunctions), which
+    // passes a teamId/memberUserId resolved from model output (or a stale/hallucinated one) straight
+    // through. A non-existent teamId or userId hits TeamMembers' FK constraints and raises an
+    // unhandled DbUpdateException that DispatchToolAsync's catch (InvalidOperationException only)
+    // does not catch, aborting the whole AI turn with a hard 500 instead of the graceful in-chat
+    // "not found" message every other AI tool gives back (confirmed live via direct SQL: inserting
+    // a bogus TeamId/UserId trips FK_TeamMembers_Teams_TeamId / FK_TeamMembers_AspNetUsers_UserId).
     public async Task AddMemberAsync(int teamId, string userId, string actingUserId)
     {
+        if (!await _db.Teams.AnyAsync(t => t.Id == teamId))
+            throw new InvalidOperationException("Team not found.");
+        if (!await _db.Users.AnyAsync(u => u.Id == userId))
+            throw new InvalidOperationException("Selected employee not found.");
         var exists = await _db.TeamMembers.AnyAsync(m => m.TeamId == teamId && m.UserId == userId);
         if (exists) return;
         _db.TeamMembers.Add(new TeamMember { TeamId = teamId, UserId = userId, AddedAt = DateTime.UtcNow });
@@ -104,6 +117,8 @@ public class TeamService : ITeamService
 
     public async Task RemoveMemberAsync(int teamId, string userId, string actingUserId)
     {
+        if (!await _db.Teams.AnyAsync(t => t.Id == teamId))
+            throw new InvalidOperationException("Team not found.");
         var member = await _db.TeamMembers.FirstOrDefaultAsync(m => m.TeamId == teamId && m.UserId == userId);
         if (member == null) return;
         _db.TeamMembers.Remove(member);
