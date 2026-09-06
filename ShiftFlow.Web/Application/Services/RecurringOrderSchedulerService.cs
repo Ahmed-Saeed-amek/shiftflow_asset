@@ -16,6 +16,14 @@ public class RecurringOrderSchedulerService : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(5);
 
+    // Same blast-radius protection PreventiveMaintenanceSchedulerService has (round 26/27): a schedule
+    // whose StartDate is far in the past combined with a short cadence can have hundreds or thousands
+    // of occurrences already "due" the very first tick after it's created or reactivated. Each one is a
+    // real InspectionOrder/MaintenanceOrder + AuditLog insert, so cap how many one schedule generates
+    // per tick and let the idempotent re-derivation above catch up the rest over subsequent ticks
+    // instead of generating everything synchronously in one pass.
+    private const int MaxOccurrencesGeneratedPerSchedulePerTick = 200;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RecurringOrderSchedulerService> _logger;
 
@@ -89,9 +97,16 @@ public class RecurringOrderSchedulerService : BackgroundService
                 : (await db.InspectionOrders.Where(i => i.SourceRecurringOrderId == schedule.Id)
                     .Select(i => i.ScheduledDate!.Value.Date).ToListAsync(ct)).ToHashSet();
 
+            var generatedThisTick = 0;
             foreach (var dueDate in dueSoFar)
             {
                 if (generatedDates.Contains(dueDate)) continue;
+                if (generatedThisTick >= MaxOccurrencesGeneratedPerSchedulePerTick)
+                {
+                    _logger.LogWarning("Recurring Order: schedule {ScheduleId} has more than {Max} occurrences still to generate — deferring the rest to the next tick.",
+                        schedule.Id, MaxOccurrencesGeneratedPerSchedulePerTick);
+                    break;
+                }
                 try
                 {
                     var creatorUserId = schedule.CreatedByUserId is { Length: > 0 } ? schedule.CreatedByUserId : systemUserId;
@@ -105,6 +120,7 @@ public class RecurringOrderSchedulerService : BackgroundService
                         await inspectionOrders.CreateAsync(schedule.OrderTypeId, null, schedule.AssignedToUserId, schedule.AssignedToTeamId,
                             [schedule.AssetId], dueDate, creatorUserId, schedule.Id, dueDate);
                     }
+                    generatedThisTick++;
                 }
                 catch (DbUpdateException ex)
                 {

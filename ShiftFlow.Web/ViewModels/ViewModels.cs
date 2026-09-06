@@ -374,7 +374,7 @@ public class OrderTypeViewModel
     public bool RequiresApproval { get; set; }
 }
 
-public class RecurringOrderViewModel
+public class RecurringOrderViewModel : IValidatableObject
 {
     public int Id { get; set; }
     [Required] public int OrderTypeId { get; set; }
@@ -385,6 +385,27 @@ public class RecurringOrderViewModel
     [Required] public DateTime StartDate { get; set; } = DateTime.UtcNow.Date;
     public DateTime? EndDate { get; set; }
     public bool IsActive { get; set; } = true;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        string T(string key) => ValidationHelper.Localizer(validationContext)(key);
+
+        if (EndDate != null && EndDate <= StartDate)
+            yield return new ValidationResult(T("End Date must be after Start Date."), new[] { nameof(EndDate) });
+
+        // Same rationale as ContractViewModel's PM cadence cap: with no EndDate this schedule runs
+        // forever, and RecurringOrderSchedulerService.RunOnceAsync has no per-tick generation cap
+        // (unlike PreventiveMaintenanceSchedulerService) — a StartDate set far in the past combined
+        // with a short cadence would make the very first tick after activation try to generate
+        // thousands of InspectionOrder/MaintenanceOrder rows synchronously (RecurrenceCalculator's
+        // 2000-occurrence hard cap is the only backstop). Reject an unreasonably distant StartDate
+        // up front instead of relying purely on that backstop.
+        if (StartDate < DateTime.UtcNow.Date.AddYears(-25))
+            yield return new ValidationResult(T("Start Date can't be more than 25 years in the past."), new[] { nameof(StartDate) });
+
+        if (EndDate != null && EndDate > StartDate.AddYears(25))
+            yield return new ValidationResult(T("Recurring order schedules can't span more than 25 years — check the End Date."), new[] { nameof(EndDate) });
+    }
 }
 
 public class VendorFixViewModel

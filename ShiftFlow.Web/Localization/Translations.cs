@@ -2027,6 +2027,8 @@ public static class Translations
         // Validation messages (IValidatableObject)
         Ar["End Date is required for Preventive Maintenance contracts."] = "تاريخ الانتهاء مطلوب لعقود الصيانة الوقائية.";
         Ar["End Date must be after Start Date."] = "يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء.";
+        Ar["Start Date can't be more than 25 years in the past."] = "لا يمكن أن يكون تاريخ البدء أبعد من 25 عامًا في الماضي.";
+        Ar["Recurring order schedules can't span more than 25 years — check the End Date."] = "لا يمكن أن تمتد جداول الطلبات المتكررة لأكثر من 25 عامًا — يرجى التحقق من تاريخ الانتهاء.";
         Ar["A cadence must be selected for Preventive Maintenance contracts."] = "يجب اختيار وتيرة التكرار لعقود الصيانة الوقائية.";
         Ar["Please select a work area."] = "يرجى اختيار منطقة عمل.";
         Ar["Day {0}: all three shifts must have a group assigned."] = "اليوم {0}: يجب إسناد مجموعة لكل من الورديات الثلاث.";
