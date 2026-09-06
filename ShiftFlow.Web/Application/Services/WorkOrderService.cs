@@ -69,6 +69,13 @@ public class WorkOrderService : IWorkOrderService
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
         await EnsureAssetInScopeAsync(workOrder.AssetId, userId);
+        // Same gap AssignEmployeeAsync was fixed for: a non-existent/stale AssignedToUserId (a
+        // tampered POST, or OrdersController's vendor-routed batch loop) used to reach an
+        // unhandled FK-constraint DbUpdateException here at SaveWithUniqueNumberRetryAsync,
+        // leaking the raw SQL error and table names to the client (confirmed live via a POST with
+        // a random GUID assignee). Validate up front like AssignEmployeeAsync already does.
+        if (!string.IsNullOrWhiteSpace(workOrder.AssignedToUserId) && !await _db.Users.AnyAsync(u => u.Id == workOrder.AssignedToUserId))
+            throw new InvalidOperationException("Selected employee not found.");
         workOrder.Stage = "New";
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
