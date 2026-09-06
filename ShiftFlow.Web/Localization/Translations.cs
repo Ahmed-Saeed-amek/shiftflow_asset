@@ -2218,6 +2218,8 @@ public static class Translations
         Ar["This inspection order isn't assigned to you."] = "أمر المعاينة هذا غير مسند إليك.";
         Ar["Select exactly one assignee — a single employee or a Team."] = "اختر جهة إسناد واحدة فقط — موظف واحد أو فريق.";
         Ar["Selected employee not found."] = "الموظف المحدد غير موجود.";
+        Ar["Selected employee not found or is inactive."] = "الموظف المحدد غير موجود أو غير مفعّل.";
+        Ar["Selected team not found."] = "الفريق المحدد غير موجود.";
         Ar["A closed maintenance order can't be reassigned."] = "لا يمكن إعادة إسناد أمر صيانة مغلق.";
         Ar["A closed inspection order can't be reassigned."] = "لا يمكن إعادة إسناد أمر معاينة مغلق.";
         Ar["Use this if the current assignee's account has been deactivated and the order needs to move to someone else."] = "استخدم هذا إذا تم إلغاء تفعيل حساب المُسنَد إليه الحالي وتحتاج نقل الأمر إلى شخص آخر.";

@@ -129,6 +129,21 @@ public class RecurringOrdersController : Controller
             TempData["Error"] = "This asset is retired and can't be scheduled for new orders.";
             return false;
         }
+        // Same bug class as ContractService/InspectionOrderService's VendorId/AssignedToUserId
+        // checks: a stale multi-select or tampered POST with a non-existent employee/team id
+        // otherwise hits the DB's FK constraint on RecurringOrders.AssignedToUserId/AssignedToTeamId
+        // and raises an unhandled DbUpdateException (confirmed live: 500 with
+        // "FK_RecurringOrders_AspNetUsers_AssignedToUserId" conflict) instead of a clean message.
+        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == vm.AssignedToUserId && u.IsActive))
+        {
+            TempData["Error"] = "Selected employee not found or is inactive.";
+            return false;
+        }
+        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == vm.AssignedToTeamId))
+        {
+            TempData["Error"] = "Selected team not found.";
+            return false;
+        }
         // Same UserAssetScope enforcement round 11 added to manual Order creation — without it, a
         // scoped OrderType.Manage holder (e.g. a scoped OperationsManager) could schedule a
         // recurring order against an asset they can't even view via AssetsController, and the
