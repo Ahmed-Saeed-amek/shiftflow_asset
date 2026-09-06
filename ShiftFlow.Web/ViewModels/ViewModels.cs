@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using Microsoft.AspNetCore.Http;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Web.Localization;
@@ -282,6 +283,14 @@ public class AssetViewModel : IValidatableObject
         var t = ValidationHelper.Localizer(validationContext);
         foreach (var r in ValidationHelper.CheckSelected(CategoryId, nameof(CategoryId), "Category", t)) yield return r;
         foreach (var r in ValidationHelper.CheckSelected(ZoneId, nameof(ZoneId), "Zone", t)) yield return r;
+        // AssetTag gets printed on a Code128 barcode label (AssetCodeGenerator.GenerateBarcodePng)
+        // — Code128 can only represent printable ASCII. A tag with Arabic/CJK/other non-Latin1
+        // characters previously saved fine but silently corrupted every such character to '?' in
+        // the generated barcode with no error anywhere, so a scanned label could never match the
+        // actual tag (confirmed live: a tag with Arabic+Japanese characters decoded back as
+        // literal '?' characters). Reject it here instead, before it's ever saved.
+        if (!string.IsNullOrEmpty(AssetTag) && !AssetTag.All(c => c >= 0x20 && c <= 0x7E))
+            yield return new ValidationResult(t("Asset Tag can only contain English letters, numbers, and standard keyboard symbols — it's printed on a barcode label that can't represent other characters."), [nameof(AssetTag)]);
     }
 }
 

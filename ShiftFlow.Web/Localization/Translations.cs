@@ -2234,6 +2234,7 @@ public static class Translations
         Ar["A block reason named '{0}' already exists."] = "يوجد سبب حظر باسم '{0}' بالفعل.";
         Ar["Role '{0}' already exists."] = "الدور '{0}' موجود بالفعل.";
         Ar["Role '{0}' created."] = "تم إنشاء الدور '{0}'.";
+        Ar["Asset Tag can only contain English letters, numbers, and standard keyboard symbols — it's printed on a barcode label that can't represent other characters."] = "يمكن أن يحتوي رمز الأصل على حروف إنجليزية وأرقام ورموز قياسية فقط — يُطبع على ملصق باركود لا يمكنه تمثيل أحرف أخرى.";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>
