@@ -31,7 +31,14 @@
   --accent: 201 96% 32%;
   --success: 152 69% 31%;
   --warning: 38 92% 50%;
-  --destructive: 354 70% 54%;
+  /* Was lightness 54% — 4.48:1 as text/outline on white, a hair under the 4.5:1 WCAG AA
+     threshold (found while auditing the other outline buttons after the primary/warning
+     fixes). 50% clears it with real margin (4.91:1) for a barely-perceptible color shift,
+     unlike the primary/warning retints which needed a bigger jump. Feeds --bs-danger, used
+     by every .btn-outline-danger/.text-danger delete action across the app; no .btn-danger
+     (solid) usage exists to double-check the white-text side, but the ratio is symmetric
+     either way. */
+  --destructive: 354 70% 50%;
   --border: 220 13% 91%;
   --input: 220 13% 91%;
   --ring: 201 96% 32%;
@@ -132,6 +139,21 @@ h1, h2, h3, h4, h5, h6 {
 .btn-outline-warning:hover {
   background-color: #B45309;
   border-color: #B45309;
+  color: #fff;
+}
+/* Same "Bootstrap hardcodes the color directly on the class instead of referencing
+   var(--bs-danger)" issue as .btn-outline-primary/.btn-outline-warning above — confirmed via
+   getComputedStyle: .btn-outline-danger showed Bootstrap's stock #dc3545 even after the
+   --destructive token below was retinted, despite --bs-danger itself correctly resolving to
+   the new value at :root. #D92638 (the new --destructive at hex precision) measures 4.90:1
+   on white, matching the token. */
+.btn-outline-danger {
+  color: #D92638;
+  border-color: #D92638;
+}
+.btn-outline-danger:hover {
+  background-color: #D92638;
+  border-color: #D92638;
   color: #fff;
 }
 .btn, .btn-sm { border-radius: var(--radius); }
