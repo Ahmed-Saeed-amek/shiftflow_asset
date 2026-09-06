@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ShiftFlow.Application.Services;
+using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
 using ShiftFlow.Web.Localization;
@@ -13,7 +16,12 @@ public class SparePartsAnalyticsController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ILanguageService _loc;
-    public SparePartsAnalyticsController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
+    private readonly UserManager<ApplicationUser> _um;
+    private readonly IAssetScopeService _scope;
+    public SparePartsAnalyticsController(ApplicationDbContext db, ILanguageService loc, UserManager<ApplicationUser> um, IAssetScopeService scope)
+    {
+        _db = db; _loc = loc; _um = um; _scope = scope;
+    }
 
     public async Task<IActionResult> Index(DateTime? from, DateTime? to, int? assetId, int? categoryId)
     {
@@ -49,6 +57,18 @@ public class SparePartsAnalyticsController : Controller
         }).ToListAsync();
 
         var allUsage = woUsage.Concat(moUsage).ToList();
+
+        // Same UserAssetScope enforced on the main Assets list/AssetsController — without it, a
+        // scoped user could see cost/usage figures (and asset tags/names via assetsById below)
+        // for assets outside their zone/category, the same leak class fixed in Dashboard and
+        // ZoneOverview.
+        var user = await _um.GetUserAsync(User);
+        if (user != null && await _scope.HasScopeAsync(user.Id))
+        {
+            var scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), user.Id)).Select(a => a.Id).ToListAsync();
+            allUsage = allUsage.Where(u => scopedAssetIds.Contains(u.AssetId)).ToList();
+        }
+
         if (assetId.HasValue) allUsage = allUsage.Where(u => u.AssetId == assetId).ToList();
 
         var partsById = await _db.SpareParts.AsNoTracking().ToDictionaryAsync(p => p.Id);
