@@ -76,6 +76,13 @@ public class AssetCategoriesController : Controller
             if (hasChildren)
                 ModelState.AddModelError(nameof(vm.ParentCategoryId), _loc.T("This category already has subcategories, so it can't become a subcategory itself."));
         }
+        // Create checks for a duplicate (ParentCategoryId, Name) pair before saving — Edit didn't,
+        // so renaming a category to match a sibling's name (or moving it under a parent that
+        // already has that name) hit the DB's unique index and raised an unhandled
+        // DbUpdateException at SaveChangesAsync instead of a clean validation error. Confirmed live.
+        if (!string.IsNullOrWhiteSpace(vm.Name) &&
+            await _db.AssetCategories.AnyAsync(c => c.Id != vm.Id && c.ParentCategoryId == vm.ParentCategoryId && c.Name == vm.Name))
+            ModelState.AddModelError(nameof(vm.Name), _loc.T("A category with this name already exists at this level."));
         if (!ModelState.IsValid)
         {
             TempData["Error"] = string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
