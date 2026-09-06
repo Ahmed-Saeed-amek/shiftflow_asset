@@ -513,6 +513,35 @@ public class WorkOrderService : IWorkOrderService
         return wo;
     }
 
+    public async Task<WorkOrder> CreateRecurringVendorOccurrenceAsync(int assetId, int vendorId, string? assignedToUserId, int sourceRecurringOrderId, DateTime scheduledDate, string systemUserId)
+    {
+        // Same guard as CreatePreventiveMaintenanceOccurrenceAsync — without it, retiring an asset
+        // still covered by an active schedule doesn't stop this background generator from opening
+        // new "Sent to Vendor" work orders against it indefinitely.
+        await EnsureAssetNotRetiredAsync(assetId);
+        var wo = new WorkOrder
+        {
+            AssetId = assetId,
+            VendorId = vendorId,
+            AssignedToUserId = assignedToUserId,
+            SourceRecurringOrderId = sourceRecurringOrderId,
+            ScheduledDate = scheduledDate.Date,
+            Stage = "Sent to Vendor",
+            Priority = "Medium",
+            Description = $"Recurring vendor order — due {scheduledDate:yyyy-MM-dd} (Schedule #{sourceRecurringOrderId})",
+            CreatedByUserId = systemUserId,
+            CreatedDate = DateTime.UtcNow,
+            RequiresVendorResponse = true,
+        };
+        wo.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
+        _db.WorkOrders.Add(wo);
+        await SetAssetStatusAsync(assetId, "Maintenance");
+        await SaveWithUniqueNumberRetryAsync(wo);
+        await _audit.LogAsync("AutoGenerateRecurring", "WorkOrder", wo.Id.ToString(), systemUserId,
+            newValue: wo.WorkOrderNumber, details: $"Schedule #{sourceRecurringOrderId}, due {scheduledDate:yyyy-MM-dd}");
+        return wo;
+    }
+
     private async Task<List<WorkOrder>> GetExportRowsAsync(string userId)
     {
         var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).AsQueryable();

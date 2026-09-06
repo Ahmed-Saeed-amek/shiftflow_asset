@@ -2180,6 +2180,17 @@ public static class Translations
         Ar["Recurring order schedule updated."] = "تم تحديث الجدول الزمني المتكرر.";
         Ar["Select a single-asset order type."] = "اختر نوع أمر بأصل واحد.";
         Ar["This asset is retired and can't be scheduled for new orders."] = "هذا الأصل متقاعد ولا يمكن جدولة أوامر جديدة له.";
+        Ar["Exactly one assignee (employee or team) is required."] = "يجب تحديد جهة إسناد واحدة فقط — موظف أو فريق.";
+        Ar["Selected order type not found."] = "نوع الأمر المحدد غير موجود.";
+        Ar["Selected order type is not active."] = "نوع الأمر المحدد غير مفعّل.";
+        Ar["Invalid cadence."] = "وتيرة التكرار غير صالحة.";
+        Ar["Recurring order schedule not found."] = "الجدول الزمني المتكرر غير موجود.";
+        Ar["This schedule's linked assets were changed by someone else since you opened this page. Reload and try again."] = "تم تغيير الأصول المرتبطة بهذا الجدول من قِبل شخص آخر منذ فتحك لهذه الصفحة. أعد التحميل وحاول مرة أخرى.";
+        Ar["This order type requires a vendor, which needs an individual employee assignee — team assignment isn't supported for vendor-routed work orders yet."] = "يتطلب نوع الأمر هذا موردًا، وهو ما يستلزم إسناده لموظف فردي — إسناد الفريق غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورّد.";
+        Ar["One or more selected assets are retired and can't be scheduled for new orders."] = "بعض الأصول المحددة متقاعدة ولا يمكن جدولة أوامر جديدة لها.";
+        Ar["One or more selected assets were not found."] = "بعض الأصول المحددة غير موجودة.";
+        Ar["Auto-generates one order per linked asset on a repeating cadence — any active order type, including vendor-routed ones."] = "ينشئ أمرًا واحدًا تلقائيًا لكل أصل مرتبط بتكرار دوري — أي نوع أمر مفعّل، بما في ذلك الأنواع الموجَّهة إلى مورّد.";
+        Ar["End Date (optional)"] = "تاريخ الانتهاء (اختياري)";
         Ar["Asset location created."] = "تم إنشاء موضع الأصل.";
         Ar["Asset location updated."] = "تم تحديث موضع الأصل.";
         Ar["You cannot delete your own account."] = "لا يمكنك حذف حسابك الخاص.";

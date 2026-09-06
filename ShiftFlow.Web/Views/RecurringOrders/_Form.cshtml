@@ -1,0 +1,140 @@
+@model RecurringOrderViewModel
+@using ShiftFlow.Domain.Entities
+@{
+    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
+    var teams = (List<Team>)ViewBag.Teams;
+    var vendors = (List<Vendor>)ViewBag.Vendors;
+}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            @* Snapshot of the linked assets this form was loaded with (Edit only) — lets
+               RecurringOrderService.UpdateAsync detect a concurrent edit instead of silently
+               discarding it. Empty/absent on Create, where there's nothing to compare against yet. *@
+            @foreach (var originalAssetId in Model.OriginalAssetIds ?? new List<int>())
+            {
+                <input type="hidden" name="OriginalAssetIds" value="@originalAssetId" />
+            }
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Order Type")</label>
+                    <select asp-for="OrderTypeId" id="roOrderTypeId" class="form-select" onchange="applyRoOrderTypeMeta()">
+                        @foreach (var t in orderTypes)
+                        {
+                            <option value="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6" id="roVendorWrap">
+                    <label class="form-label small">@Loc.T("Vendor")</label>
+                    <select asp-for="VendorId" class="form-select">
+                        <option value="">@Loc.T("Select vendor…")</option>
+                        @foreach (var v in vendors)
+                        {
+                            <option value="@v.Id">@v.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label d-block small">@Loc.T("Assign To")</label>
+                    <div class="btn-group btn-group-sm mb-2" role="group" id="roAssigneeToggle">
+                        <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeUser" value="User" checked />
+                        <label class="btn btn-outline-secondary" for="roAssigneeUser">@Loc.T("Employee")</label>
+                        <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeTeam" value="Team" />
+                        <label class="btn btn-outline-secondary" for="roAssigneeTeam">@Loc.T("Team")</label>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6" id="roAssigneeUserRow">
+                            <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=(string?)ViewBag.SelectedEmployeeLabel})" />
+                        </div>
+                        <div class="col-md-6 d-none" id="roAssigneeTeamRow">
+                            <select asp-for="AssignedToTeamId" class="form-select">
+                                <option value="">@Loc.T("Select a team")</option>
+                                @foreach (var t in teams)
+                                {
+                                    <option value="@t.Id">@t.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Cadence")</label>
+                    <select asp-for="Cadence" class="form-select">
+                        @foreach (var c in RecurringOrder.Cadences)
+                        {
+                            <option value="@c">@Loc.T(c)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Start Date")</label>
+                    <input asp-for="StartDate" type="date" class="form-control" />
+                    <span asp-validation-for="StartDate" class="text-danger small"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("End Date (optional)")</label>
+                    <input asp-for="EndDate" type="date" class="form-control" />
+                    <span asp-validation-for="EndDate" class="text-danger small"></span>
+                    <div class="form-text">@Loc.T("Leave blank for an open-ended schedule — occurrences generate up to today until you set an end date or deactivate it.")</div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="IsActive" type="checkbox" class="form-check-input" />
+                        <label class="form-check-label small" asp-for="IsActive">@Loc.T("Active")</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">@Loc.T("Assets")</label>
+                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    // [orderTypeId]: { requiresVendor, assignmentMode } — mirrors Orders/Create.cshtml's meta map, so
+    // this form can't submit an employee against a TeamOnly type (or vice versa), and shows/requires
+    // the Vendor field only for a RequiresVendor type, same rules RecurringOrderService enforces server-side.
+    const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.RequiresVendor, assignmentMode = t.AssignmentMode })));
+
+    function applyRoAssigneeType() {
+        const showUser = document.getElementById('roAssigneeUser').checked;
+        document.getElementById('roAssigneeUserRow').classList.toggle('d-none', !showUser);
+        document.getElementById('roAssigneeTeamRow').classList.toggle('d-none', showUser);
+    }
+    document.querySelectorAll('input[name="roAssigneeType"]').forEach(r => r.addEventListener('change', applyRoAssigneeType));
+
+    function applyRoOrderTypeMeta() {
+        const meta = roOrderTypeMeta[document.getElementById('roOrderTypeId').value] || { requiresVendor: false, assignmentMode: 'Either' };
+        const userRadio = document.getElementById('roAssigneeUser');
+        const teamRadio = document.getElementById('roAssigneeTeam');
+        document.getElementById('roVendorWrap').classList.toggle('d-none', !meta.requiresVendor);
+        if (meta.requiresVendor) {
+            // A vendor-routed work order has no team-assignment concept — force employee-only.
+            userRadio.checked = true; userRadio.disabled = false; teamRadio.disabled = true;
+            document.getElementById('roAssigneeToggle').classList.add('d-none');
+            applyRoAssigneeType();
+            return;
+        }
+        userRadio.disabled = meta.assignmentMode === 'TeamOnly';
+        teamRadio.disabled = meta.assignmentMode === 'EmployeeOnly';
+        document.getElementById('roAssigneeToggle').classList.toggle('d-none', meta.assignmentMode !== 'Either');
+        if (meta.assignmentMode === 'TeamOnly' && !teamRadio.checked) { teamRadio.checked = true; applyRoAssigneeType(); }
+        if (meta.assignmentMode === 'EmployeeOnly' && !userRadio.checked) { userRadio.checked = true; applyRoAssigneeType(); }
+    }
+    applyRoOrderTypeMeta();
+    applyRoAssigneeType();
+
+    @if (Model.AssignedToTeamId.HasValue)
+    {
+        <text>document.getElementById('roAssigneeTeam').checked = true; applyRoAssigneeType();</text>
+    }
+</script>

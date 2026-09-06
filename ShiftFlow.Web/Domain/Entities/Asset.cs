@@ -24,6 +24,7 @@ public class Asset
     public virtual ICollection<WorkOrder> WorkOrders{get;set;}=new List<WorkOrder>();
     public virtual ICollection<ContractAsset> ContractLinks{get;set;}=new List<ContractAsset>();
     public virtual ICollection<SparePartAsset> SparePartLinks{get;set;}=new List<SparePartAsset>();
+    public virtual ICollection<RecurringOrderAsset> RecurringOrderLinks{get;set;}=new List<RecurringOrderAsset>();
 
     public static readonly string[] Statuses = ["Working", "Defective", "Maintenance", "Retired"];
 }

@@ -95,13 +95,17 @@ public class OrderTypesController : Controller
         // AssignmentMode is re-validated at the service layer on every create/reassign, so flipping
         // it can no longer corrupt data — but a RecurringOrder created under the old mode would
         // start failing every scheduler tick with an unhelpful "wrong assignee" error instead of
-        // ever generating again. AllowsMultipleAssets has the same "stuck schedule" problem the
-        // other way: RecurringOrder assumes single-asset at creation time. Block both on an in-use
-        // type rather than leave an admin wondering why a schedule silently stopped producing orders.
-        if ((type.AssignmentMode != vm.AssignmentMode || type.AllowsMultipleAssets != vm.AllowsMultipleAssets)
+        // ever generating again. RequiresVendor has the same "wrong table" problem IsDirectFix
+        // already gets blocked for above: RecurringOrderSchedulerService dedups against WorkOrders
+        // for a RequiresVendor type but MaintenanceOrders/InspectionOrders otherwise, so flipping it
+        // on an in-use schedule makes the dedup check start looking in the wrong table and
+        // re-generate every already-covered occurrence as a duplicate. Block both on an in-use
+        // schedule rather than leave an admin wondering why occurrences doubled up or a schedule
+        // silently stopped producing orders.
+        if ((type.AssignmentMode != vm.AssignmentMode || type.RequiresVendor != vm.RequiresVendor)
             && await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == vm.Id))
         {
-            TempData["Error"] = $"'{type.Name}' has a recurring schedule using it — Assign To and Assets can't be changed while a schedule references it.";
+            TempData["Error"] = $"'{type.Name}' has a recurring schedule using it — Assign To and Requires Vendor can't be changed while a schedule references it.";
             return RedirectToAction(nameof(Index));
         }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;

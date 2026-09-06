@@ -46,6 +46,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<MaintenanceOrderPart> MaintenanceOrderParts => Set<MaintenanceOrderPart>();
     public DbSet<OrderType> OrderTypes => Set<OrderType>();
     public DbSet<RecurringOrder> RecurringOrders => Set<RecurringOrder>();
+    public DbSet<RecurringOrderAsset> RecurringOrderAssets => Set<RecurringOrderAsset>();
     public DbSet<SparePart> SpareParts => Set<SparePart>();
     public DbSet<SparePartAsset> SparePartAssets => Set<SparePartAsset>();
 
@@ -118,11 +119,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(o => o.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.SourceRecurringOrder).WithMany()
                 .HasForeignKey(o => o.SourceRecurringOrderId).OnDelete(DeleteBehavior.Restrict);
-            // Prevents RecurringOrderSchedulerService from ever double-creating the same
-            // (schedule, due date) occurrence — same pattern as WorkOrder's PM dedup index.
-            e.HasIndex(o => new { o.SourceRecurringOrderId, o.ScheduledDate })
-                .IsUnique()
-                .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
+            // No DB-level dedup index here, unlike WorkOrder/MaintenanceOrder's (SourceX, AssetId,
+            // ScheduledDate) unique index: InspectionOrder has no direct AssetId column (a schedule
+            // now covers multiple assets, one generated InspectionOrder per asset, but the asset only
+            // lives on the child InspectionRun.Items, not a column here) so there's no single-table
+            // column set that expresses "one row per (schedule, asset, date)". RecurringOrderSchedulerService's
+            // in-memory (AssetId, date) check before each CreateAsync call is the only guard for this
+            // path — accepted as sufficient since this app runs the scheduler as a single instance;
+            // WorkOrder/MaintenanceOrder's DB-level index remains the real safety net for those two.
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_InspectionOrder_ExactlyOneAssignee",
@@ -287,6 +291,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(w => new { w.SourceContractId, w.AssetId, w.ScheduledDate })
                 .IsUnique()
                 .HasFilter("[SourceContractId] IS NOT NULL");
+            e.HasOne(w => w.SourceRecurringOrder).WithMany()
+                .HasForeignKey(w => w.SourceRecurringOrderId).OnDelete(DeleteBehavior.Restrict);
+            // Same dedup guard as SourceContractId above, for RecurringOrderSchedulerService's
+            // vendor-routed occurrences — a schedule can cover multiple assets (RecurringOrderAsset),
+            // so AssetId is included here too, same as the contract index.
+            e.HasIndex(w => new { w.SourceRecurringOrderId, w.AssetId, w.ScheduledDate })
+                .IsUnique()
+                .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
         });
         b.Entity<WorkOrderPart>(e =>
         {
@@ -337,8 +349,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(m => m.SourceRecurringOrder).WithMany()
                 .HasForeignKey(m => m.SourceRecurringOrderId).OnDelete(DeleteBehavior.Restrict);
             // Prevents RecurringOrderSchedulerService from ever double-creating the same
-            // (schedule, due date) occurrence — same pattern as WorkOrder's PM dedup index.
-            e.HasIndex(m => new { m.SourceRecurringOrderId, m.ScheduledDate })
+            // (schedule, asset, due date) occurrence — same pattern as WorkOrder's PM dedup index. A
+            // schedule can cover multiple assets (RecurringOrderAsset), so AssetId is included.
+            e.HasIndex(m => new { m.SourceRecurringOrderId, m.AssetId, m.ScheduledDate })
                 .IsUnique()
                 .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
@@ -353,19 +366,28 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(r => r.IsActive);
             e.HasOne(r => r.OrderType).WithMany()
                 .HasForeignKey(r => r.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(r => r.Asset).WithMany()
-                .HasForeignKey(r => r.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.AssignedToUser).WithMany()
                 .HasForeignKey(r => r.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.AssignedToTeam).WithMany()
                 .HasForeignKey(r => r.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Vendor).WithMany()
+                .HasForeignKey(r => r.VendorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.CreatedByUser).WithMany()
                 .HasForeignKey(r => r.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             // Exactly one of AssignedToUserId/AssignedToTeamId must be set — same rule as
-            // InspectionOrder/MaintenanceOrder, enforced in RecurringOrdersController.
+            // InspectionOrder/MaintenanceOrder, enforced in RecurringOrderService.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_RecurringOrder_ExactlyOneAssignee",
                 "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
+        });
+        b.Entity<RecurringOrderAsset>(e =>
+        {
+            e.HasKey(ra => ra.Id);
+            e.HasIndex(ra => new { ra.RecurringOrderId, ra.AssetId }).IsUnique();
+            e.HasOne(ra => ra.RecurringOrder).WithMany(r => r.AssetLinks)
+                .HasForeignKey(ra => ra.RecurringOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(ra => ra.Asset).WithMany(a => a.RecurringOrderLinks)
+                .HasForeignKey(ra => ra.AssetId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<OrderType>(e =>
         {

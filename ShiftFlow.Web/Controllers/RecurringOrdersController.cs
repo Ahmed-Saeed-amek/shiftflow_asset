@@ -10,20 +10,22 @@ using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
 
-/// <summary>Admin-managed schedules that auto-generate an Inspection or Maintenance order (per
-/// OrderType.IsDirectFix) on a repeating cadence — see RecurringOrderSchedulerService, which is the
-/// only thing that ever reads these rows outside this CRUD. Scoped to single-asset order types only
-/// (AllowsMultipleAssets == false): a recurring schedule needs one fixed per-instance asset, which a
-/// multi-asset type has no fixed list for at the type level.</summary>
+/// <summary>Admin-managed schedules that auto-generate an Inspection order, Maintenance order (per
+/// OrderType.IsDirectFix), or — for a RequiresVendor type — a vendor-routed Work Order, per linked
+/// asset, on a repeating cadence. See RecurringOrderSchedulerService, which is the only thing that
+/// ever reads these rows outside this CRUD. Any active Order Type can be scheduled — cardinality is
+/// handled by the schedule's own AssetLinks (mirroring Contract/ContractAsset), not the OrderType's
+/// AllowsMultipleAssets flag: one order is generated per linked asset per occurrence, the same "one
+/// row per asset" shape PreventiveMaintenanceSchedulerService already uses for vendor PM.</summary>
 [Authorize(Policy = PermissionCatalog.OrderTypeManage)]
 public class RecurringOrdersController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly IRecurringOrderService _recurringOrders;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IAssetScopeService _scope;
-    public RecurringOrdersController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IAssetScopeService scope)
+    public RecurringOrdersController(ApplicationDbContext db, IRecurringOrderService recurringOrders, UserManager<ApplicationUser> userManager)
     {
-        _db = db; _userManager = userManager; _scope = scope;
+        _db = db; _recurringOrders = recurringOrders; _userManager = userManager;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -32,127 +34,129 @@ public class RecurringOrdersController : Controller
     {
         var schedules = await _db.RecurringOrders
             .Include(r => r.OrderType)
-            .Include(r => r.Asset)
+            .Include(r => r.AssetLinks)
             .Include(r => r.AssignedToUser)
             .Include(r => r.AssignedToTeam)
+            .Include(r => r.Vendor)
             .OrderByDescending(r => r.CreatedDate)
             .ToListAsync();
-        // RequiresVendor types are excluded too — the scheduler creates a plain MaintenanceOrder/
-        // InspectionOrder per OrderType.IsDirectFix, with no WorkOrder+vendor pipeline support yet.
-        ViewBag.OrderTypes = await _db.OrderTypes
-            .Where(t => t.IsActive && !t.AllowsMultipleAssets && !t.RequiresVendor)
-            .OrderBy(t => t.SortOrder).ToListAsync();
-        ViewBag.Teams = await _db.Teams.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
         return View(schedules);
+    }
+
+    public async Task<IActionResult> Create()
+    {
+        await PopulateLookupsAsync();
+        ViewBag.SelectedAssetChips = new List<AssetChip>();
+        return View(new RecurringOrderViewModel());
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(RecurringOrderViewModel vm)
     {
-        if (!(await ValidateAsync(vm))) return RedirectToAction(nameof(Index));
-
-        _db.RecurringOrders.Add(new RecurringOrder
+        if (!ModelState.IsValid) { await PopulateLookupsAsync(vm); ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds); return View(vm); }
+        try
         {
-            OrderTypeId = vm.OrderTypeId,
-            AssetId = vm.AssetId,
-            AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
-            AssignedToTeamId = vm.AssignedToTeamId,
-            Cadence = vm.Cadence,
-            StartDate = vm.StartDate.Date,
-            EndDate = vm.EndDate?.Date,
-            IsActive = vm.IsActive,
-            CreatedByUserId = CurrentUserId,
-            CreatedDate = DateTime.UtcNow,
+            await _recurringOrders.CreateAsync(new RecurringOrder
+            {
+                OrderTypeId = vm.OrderTypeId,
+                AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
+                AssignedToTeamId = vm.AssignedToTeamId,
+                VendorId = vm.VendorId,
+                Cadence = vm.Cadence,
+                StartDate = vm.StartDate.Date,
+                EndDate = vm.EndDate?.Date,
+                IsActive = vm.IsActive,
+            }, vm.AssetIds ?? [], CurrentUserId);
+            TempData["Success"] = "Recurring order schedule created.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync(vm);
+            ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds);
+            return View(vm);
+        }
+    }
+
+    public async Task<IActionResult> Edit(int id)
+    {
+        var schedule = await _db.RecurringOrders.Include(r => r.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(r => r.Id == id);
+        if (schedule == null) return NotFound();
+        await PopulateLookupsAsync();
+        ViewBag.SelectedEmployeeLabel = !string.IsNullOrEmpty(schedule.AssignedToUserId)
+            ? await _db.Users.Where(u => u.Id == schedule.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
+            : null;
+        ViewBag.SelectedAssetChips = schedule.AssetLinks
+            .Select(l => new AssetChip { Id = l.AssetId, Label = $"{l.Asset!.AssetTag} — {l.Asset.Name}" }).ToList();
+        var linkedAssetIds = schedule.AssetLinks.Select(l => l.AssetId).ToList();
+        return View(new RecurringOrderViewModel
+        {
+            Id = schedule.Id,
+            OrderTypeId = schedule.OrderTypeId,
+            AssetIds = linkedAssetIds,
+            OriginalAssetIds = linkedAssetIds,
+            AssignedToUserId = schedule.AssignedToUserId,
+            AssignedToTeamId = schedule.AssignedToTeamId,
+            VendorId = schedule.VendorId,
+            Cadence = schedule.Cadence,
+            StartDate = schedule.StartDate,
+            EndDate = schedule.EndDate,
+            IsActive = schedule.IsActive,
         });
-        await _db.SaveChangesAsync();
-        TempData["Success"] = "Recurring order schedule created.";
-        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(RecurringOrderViewModel vm)
     {
-        if (!(await ValidateAsync(vm))) return RedirectToAction(nameof(Index));
-
-        var schedule = await _db.RecurringOrders.FindAsync(vm.Id);
-        if (schedule == null) return NotFound();
-
-        schedule.OrderTypeId = vm.OrderTypeId;
-        schedule.AssetId = vm.AssetId;
-        schedule.AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId;
-        schedule.AssignedToTeamId = vm.AssignedToTeamId;
-        schedule.Cadence = vm.Cadence;
-        schedule.StartDate = vm.StartDate.Date;
-        schedule.EndDate = vm.EndDate?.Date;
-        schedule.IsActive = vm.IsActive;
-        await _db.SaveChangesAsync();
-        TempData["Success"] = "Recurring order schedule updated.";
-        return RedirectToAction(nameof(Index));
+        if (!ModelState.IsValid) { await PopulateLookupsAsync(vm); ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds); return View(vm); }
+        try
+        {
+            await _recurringOrders.UpdateAsync(new RecurringOrder
+            {
+                Id = vm.Id,
+                OrderTypeId = vm.OrderTypeId,
+                AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
+                AssignedToTeamId = vm.AssignedToTeamId,
+                VendorId = vm.VendorId,
+                Cadence = vm.Cadence,
+                StartDate = vm.StartDate.Date,
+                EndDate = vm.EndDate?.Date,
+                IsActive = vm.IsActive,
+            }, vm.AssetIds ?? [], vm.OriginalAssetIds ?? [], CurrentUserId);
+            TempData["Success"] = "Recurring order schedule updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            await PopulateLookupsAsync(vm);
+            ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds);
+            return View(vm);
+        }
     }
 
-    private async Task<bool> ValidateAsync(RecurringOrderViewModel vm)
+    private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)
     {
-        var hasUser = !string.IsNullOrEmpty(vm.AssignedToUserId);
-        var hasTeam = vm.AssignedToTeamId.HasValue;
-        if (!ModelState.IsValid || hasUser == hasTeam || !RecurringOrder.Cadences.Contains(vm.Cadence))
+        if (assetIds == null || assetIds.Count == 0) return [];
+        return await _db.Assets.Where(a => assetIds.Contains(a.Id))
+            .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name }).ToListAsync();
+    }
+
+    private async Task PopulateLookupsAsync(RecurringOrderViewModel? vm = null)
+    {
+        ViewBag.OrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
+        ViewBag.Teams = await _db.Teams.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        // Redisplay after a failed POST needs the picker's search box populated with a name, not
+        // just the hidden AssignedToUserId, otherwise the box goes blank even though the submitted
+        // selection is still there under the hood — same as Teams'/UserAssetScopes' redisplay fix.
+        string? assignedToUserId = vm?.AssignedToUserId;
+        if (!string.IsNullOrEmpty(assignedToUserId) && ViewBag.SelectedEmployeeLabel == null)
         {
-            TempData["Error"] = "Order type, asset, cadence, start date and exactly one assignee (employee or team) are required.";
-            return false;
+            ViewBag.SelectedEmployeeLabel = await _db.Users.Where(u => u.Id == assignedToUserId)
+                .Select(u => u.FullName).FirstOrDefaultAsync();
         }
-        var orderType = await _db.OrderTypes.FindAsync(vm.OrderTypeId);
-        if (orderType == null || orderType.AllowsMultipleAssets)
-        {
-            TempData["Error"] = "Select a single-asset order type.";
-            return false;
-        }
-        if (orderType.RequiresVendor)
-        {
-            TempData["Error"] = "Vendor-required order types can't be scheduled yet — the recurring generator doesn't support the Work Order/vendor pipeline.";
-            return false;
-        }
-        // Unlike OrdersController.Create, this form can't just silently drop whichever side the
-        // OrderType's AssignmentMode disallows (there's no "resolve server-side from posted fields"
-        // step here — the admin picks employee-or-team directly) — reject the mismatch instead so a
-        // TeamOnly type never ends up with an individual employee baked into every future occurrence.
-        if (orderType.AssignmentMode == "EmployeeOnly" && hasTeam)
-        {
-            TempData["Error"] = $"'{orderType.Name}' can only be assigned to an employee, not a team.";
-            return false;
-        }
-        if (orderType.AssignmentMode == "TeamOnly" && hasUser)
-        {
-            TempData["Error"] = $"'{orderType.Name}' can only be assigned to a team, not an employee.";
-            return false;
-        }
-        if (await _db.Assets.AnyAsync(a => a.Id == vm.AssetId && a.Status == "Retired"))
-        {
-            TempData["Error"] = "This asset is retired and can't be scheduled for new orders.";
-            return false;
-        }
-        // Same bug class as ContractService/InspectionOrderService's VendorId/AssignedToUserId
-        // checks: a stale multi-select or tampered POST with a non-existent employee/team id
-        // otherwise hits the DB's FK constraint on RecurringOrders.AssignedToUserId/AssignedToTeamId
-        // and raises an unhandled DbUpdateException (confirmed live: 500 with
-        // "FK_RecurringOrders_AspNetUsers_AssignedToUserId" conflict) instead of a clean message.
-        if (hasUser && !await _db.Users.AnyAsync(u => u.Id == vm.AssignedToUserId && u.IsActive))
-        {
-            TempData["Error"] = "Selected employee not found or is inactive.";
-            return false;
-        }
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == vm.AssignedToTeamId))
-        {
-            TempData["Error"] = "Selected team not found.";
-            return false;
-        }
-        // Same UserAssetScope enforcement round 11 added to manual Order creation — without it, a
-        // scoped OrderType.Manage holder (e.g. a scoped OperationsManager) could schedule a
-        // recurring order against an asset they can't even view via AssetsController, and the
-        // scheduler would then keep auto-generating real orders against it indefinitely.
-        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), CurrentUserId)).AnyAsync(a => a.Id == vm.AssetId))
-        {
-            TempData["Error"] = "Asset not found.";
-            return false;
-        }
-        return true;
     }
 }

@@ -378,9 +378,15 @@ public class RecurringOrderViewModel : IValidatableObject
 {
     public int Id { get; set; }
     [Required] public int OrderTypeId { get; set; }
-    [Required] public int AssetId { get; set; }
+    public List<int>? AssetIds { get; set; }
+    /// <summary>Snapshot of the linked assets this form was loaded with (Edit only) — lets
+    /// RecurringOrderService.UpdateAsync detect a concurrent edit instead of silently discarding it.
+    /// Empty/absent on Create, where there's nothing to compare against yet.</summary>
+    public List<int>? OriginalAssetIds { get; set; }
     public string? AssignedToUserId { get; set; }
     public int? AssignedToTeamId { get; set; }
+    /// <summary>Required, employee-only, when the picked OrderType.RequiresVendor is true — see RecurringOrder.VendorId.</summary>
+    public int? VendorId { get; set; }
     [Required] public string Cadence { get; set; } = "Monthly";
     [Required] public DateTime StartDate { get; set; } = DateTime.UtcNow.Date;
     public DateTime? EndDate { get; set; }
@@ -394,12 +400,10 @@ public class RecurringOrderViewModel : IValidatableObject
             yield return new ValidationResult(T("End Date must be after Start Date."), new[] { nameof(EndDate) });
 
         // Same rationale as ContractViewModel's PM cadence cap: with no EndDate this schedule runs
-        // forever, and RecurringOrderSchedulerService.RunOnceAsync has no per-tick generation cap
-        // (unlike PreventiveMaintenanceSchedulerService) — a StartDate set far in the past combined
-        // with a short cadence would make the very first tick after activation try to generate
-        // thousands of InspectionOrder/MaintenanceOrder rows synchronously (RecurrenceCalculator's
-        // 2000-occurrence hard cap is the only backstop). Reject an unreasonably distant StartDate
-        // up front instead of relying purely on that backstop.
+        // forever — and even though RecurringOrderSchedulerService.RunOnceAsync caps how much it
+        // generates per tick, a StartDate set far in the past combined with a short cadence and many
+        // linked assets would still take many ticks to fully catch up, and needlessly so. Reject an
+        // unreasonably distant StartDate up front instead of relying purely on the per-tick cap.
         if (StartDate < DateTime.UtcNow.Date.AddYears(-25))
             yield return new ValidationResult(T("Start Date can't be more than 25 years in the past."), new[] { nameof(StartDate) });
 
