@@ -444,6 +444,16 @@ body.sidebar-locked { overflow: hidden; }
 .badge { font-size: .76rem; font-weight: 500; border-radius: 0.5rem; }
 .bg-purple { background-color: #a78bfa !important; } /* "HandedOver" task status badge */
 .btn-sm, .form-control, .form-select { border-radius: var(--radius); }
+/* Bootstrap's .btn-sm renders ~30px tall — comfortable for a mouse, under the ~44px a touch
+   target needs to be reliably tappable without missing (same class of fix as [data-chip]
+   .btn-close-sm below, just for every other .btn-sm: table row actions, modal Save/Cancel,
+   toolbar buttons). Scoped to the touch breakpoint only, not a blanket bump — this app's
+   tables are deliberately dense on desktop (row actions packed tightly is a feature there,
+   not a bug), and a 44px floor on every .btn-sm at desktop widths would visibly bloat every
+   table without helping anyone using a mouse. */
+@media (max-width: 991.98px) {
+  .btn-sm { min-height: 44px; padding-top: .5rem; padding-bottom: .5rem; }
+}
 /* Bootstrap's .form-control/.form-select set background-color: var(--bs-body-bg)
    directly on the class, same issue as .list-group/.table above — the page-bg
    remap otherwise makes inputs disappear against the page wherever they aren't
