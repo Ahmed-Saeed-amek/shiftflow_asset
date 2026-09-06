@@ -74,12 +74,27 @@ public static class FileUploadValidator
     {
         var accepted = new List<IFormFile>();
         var rejected = new List<(string, string)>();
+        // MaxTotalRequestBytes was declared but never actually checked anywhere — each file only
+        // ever got validated against the 10 MB per-file cap, so a submission with several files
+        // just under that limit (e.g. nine 9.9 MB attachments, ~89 MB total) passed every
+        // individual check with no aggregate limit at all.
+        long acceptedTotalBytes = 0;
 
         foreach (var file in files)
         {
             var result = await ValidateAsync(file, ct);
-            if (result.IsAllowed) accepted.Add(file);
-            else rejected.Add((file.FileName, result.RejectionReason ?? "Rejected."));
+            if (!result.IsAllowed)
+            {
+                rejected.Add((file.FileName, result.RejectionReason ?? "Rejected."));
+                continue;
+            }
+            if (acceptedTotalBytes + file.Length > MaxTotalRequestBytes)
+            {
+                rejected.Add((file.FileName, $"Total attachment size for this submission can't exceed {MaxTotalRequestBytes / (1024 * 1024)} MB."));
+                continue;
+            }
+            acceptedTotalBytes += file.Length;
+            accepted.Add(file);
         }
 
         return (accepted, rejected);
