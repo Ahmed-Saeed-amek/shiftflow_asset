@@ -575,6 +575,15 @@ public class UsersController : Controller
         var wasActive = user.IsActive;
         user.IsActive = !user.IsActive;
         await _um.UpdateAsync(user);
+        // Deactivating only ever blocked a NEW login attempt (AccountController.Login's IsActive
+        // check) — an already-open session's cookie stayed fully valid and authenticated until its
+        // own 8h sliding expiration, with no mechanism kicking the user out in between (confirmed
+        // live: a deactivated user kept full app access on their existing session with no re-login).
+        // Rotating the security stamp makes the already-registered SecurityStampValidator reject
+        // that session on its next revalidation (Program.cs tightens the interval to 5 minutes) —
+        // the same mechanism that already, incidentally, makes ResetPassword's temp-password reset
+        // force a re-login, just never wired up for deactivation.
+        if (!user.IsActive) await _um.UpdateSecurityStampAsync(user);
         await _audit.LogAsync(user.IsActive ? "Activate" : "Deactivate", "User", id, currentUserId!,
             oldValue: wasActive ? "Active" : "Inactive", newValue: user.IsActive ? "Active" : "Inactive");
         TempData["Success"] = $"User '{user.FullName}' {(user.IsActive ? "activated" : "deactivated")}.";

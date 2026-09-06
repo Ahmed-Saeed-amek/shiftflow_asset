@@ -63,6 +63,13 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(o =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+// The default 30-minute SecurityStampValidator interval left too wide a window between a security-
+// relevant change (deactivation now rotates the stamp — see UsersController.ToggleActive — and a
+// password reset already did via UserManager.ResetPasswordAsync) and an already-open session
+// actually getting kicked out. Tightened so a deactivated/reset user is signed out of any live
+// session within minutes rather than up to half an hour.
+builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.FromMinutes(5));
+
 builder.Services.ConfigureApplicationCookie(o =>
 {
     o.LoginPath = "/Account/Login";
