@@ -119,6 +119,21 @@ h1, h2, h3, h4, h5, h6 {
   border-color: #0369A1;
   color: #fff;
 }
+/* Same contrast problem as the primary retint above, found while checking for other
+   solid-color-as-text usages: Bootstrap's own --bs-warning (#0EA5E9's warning counterpart,
+   the raw HSL(38,92%,50%) amber) as text on white measures 2.14:1 — worse than the primary
+   button was. Used live in Users/Index.cshtml's Deactivate button (.btn-outline-warning was
+   never overridden the way .btn-outline-primary already is here). #B45309 gives 5.02:1 both
+   as outline text/border and as the hover fill's white-on-amber (same ratio, symmetric). */
+.btn-outline-warning {
+  color: #B45309;
+  border-color: #B45309;
+}
+.btn-outline-warning:hover {
+  background-color: #B45309;
+  border-color: #B45309;
+  color: #fff;
+}
 .btn, .btn-sm { border-radius: var(--radius); }
 .text-primary { color: #0369A1 !important; }
 
