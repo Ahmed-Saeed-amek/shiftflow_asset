@@ -331,16 +331,27 @@ public class WorkOrdersController : Controller
     [Authorize]
     public async Task<IActionResult> DownloadAttachment(int attachmentId)
     {
-        var attachment = await _db.WorkOrderAttachments.Include(a => a.WorkOrder).FirstOrDefaultAsync(a => a.Id == attachmentId);
+        var attachment = await _db.WorkOrderAttachments.Include(a => a.WorkOrder).ThenInclude(w => w!.Asset)
+            .FirstOrDefaultAsync(a => a.Id == attachmentId);
         if (attachment?.WorkOrder == null) return NotFound();
 
         var isStaff = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
             .AuthorizeAsync(User, PermissionCatalog.WorkOrderView)).Succeeded;
+        var userId = _userManager.GetUserId(User)!;
         if (!isStaff)
         {
-            var userId = _userManager.GetUserId(User);
             var myVendorId = await _db.Vendors.Where(v => v.UserId == userId).Select(v => (int?)v.Id).FirstOrDefaultAsync();
             if (myVendorId == null || myVendorId != attachment.WorkOrder.VendorId) return Forbid();
+        }
+        else
+        {
+            // Same UserAssetScope restriction Details already enforces (round 12) — without it, a
+            // scoped WorkOrder.View holder who is 404'd out of an out-of-scope work order's Details
+            // page could still pull its attachments directly by attachment ID, bypassing the scope
+            // entirely. Same assignee exemption as Details: a scope narrowed/added after assignment
+            // must not lock the assignee out of their own already-assigned work's attachments.
+            var wo = attachment.WorkOrder;
+            if (wo.AssignedToUserId != userId && wo.Asset != null && !await _scope.IsInScopeAsync(wo.Asset, userId)) return NotFound();
         }
 
         var path = ShiftFlow.Web.Services.WorkOrderAttachmentStorage.ResolvePhysicalPath(attachment.FilePath);
