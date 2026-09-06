@@ -66,7 +66,7 @@ public class AssetService : IAssetService
         var assigneeName = a.AssignedToUserId != null
             ? await _db.Users.Where(u => u.Id == a.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
             : null;
-        return $"{a.Name}, Category: {categoryName ?? "—"}, Zone: {zoneName ?? "—"}, Status: {a.Status}, Assigned to: {assigneeName ?? "—"}";
+        return $"{a.AssetTag}, {a.Name}, Category: {categoryName ?? "—"}, Zone: {zoneName ?? "—"}, Status: {a.Status}, Assigned to: {assigneeName ?? "—"}";
     }
 
     public async Task UpdateAsync(Asset asset, string userId)
@@ -75,7 +75,12 @@ public class AssetService : IAssetService
         await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         var existing = await _db.Assets.FindAsync(asset.Id) ?? throw new InvalidOperationException("Asset not found.");
         var oldValue = await SnapshotAsync(existing);
-        existing.Name = asset.Name; existing.NameAr = asset.NameAr; existing.CategoryId = asset.CategoryId;
+        // AssetTag used to be missing from this list entirely — the Edit form (shared _Form.cshtml
+        // with Create) lets the user type a new tag and it passes validation, but nothing here ever
+        // wrote it back, so a changed tag was silently discarded even though the save reported
+        // success (confirmed live: POST with a new AssetTag returned success but the DB row was
+        // unchanged). The controller now duplicate-checks AssetTag on Edit the same way Create does.
+        existing.AssetTag = asset.AssetTag; existing.Name = asset.Name; existing.NameAr = asset.NameAr; existing.CategoryId = asset.CategoryId;
         existing.ZoneId = asset.ZoneId; existing.Model = asset.Model; existing.SerialNumber = asset.SerialNumber;
         existing.Manufacturer = asset.Manufacturer; existing.Sku = asset.Sku; existing.Status = asset.Status; existing.AssignedToUserId = asset.AssignedToUserId;
         existing.PurchaseDate = asset.PurchaseDate; existing.WarrantyExpiry = asset.WarrantyExpiry; existing.Notes = asset.Notes;

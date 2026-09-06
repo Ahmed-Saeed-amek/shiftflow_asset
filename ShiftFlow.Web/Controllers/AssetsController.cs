@@ -185,14 +185,33 @@ public class AssetsController : Controller
         // vm.Id itself, so the scope check here is a direct existence check against the scoped
         // queryable rather than routing the whole update through it.
         if (!await (await ScopedAssetsAsync(userId)).AnyAsync(a => a.Id == vm.Id)) return NotFound();
+        // The Asset Tag field is editable on this form (shared _Form.cshtml with Create) and was
+        // validated above, but AssetService.UpdateAsync never actually saved it — every other field
+        // change took effect and the user got a "Asset updated" success message, so a changed tag
+        // was silently discarded with no error anywhere (confirmed live: posting a new AssetTag
+        // returned 302/success but the DB row kept its original tag). Mirror Create's duplicate
+        // check here now that the tag is actually being persisted.
+        if (await _db.Assets.AnyAsync(a => a.AssetTag == vm.AssetTag && a.Id != vm.Id))
+        {
+            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
+        }
         try
         {
             await _assetService.UpdateAsync(new Asset
             {
-                Id = vm.Id, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
+                Id = vm.Id, AssetTag = vm.AssetTag, Name = vm.Name, NameAr = vm.NameAr, CategoryId = vm.CategoryId, ZoneId = vm.ZoneId,
                 Model = vm.Model, SerialNumber = vm.SerialNumber, Manufacturer = vm.Manufacturer, Sku = vm.Sku, Status = vm.Status,
                 AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
             }, userId);
+        }
+        catch (DbUpdateException)
+        {
+            // Same TOCTOU race as Create: the AnyAsync check above isn't atomic with this save.
+            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
+            return View(vm);
         }
         catch (InvalidOperationException ex)
         {
