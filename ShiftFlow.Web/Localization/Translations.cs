@@ -65,6 +65,7 @@ public static class Translations
         ["Ask me anything about the system!"] = "اسألني أي شيء عن النظام!",
         ["Status"] = "الحالة",
         ["Search..."] = "بحث...",
+        ["Toggle menu"] = "تبديل القائمة",
         ["Filter"] = "تصفية",
         ["Save"] = "حفظ",
         ["Cancel"] = "إلغاء",

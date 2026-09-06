@@ -32,7 +32,7 @@
                             <form method="post" asp-action="Delete" asp-route-id="@t.Id" class="d-inline"
                                   onsubmit="return confirm('@Loc.T("Delete this order type? Only allowed if no orders or schedules use it.")')">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="@Loc.T("Delete")"><i class="bi bi-trash"></i></button>
                             </form>
                         </td>
                     </tr>
