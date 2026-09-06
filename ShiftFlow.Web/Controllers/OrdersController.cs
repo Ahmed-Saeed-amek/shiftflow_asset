@@ -195,17 +195,30 @@ public class OrdersController : Controller
                         await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
                         return View(vm);
                     }
+                    // Each iteration's CreateAsync issues its own SaveChangesAsync — without an
+                    // enclosing transaction, an out-of-scope/retired/otherwise-invalid asset
+                    // later in the list (a raw/tampered POST can submit any ID; the retired check
+                    // above only covers that one case) throws mid-loop, but every order already
+                    // created for the assets before it stays committed. The catch below then
+                    // reports the whole submission as failed — which it visibly wasn't, since the
+                    // asset's status was also flipped to Defective by the surviving order(s). One
+                    // transaction across the whole batch makes "any asset in the list is invalid"
+                    // fail all-or-nothing, matching what the error message on failure already implies.
                     WorkOrder? first = null;
-                    foreach (var assetId in assetIds)
+                    await using (var tx = await _db.Database.BeginTransactionAsync())
                     {
-                        var wo = await _workOrders.CreateAsync(new WorkOrder
+                        foreach (var assetId in assetIds)
                         {
-                            AssetId = assetId,
-                            AssignedToUserId = assignedToUserId,
-                            OrderTypeId = orderType.Id,
-                            Description = null, RequiresVendorResponse = true,
-                        }, CurrentUserId);
-                        first ??= wo;
+                            var wo = await _workOrders.CreateAsync(new WorkOrder
+                            {
+                                AssetId = assetId,
+                                AssignedToUserId = assignedToUserId,
+                                OrderTypeId = orderType.Id,
+                                Description = null, RequiresVendorResponse = true,
+                            }, CurrentUserId);
+                            first ??= wo;
+                        }
+                        await tx.CommitAsync();
                     }
                     if (assetIds.Count == 1)
                     {
@@ -215,12 +228,18 @@ public class OrdersController : Controller
                     TempData["Success"] = $"{assetIds.Count} work orders created — this order type requires a vendor.";
                     return RedirectToAction(nameof(Index));
                 }
+                // Same all-or-nothing reasoning as the WorkOrder loop above — one transaction
+                // across every asset in the batch, not one commit per asset.
                 MaintenanceOrder? firstOrder = null;
-                foreach (var assetId in assetIds)
+                await using (var tx = await _db.Database.BeginTransactionAsync())
                 {
-                    var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToTeamId,
-                        null, vm.DueDate, CurrentUserId, orderType.Id);
-                    firstOrder ??= order;
+                    foreach (var assetId in assetIds)
+                    {
+                        var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToTeamId,
+                            null, vm.DueDate, CurrentUserId, orderType.Id);
+                        firstOrder ??= order;
+                    }
+                    await tx.CommitAsync();
                 }
                 if (assetIds.Count == 1)
                 {
