@@ -75,11 +75,25 @@ public class UserAssetScopesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(UserAssetScopeViewModel vm)
     {
+        // The picker on this shared _Form.cshtml is fully editable on Edit too (not just Create),
+        // so a manager reassigning the scope to a different employee must actually have that change
+        // persisted — same duplicate-scope rule as Create applies here, just excluding this scope's
+        // own row.
+        if (await _db.UserAssetScopes.AnyAsync(s => s.Id != vm.Id && s.UserId == vm.UserId))
+            ModelState.AddModelError(nameof(vm.UserId), _loc.T("This user already has a scope assigned — edit or remove it first."));
         await ValidateScopeReferencesAsync(vm);
-        if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
+        if (!ModelState.IsValid)
+        {
+            await PopulateLookupsAsync();
+            // Redisplay needs the picker's search box populated with a name, not just the hidden
+            // UserId — same as Teams' member-chip redisplay, otherwise the box goes blank even
+            // though the submitted selection is still there under the hood.
+            ViewBag.SelectedUserName = (await _db.Users.FindAsync(vm.UserId))?.FullName;
+            return View(vm);
+        }
         var scope = await _db.UserAssetScopes.FindAsync(vm.Id);
         if (scope == null) return NotFound();
-        scope.ZoneId = vm.ZoneId; scope.LocationCategoryId = vm.LocationCategoryId; scope.CategoryId = vm.CategoryId;
+        scope.UserId = vm.UserId; scope.ZoneId = vm.ZoneId; scope.LocationCategoryId = vm.LocationCategoryId; scope.CategoryId = vm.CategoryId;
         await _db.SaveChangesAsync();
         TempData["Success"] = _loc.T("Scope updated.");
         return RedirectToAction(nameof(Index));
