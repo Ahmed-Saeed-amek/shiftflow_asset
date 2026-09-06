@@ -18,18 +18,23 @@
   --background: 187 29% 94%;   /* #EBF3F4 — UrbanHub's exact pale blue-grey canvas */
   --foreground: 215 28% 17%;
   --card: 0 0% 100%;
-  --primary: 199 89% 48%;
+  /* Was 199 89% 48% (#0EA5E9) — white text/icons on that fill measured 2.77:1 contrast,
+     failing WCAG AA even at the 3:1 large-text/UI-component floor (needs 4.5:1 for normal
+     text). #0369A1 gives white-on-primary 5.93:1 and stays recognizably the same blue.
+     --chart-1 intentionally keeps the old lighter blue — chart bars don't have this
+     text-on-fill contrast problem, so retinting it would just be an unrelated palette change. */
+  --primary: 201 96% 32%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 14% 96%;
   --muted: 220 14% 96%;
   --muted-foreground: 220 9% 46%;
-  --accent: 199 89% 48%;
+  --accent: 201 96% 32%;
   --success: 152 69% 31%;
   --warning: 38 92% 50%;
   --destructive: 354 70% 54%;
   --border: 220 13% 91%;
   --input: 220 13% 91%;
-  --ring: 199 89% 48%;
+  --ring: 201 96% 32%;
 
   --chart-1: 199 89% 48%;
   --chart-2: 38 92% 50%;
@@ -43,13 +48,13 @@
   --font-body: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
 
   --sidebar-background: 0 0% 100%;     /* UrbanHub's actual sidebar is white, not grey */
-  --sidebar-primary: 199 89% 48%;
-  --sidebar-accent: 199 89% 48%;
+  --sidebar-primary: 201 96% 32%;
+  --sidebar-accent: 201 96% 32%;
   --sidebar-border: 220 13% 91%;
 
   /* Bootstrap variable remap */
   --bs-primary: hsl(var(--primary));
-  --bs-primary-rgb: 14, 165, 233;
+  --bs-primary-rgb: 3, 105, 161;
   --bs-secondary: hsl(var(--muted-foreground));
   --bs-success: hsl(var(--success));
   --bs-warning: hsl(var(--warning));
@@ -97,25 +102,25 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background-color: #0EA5E9;
-  border-color: #0EA5E9;
+  background-color: #0369A1;
+  border-color: #0369A1;
   color: #fff;
 }
 .btn-primary:hover, .btn-primary:focus {
-  background-color: #0284C7;
-  border-color: #0284C7;
+  background-color: #075985;
+  border-color: #075985;
 }
 .btn-outline-primary {
-  color: #0EA5E9;
-  border-color: #0EA5E9;
+  color: #0369A1;
+  border-color: #0369A1;
 }
 .btn-outline-primary:hover {
-  background-color: #0EA5E9;
-  border-color: #0EA5E9;
+  background-color: #0369A1;
+  border-color: #0369A1;
   color: #fff;
 }
 .btn, .btn-sm { border-radius: var(--radius); }
-.text-primary { color: #0EA5E9 !important; }
+.text-primary { color: #0369A1 !important; }
 
 /* Guarantees the footer sits at the true viewport bottom even when
    #sidebar drops out of flow (its position:fixed mobile breakpoint below)
@@ -169,7 +174,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: .7rem;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #0EA5E9;
+  color: #0369A1;
   padding: .25rem .5rem;
 }
 #sidebar .nav-link {
@@ -194,13 +199,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 #sidebar .nav-link:hover,
 #sidebar .nav-link.active {
-  background: rgba(14,165,233,.08);
-  color: #0EA5E9 !important;
+  background: rgba(3,105,161,.08);
+  color: #0369A1 !important;
 }
 #sidebar .nav-link.active { font-weight: 600; }
 #sidebar .nav-link:hover i,
 #sidebar .nav-link.active i {
-  background: #0EA5E9;
+  background: #0369A1;
   color: #fff;
 }
 #sidebar .nav-group-chevron { transition: transform .15s; }
@@ -448,8 +453,8 @@ body.sidebar-locked { overflow: hidden; }
   background-color: hsl(var(--card));
 }
 .form-control:focus, .form-select:focus {
-  border-color: #0EA5E9;
-  box-shadow: 0 0 0 0.2rem rgba(14,165,233,0.15);
+  border-color: #0369A1;
+  box-shadow: 0 0 0 0.2rem rgba(3,105,161,0.15);
 }
 
 /* Dropdowns / popovers */
@@ -534,16 +539,16 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
 .cal-cell.cal-outside .cal-daynum { color: hsl(var(--muted-foreground)); }
 .cal-daynum { font-size: .85rem; font-weight: 500; margin-bottom: .25rem; }
 .cal-cell.cal-today {
-  border: 2px solid #0EA5E9;
+  border: 2px solid #0369A1;
   border-radius: var(--radius);
   margin: -1px;
 }
-.cal-cell.cal-today .cal-daynum { color: #0EA5E9; font-weight: 700; }
+.cal-cell.cal-today .cal-daynum { color: #0369A1; font-weight: 700; }
 .cal-chip {
   display: block;
   font-size: .7rem;
-  background: rgba(14,165,233,0.10);
-  color: #0EA5E9;
+  background: rgba(3,105,161,0.10);
+  color: #0369A1;
   border-radius: 0.5rem;
   padding: .05rem .35rem;
   margin-bottom: .15rem;
@@ -552,7 +557,7 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   text-overflow: ellipsis;
   text-decoration: none;
 }
-.cal-chip:hover { background: rgba(14,165,233,0.18); color: #0EA5E9; }
+.cal-chip:hover { background: rgba(3,105,161,0.18); color: #0369A1; }
 .cal-more { font-size: .7rem; color: hsl(var(--muted-foreground)); }
 
 /* Compact calendar on phones/small tablets — shrink cells instead of letting
@@ -586,12 +591,12 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #0EA5E9;
+  background: #0369A1;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(14,165,233,0.35);
+  box-shadow: 0 8px 24px rgba(3,105,161,0.35);
   cursor: pointer;
   transition: transform .2s;
 }
