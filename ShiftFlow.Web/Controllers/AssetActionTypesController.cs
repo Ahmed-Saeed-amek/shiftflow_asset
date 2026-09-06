@@ -48,6 +48,15 @@ public class AssetActionTypesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetActionTypeViewModel vm)
     {
+        // Unlike Create, this had no ModelState.IsValid check at all — submitting an empty Name
+        // (e.g. by clearing the field in the edit modal) bypassed the [Required] validation and hit
+        // the DB's NOT NULL constraint on AssetActionTypes.Name, raising an unhandled
+        // DbUpdateException/500 instead of the friendly redirect-with-error Create already gives.
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Name is required.";
+            return RedirectToAction(nameof(Index), new { categoryId = vm.CategoryId });
+        }
         var actionType = await _db.AssetActionTypes.FindAsync(vm.Id);
         if (actionType != null)
         {
@@ -75,11 +84,19 @@ public class AssetActionTypesController : Controller
     public async Task<IActionResult> EditCause(AssetActionCauseViewModel vm)
     {
         var cause = await _db.AssetActionCauses.Include(c => c.ActionType).FirstOrDefaultAsync(c => c.Id == vm.Id);
-        if (cause != null)
+        // Same missing-ModelState.IsValid divergence as Edit above — CreateCause checks
+        // ModelState.IsValid before saving, EditCause didn't, so an empty Name hit the DB's NOT
+        // NULL constraint on AssetActionCauses.Name and raised an unhandled 500 instead of a
+        // friendly error.
+        if (cause != null && ModelState.IsValid)
         {
             cause.Name = vm.Name; cause.NameAr = vm.NameAr; cause.IsActive = vm.IsActive;
             await _db.SaveChangesAsync();
             TempData["Success"] = "Cause updated.";
+        }
+        else if (cause != null)
+        {
+            TempData["Error"] = "Name is required.";
         }
         return RedirectToAction(nameof(Index), new { categoryId = cause?.ActionType?.CategoryId });
     }
