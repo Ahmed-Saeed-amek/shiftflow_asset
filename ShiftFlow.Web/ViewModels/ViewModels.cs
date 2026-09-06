@@ -96,6 +96,16 @@ public class ContractViewModel : IValidatableObject
 
             if (string.IsNullOrWhiteSpace(PmCadence) || !Contract.PmCadences.Contains(PmCadence))
                 yield return new ValidationResult(T("A cadence must be selected for Preventive Maintenance contracts."), new[] { nameof(PmCadence) });
+
+            // The PM schedule table (Contracts/Details) renders one row per occurrence with no
+            // pagination — an EndDate decades out (a fat-fingered year, e.g. 9998 instead of 2028)
+            // combined with a short cadence generates hundreds of thousands of rows and a
+            // multi-hundred-MB response (confirmed live: Weekly over ~7,900 years produced 416,000+
+            // rows, ~200MB). RecurrenceCalculator caps generation as a hard safety valve regardless,
+            // but this catches the mistake up front with a clear error instead of silently
+            // truncating the schedule the admin asked for.
+            if (EndDate != null && EndDate > StartDate.AddYears(25))
+                yield return new ValidationResult(T("Preventive Maintenance contracts can't span more than 25 years — check the End Date."), new[] { nameof(EndDate) });
         }
     }
 }

@@ -14,12 +14,22 @@ public static class RecurrenceCalculator
     /// 28th forever (confirmed live: Jan 31 -> Feb 28 -> Mar 28 -> ... instead of Mar 31). Computing
     /// from the original startDate each time means only the months genuinely too short (Feb) clamp,
     /// and every other month still lands on the intended day.</summary>
+    // A hard safety valve, not a realistic limit — even Weekly for 2,000 occurrences is ~38 years.
+    // Without this, a contract/schedule with a far-future EndDate (a fat-fingered year, or a
+    // deliberately malicious one — this path is reachable by anyone who can create a Contract, not
+    // just an admin) makes this loop run unbounded: confirmed live, a Weekly PM contract from
+    // 2026 to year 9998 generated 416,000+ occurrences, and ContractsController.Details rendered
+    // every one into an unpaginated HTML table, producing a ~200MB response that hangs the
+    // requesting browser and burns server memory/CPU building it — a real DoS vector, not just a
+    // usability nit.
+    private const int MaxOccurrences = 2000;
+
     public static List<DateTime> ComputeOccurrenceDueDates(DateTime startDate, DateTime endDate, string cadence)
     {
         var dates = new List<DateTime>();
         var start = startDate.Date;
         var end = endDate.Date;
-        for (var step = 0; ; step++)
+        for (var step = 0; step < MaxOccurrences; step++)
         {
             var occurrence = cadence switch
             {
