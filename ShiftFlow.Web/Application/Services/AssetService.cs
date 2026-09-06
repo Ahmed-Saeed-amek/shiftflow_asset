@@ -29,8 +29,22 @@ public class AssetService : IAssetService
             throw new InvalidOperationException("Selected employee not found or is inactive.");
     }
 
+    // CategoryId/ZoneId are populated from dropdowns the same way AssignedToUserId is, and were
+    // just as unchecked: a direct POST with a stale/tampered id sailed past this service straight
+    // into SaveChangesAsync, where it hit the FK constraint and surfaced as an unhandled 500 with a
+    // raw SqlException (confirmed live) instead of the friendly validation error every other
+    // tampered-FK path in this controller already gets.
+    private async Task EnsureCategoryAndZoneExistAsync(int categoryId, int zoneId)
+    {
+        if (!await _db.AssetCategories.AnyAsync(c => c.Id == categoryId))
+            throw new InvalidOperationException("Selected category not found.");
+        if (!await _db.Zones.AnyAsync(z => z.Id == zoneId))
+            throw new InvalidOperationException("Selected zone not found.");
+    }
+
     public async Task<Asset> CreateAsync(Asset asset, string userId)
     {
+        await EnsureCategoryAndZoneExistAsync(asset.CategoryId, asset.ZoneId);
         await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         asset.CreatedByUserId = userId;
         asset.CreatedDate = DateTime.UtcNow;
@@ -57,6 +71,7 @@ public class AssetService : IAssetService
 
     public async Task UpdateAsync(Asset asset, string userId)
     {
+        await EnsureCategoryAndZoneExistAsync(asset.CategoryId, asset.ZoneId);
         await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         var existing = await _db.Assets.FindAsync(asset.Id) ?? throw new InvalidOperationException("Asset not found.");
         var oldValue = await SnapshotAsync(existing);
