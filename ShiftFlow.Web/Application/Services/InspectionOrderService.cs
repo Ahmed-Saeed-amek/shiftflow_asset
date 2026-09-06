@@ -35,6 +35,20 @@ public class InspectionOrderService : IInspectionOrderService
             throw new InvalidOperationException("This order type can only be assigned to a team, not an employee.");
     }
 
+    // A stale/tampered maintenance-action-type checkbox value otherwise hits the DB's Restrict FK
+    // constraint on InspectionItemMaintenanceActions.MaintenanceActionTypeId and raises an unhandled
+    // DbUpdateException — same bug class already guarded against for ActionType/Cause/VendorId/
+    // employeeUserId elsewhere (e.g. WorkOrderService.VendorBlockAsync's block-reason check). Confirmed
+    // live: posting a non-existent id to UpdateMaintenanceActions leaked a raw SQL FK-violation error.
+    private async Task EnsureMaintenanceActionTypesExistAsync(List<int>? maintenanceActionTypeIds)
+    {
+        if (maintenanceActionTypeIds is null || maintenanceActionTypeIds.Count == 0) return;
+        var distinctIds = maintenanceActionTypeIds.Distinct().ToList();
+        var existingCount = await _db.MaintenanceActionTypes.CountAsync(t => distinctIds.Contains(t.Id));
+        if (existingCount != distinctIds.Count)
+            throw new InvalidOperationException("One or more selected maintenance actions were not found.");
+    }
+
     public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
         List<int>? assetIds, DateTime? dueDate, string createdByUserId, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
@@ -222,6 +236,7 @@ public class InspectionOrderService : IInspectionOrderService
             ?? throw new InvalidOperationException("Inspection item not found.");
         if (outcome == "Pending" || !InspectionRunAsset.Outcomes.Contains(outcome))
             throw new InvalidOperationException("Invalid outcome.");
+        await EnsureMaintenanceActionTypesExistAsync(maintenanceActionTypeIds);
 
         var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
             .Select(r => r.InspectionOrderId).FirstAsync();
@@ -309,6 +324,7 @@ public class InspectionOrderService : IInspectionOrderService
     {
         var item = await _db.InspectionRunAssets.FindAsync(itemId)
             ?? throw new InvalidOperationException("Inspection item not found.");
+        await EnsureMaintenanceActionTypesExistAsync(maintenanceActionTypeIds);
 
         var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
             .Select(r => r.InspectionOrderId).FirstAsync();
