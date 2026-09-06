@@ -99,13 +99,16 @@ public class OrderTypesController : Controller
         // already gets blocked for above: RecurringOrderSchedulerService dedups against WorkOrders
         // for a RequiresVendor type but MaintenanceOrders/InspectionOrders otherwise, so flipping it
         // on an in-use schedule makes the dedup check start looking in the wrong table and
-        // re-generate every already-covered occurrence as a duplicate. Block both on an in-use
-        // schedule rather than leave an admin wondering why occurrences doubled up or a schedule
-        // silently stopped producing orders.
-        if ((type.AssignmentMode != vm.AssignmentMode || type.RequiresVendor != vm.RequiresVendor)
+        // re-generate every already-covered occurrence as a duplicate. AllowsMultipleAssets can't
+        // safely flip false either, once a schedule has more than one linked asset: the Edit form's
+        // single-asset picker would only ever post that one asset back, silently unlinking the rest
+        // on the next save. Block all three on an in-use schedule rather than leave an admin
+        // wondering why occurrences doubled up, a schedule stopped producing orders, or an edit
+        // quietly dropped assets.
+        if ((type.AssignmentMode != vm.AssignmentMode || type.RequiresVendor != vm.RequiresVendor || type.AllowsMultipleAssets != vm.AllowsMultipleAssets)
             && await _db.RecurringOrders.AnyAsync(r => r.OrderTypeId == vm.Id))
         {
-            TempData["Error"] = $"'{type.Name}' has a recurring schedule using it — Assign To and Requires Vendor can't be changed while a schedule references it.";
+            TempData["Error"] = $"'{type.Name}' has a recurring schedule using it — Assign To, Requires Vendor and Assets can't be changed while a schedule references it.";
             return RedirectToAction(nameof(Index));
         }
         type.Name = vm.Name; type.NameAr = vm.NameAr; type.Prefix = vm.Prefix;

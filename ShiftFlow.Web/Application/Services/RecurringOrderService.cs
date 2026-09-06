@@ -61,6 +61,13 @@ public class RecurringOrderService : IRecurringOrderService
 
         if (assetIds.Count == 0)
             throw new InvalidOperationException("Select at least one asset.");
+        // Mirrors OrdersController.Create's cardinality resolution: an AllowsMultipleAssets-false type
+        // (e.g. Maintenance, tied to spare-part usage per asset) is limited to exactly one asset. The
+        // controller already resolves this server-side from the OrderType's own flag rather than
+        // trusting whichever picker the client posted — this is the defense-in-depth backstop against
+        // a raw/tampered POST bypassing that resolution.
+        if (!orderType.AllowsMultipleAssets && assetIds.Count > 1)
+            throw new InvalidOperationException("This order type only supports a single asset — select just one.");
         if (await _db.Assets.CountAsync(a => assetIds.Contains(a.Id)) != assetIds.Distinct().Count())
             throw new InvalidOperationException("One or more selected assets were not found.");
         if (await _db.Assets.AnyAsync(a => assetIds.Contains(a.Id) && a.Status == "Retired"))

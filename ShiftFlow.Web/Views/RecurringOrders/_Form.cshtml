@@ -89,7 +89,17 @@
                 </div>
                 <div class="col-12">
                     <label class="form-label small">@Loc.T("Assets")</label>
-                    <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
+                    @* Cardinality is a property of the selected OrderType (AllowsMultipleAssets), same
+                       as Orders/Create.cshtml — Maintenance (tied to spare-part usage per asset) gets
+                       the single-asset picker, Inspection/Quick Check get the multi-asset one. Both
+                       pickers are always rendered; roOrderTypeMeta's applyCardinality below toggles
+                       which one is visible/posted. *@
+                    <div id="roAssetSingleWrap">
+                        <partial name="_AssetSinglePicker" model="@(new AssetSinglePickerModel{Name="AssetId",SelectedId=Model.AssetId > 0 ? Model.AssetId : null,SelectedLabel=(string?)ViewBag.SelectedAssetLabel})" />
+                    </div>
+                    <div id="roAssetMultiWrap">
+                        <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
+                    </div>
                 </div>
             </div>
             <div class="mt-4 d-flex gap-2">
@@ -100,10 +110,16 @@
     </div>
 </div>
 <script>
-    // [orderTypeId]: { requiresVendor, assignmentMode } — mirrors Orders/Create.cshtml's meta map, so
-    // this form can't submit an employee against a TeamOnly type (or vice versa), and shows/requires
-    // the Vendor field only for a RequiresVendor type, same rules RecurringOrderService enforces server-side.
-    const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.RequiresVendor, assignmentMode = t.AssignmentMode })));
+    // [orderTypeId]: { requiresVendor, allowsMultipleAssets, assignmentMode } — mirrors Orders/Create.cshtml's
+    // meta map, so this form can't submit an employee against a TeamOnly type (or vice versa), shows/requires
+    // the Vendor field only for a RequiresVendor type, and switches asset pickers by cardinality — same
+    // rules RecurringOrderService/RecurringOrdersController enforce server-side.
+    const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.RequiresVendor, allowsMultipleAssets = t.AllowsMultipleAssets, assignmentMode = t.AssignmentMode })));
+
+    const roAssetSingleWrap = document.getElementById('roAssetSingleWrap');
+    const roAssetMultiWrap = document.getElementById('roAssetMultiWrap');
+    const roAssetSingleHidden = roAssetSingleWrap.querySelector('[data-ap-value]');
+    const roAssetMultiChips = roAssetMultiWrap.querySelector('[data-chips]');
 
     function applyRoAssigneeType() {
         const showUser = document.getElementById('roAssigneeUser').checked;
@@ -112,11 +128,22 @@
     }
     document.querySelectorAll('input[name="roAssigneeType"]').forEach(r => r.addEventListener('change', applyRoAssigneeType));
 
+    function applyRoCardinality(allowsMultiple) {
+        roAssetSingleWrap.classList.toggle('d-none', allowsMultiple);
+        roAssetMultiWrap.classList.toggle('d-none', !allowsMultiple);
+        // Clear whichever picker is now hidden — same reasoning as Orders/Create.cshtml's
+        // applyCardinality — so a stale value from switching order types never posts alongside the
+        // visible picker's selection.
+        if (allowsMultiple && roAssetSingleHidden) roAssetSingleHidden.value = '';
+        if (!allowsMultiple && roAssetMultiChips) roAssetMultiChips.innerHTML = '';
+    }
+
     function applyRoOrderTypeMeta() {
-        const meta = roOrderTypeMeta[document.getElementById('roOrderTypeId').value] || { requiresVendor: false, assignmentMode: 'Either' };
+        const meta = roOrderTypeMeta[document.getElementById('roOrderTypeId').value] || { requiresVendor: false, allowsMultipleAssets: false, assignmentMode: 'Either' };
         const userRadio = document.getElementById('roAssigneeUser');
         const teamRadio = document.getElementById('roAssigneeTeam');
         document.getElementById('roVendorWrap').classList.toggle('d-none', !meta.requiresVendor);
+        applyRoCardinality(!!meta.allowsMultipleAssets);
         if (meta.requiresVendor) {
             // A vendor-routed work order has no team-assignment concept — force employee-only.
             userRadio.checked = true; userRadio.disabled = false; teamRadio.disabled = true;

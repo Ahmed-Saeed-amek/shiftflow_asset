@@ -378,6 +378,13 @@ public class RecurringOrderViewModel : IValidatableObject
 {
     public int Id { get; set; }
     [Required] public int OrderTypeId { get; set; }
+    /// <summary>Posted by the single-asset picker when the picked OrderType.AllowsMultipleAssets is
+    /// false (e.g. Maintenance, which is tied to spare-part usage per asset) — RecurringOrdersController
+    /// resolves which of AssetId/AssetIds actually applies server-side from the OrderType's own flag,
+    /// the same way OrdersController.Create does, rather than trusting whichever field the client posted.</summary>
+    public int AssetId { get; set; }
+    /// <summary>Posted by the multi-asset picker when the picked OrderType.AllowsMultipleAssets is true
+    /// (e.g. Inspection, Quick Check).</summary>
     public List<int>? AssetIds { get; set; }
     /// <summary>Snapshot of the linked assets this form was loaded with (Edit only) — lets
     /// RecurringOrderService.UpdateAsync detect a concurrent edit instead of silently discarding it.
