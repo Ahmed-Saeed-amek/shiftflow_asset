@@ -454,6 +454,17 @@ body.sidebar-locked { overflow: hidden; }
    multiple lines. */
 .nav-tabs.overflow-x-auto .nav-item { flex-shrink: 0; }
 
+/* Row-action button clusters (Users, and every other list page following the same
+   d-flex/gap-1 convention) measured a 4px gap between adjacent .btn-sm icons — under the 8px
+   minimum a touch target needs from its neighbor to avoid mis-taps, and more likely to matter
+   now that .btn-sm is 44px tall at this same breakpoint. Scoped to gap-1 wrappers that actually
+   contain a button (:has(), same technique already used below for .table-card-stack) rather
+   than overriding .gap-1 globally — it's also used for non-button spacing (form layouts, chip
+   pickers) where 4px is an intentional, unrelated design choice. */
+@media (max-width: 991.98px) {
+  .gap-1:has(.btn) { gap: .5rem !important; }
+}
+
 /* Task-row status select (see Shift.cshtml) — fixed 130px reads fine once
    the row has wrapped onto its own line at narrow widths (flex-wrap on the
    task-row), but should still cap out rather than stretch full-width next
