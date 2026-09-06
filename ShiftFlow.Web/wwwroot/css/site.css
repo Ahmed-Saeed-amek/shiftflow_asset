@@ -655,3 +655,20 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
    target needs to be reliably tappable without also hitting the chip label next to it. Keep the
    glyph's visual size (background-size is fixed at 1em, unaffected) but pad out the box. */
 [data-chip] .btn-close-sm { padding: .7rem; }
+
+/* Respect the OS-level "reduce motion" preference — nothing in this file checked for it before,
+   despite several hover/transform transitions (card hover-lift, avatar bubble scale, sidebar
+   collapse, nav-link hover) plus Bootstrap's own JS-driven fades/collapses. Near-zero duration
+   rather than `transition: none`/`animation: none` outright: keeps transitionend/animationend
+   still firing (nothing in site.js currently listens for either, but Bootstrap's own collapse/
+   modal/dropdown JS does internally, and disabling the property entirely can leave that code
+   waiting on an event that never comes instead of resolving instantly). scroll-behavior is
+   included since smooth-scrolling itself is motion, even with no transition/animation involved. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
