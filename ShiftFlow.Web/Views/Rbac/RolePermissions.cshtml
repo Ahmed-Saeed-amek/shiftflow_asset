@@ -34,7 +34,7 @@
     @Html.AntiForgeryToken()
     @* Snapshot of what's actually granted right now — lets SaveRolePermissions detect a concurrent
        edit (someone else changed this role's permissions since this page loaded) instead of
-       silently discarding their change the way the round-19 Team-membership bug did. *@
+       silently discarding their change the way the round-19 Group-membership bug did. *@
     @foreach (var perm in rolePerms)
     {
         <input type="hidden" name="originalGranted" value="@perm" />

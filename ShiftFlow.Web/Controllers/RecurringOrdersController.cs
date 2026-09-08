@@ -37,7 +37,7 @@ public class RecurringOrdersController : Controller
             .Include(r => r.OrderType)
             .Include(r => r.AssetLinks)
             .Include(r => r.AssignedToUser)
-            .Include(r => r.AssignedToTeam)
+            .Include(r => r.AssignedToGroup)
             .Include(r => r.Vendor)
             .OrderByDescending(r => r.CreatedDate)
             .ToListAsync();
@@ -62,7 +62,7 @@ public class RecurringOrdersController : Controller
             {
                 OrderTypeId = vm.OrderTypeId,
                 AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
-                AssignedToTeamId = vm.AssignedToTeamId,
+                AssignedToGroupId = vm.AssignedToGroupId,
                 VendorId = vm.VendorId,
                 Cadence = vm.Cadence,
                 StartDate = vm.StartDate.Date,
@@ -106,7 +106,7 @@ public class RecurringOrdersController : Controller
             AssetIds = linkedAssetIds,
             OriginalAssetIds = linkedAssetIds,
             AssignedToUserId = schedule.AssignedToUserId,
-            AssignedToTeamId = schedule.AssignedToTeamId,
+            AssignedToGroupId = schedule.AssignedToGroupId,
             VendorId = schedule.VendorId,
             Cadence = schedule.Cadence,
             StartDate = schedule.StartDate,
@@ -127,7 +127,7 @@ public class RecurringOrdersController : Controller
                 Id = vm.Id,
                 OrderTypeId = vm.OrderTypeId,
                 AssignedToUserId = string.IsNullOrEmpty(vm.AssignedToUserId) ? null : vm.AssignedToUserId,
-                AssignedToTeamId = vm.AssignedToTeamId,
+                AssignedToGroupId = vm.AssignedToGroupId,
                 VendorId = vm.VendorId,
                 Cadence = vm.Cadence,
                 StartDate = vm.StartDate.Date,
@@ -168,7 +168,7 @@ public class RecurringOrdersController : Controller
     private async Task PopulateLookupsAsync(RecurringOrderViewModel? vm = null)
     {
         ViewBag.OrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
-        ViewBag.Teams = await _db.Teams.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
+        ViewBag.Groups = await _db.Groups.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
         ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
@@ -176,7 +176,7 @@ public class RecurringOrdersController : Controller
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         // Redisplay after a failed POST needs the picker's search box populated with a name, not
         // just the hidden AssignedToUserId, otherwise the box goes blank even though the submitted
-        // selection is still there under the hood — same as Teams'/UserAssetScopes' redisplay fix.
+        // selection is still there under the hood — same as Groups'/UserAssetScopes' redisplay fix.
         string? assignedToUserId = vm?.AssignedToUserId;
         if (!string.IsNullOrEmpty(assignedToUserId) && ViewBag.SelectedEmployeeLabel == null)
         {

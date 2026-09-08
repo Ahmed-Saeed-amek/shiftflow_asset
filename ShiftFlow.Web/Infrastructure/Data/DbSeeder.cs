@@ -441,6 +441,24 @@ public static class DbSeeder
 
     private static async Task SeedPermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> rm)
     {
+        // Team -> Group rename: carry over any already-seeded grants/overrides under the old
+        // "Team.View"/"Team.Manage" codes instead of losing them (a straight reseed under the new
+        // names would leave a role that already had Team.Manage granted with nothing, since the
+        // top-up logic below only ADDS missing rows, it doesn't know "Team.Manage" and "Group.Manage"
+        // are the same permission under a new name).
+        var teamToGroupRename = new Dictionary<string, string> { ["Team.View"] = "Group.View", ["Team.Manage"] = "Group.Manage" };
+        foreach (var (oldName, newName) in teamToGroupRename)
+        {
+            var stalePermission = await db.Permissions.FirstOrDefaultAsync(p => p.Name == oldName);
+            if (stalePermission != null) stalePermission.Name = newName;
+            var staleGrants = await db.RolePermissions.Where(rp => rp.PermissionName == oldName).ToListAsync();
+            foreach (var g in staleGrants) g.PermissionName = newName;
+            var staleOverrides = await db.UserPermissions.Where(up => up.PermissionName == oldName).ToListAsync();
+            foreach (var o in staleOverrides) o.PermissionName = newName;
+            if (stalePermission != null || staleGrants.Count > 0 || staleOverrides.Count > 0)
+                await db.SaveChangesAsync();
+        }
+
         var catalog = new[]
         {
             new Permission { Name = "User.View",          Category = "Users", Description = "See the list of user accounts, their roles, and profile details" },
@@ -449,11 +467,11 @@ public static class DbSeeder
             // Inspection Orders
             new Permission { Name = "InspectionOrder.View",         Category = "Inspection Orders", Description = "See all inspection orders across the organization" },
             new Permission { Name = "InspectionOrder.Manage",       Category = "Inspection Orders", Description = "Create and cancel inspection orders" },
-            new Permission { Name = "InspectionOrder.Report",       Category = "Inspection Orders", Description = "Report an asset's inspection outcome on an order assigned to you or your team" },
+            new Permission { Name = "InspectionOrder.Report",       Category = "Inspection Orders", Description = "Report an asset's inspection outcome on an order assigned to you or your group" },
             new Permission { Name = "InspectionOrder.Export",       Category = "Inspection Orders", Description = "Export the inspection order list to Excel" },
-            // Teams
-            new Permission { Name = "Team.View",                    Category = "Teams", Description = "See the list of teams and their members" },
-            new Permission { Name = "Team.Manage",                  Category = "Teams", Description = "Create teams and manage their membership" },
+            // Groups
+            new Permission { Name = "Group.View",                    Category = "Groups", Description = "See the list of groups and their members" },
+            new Permission { Name = "Group.Manage",                  Category = "Groups", Description = "Create groups and manage their membership" },
             // AI Assistant
             new Permission { Name = "AiAssistant.Use",              Category = "AI Assistant", Description = "Access the AI assistant for inspection-order-related questions and actions" },
             // Administration
@@ -514,7 +532,7 @@ public static class DbSeeder
                 "System.IsAdmin",
                 "User.Manage", "User.View",
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
-                "Team.View", "Team.Manage",
+                "Group.View", "Group.Manage",
                 "AiAssistant.Use",
                 "AuditLog.View", "Rbac.Manage",
                 "Asset.View", "Asset.Manage", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
@@ -528,7 +546,7 @@ public static class DbSeeder
             [
                 "User.View",
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
-                "Team.View", "Team.Manage",
+                "Group.View", "Group.Manage",
                 "AiAssistant.Use",
                 // AssetCategory.Manage and OrderType.Manage were missing despite this role already
                 // holding Asset.Manage / WorkOrder.Manage / MaintenanceOrder.Manage — a fresh-eyes
@@ -547,7 +565,7 @@ public static class DbSeeder
             ["Supervisor"] =
             [
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report",
-                "Team.View",
+                "Group.View",
                 "Asset.View", "Asset.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
@@ -557,7 +575,7 @@ public static class DbSeeder
             ],
             ["Section Head"] =
             [
-                "InspectionOrder.View", "Team.View",
+                "InspectionOrder.View", "Group.View",
                 "Asset.View", "Vendor.View", "WorkOrder.View",
                 "MaintenanceOrder.View",
                 "SparePart.View",
@@ -592,14 +610,14 @@ public static class DbSeeder
             ],
             ["HR"] =
             [
-                // View-only: employee directory and team rosters — the actual point of an "HR"
-                // role. Deliberately not User.Manage or Team.Manage; account creation/deactivation
-                // and team membership changes stay with whoever already holds those (Admin) rather
+                // View-only: employee directory and group rosters — the actual point of an "HR"
+                // role. Deliberately not User.Manage or Group.Manage; account creation/deactivation
+                // and group membership changes stay with whoever already holds those (Admin) rather
                 // than assumed onto HR here. Asset.View was dropped after three separate fresh-eyes
                 // reviews independently flagged HR seeing full operational asset/work-order/
                 // inspection-history data (and the Asset Categories/Locations config submenu it
                 // unlocks) as a permission-scope leak with no HR use case — see the removal below.
-                "User.View", "Team.View",
+                "User.View", "Group.View",
             ],
         };
 
@@ -646,7 +664,7 @@ public static class DbSeeder
 
         // The entire shift-scheduling/rostering subsystem (Schedule.*, Group.Member.Manage,
         // ChangeRequest.*, ShiftOps.*, ShiftAnalytics.View) was retired in favor of Inspection
-        // Orders/Teams. Clean up every grant, override, and catalog row left over from earlier
+        // Orders/Groups. Clean up every grant, override, and catalog row left over from earlier
         // seeded runs — same pattern as the other stale-permission cleanups in this method.
         var retiredShiftPermissionPrefixes = new[] { "Schedule.", "Group.Member.", "ChangeRequest.", "ShiftOps.", "ShiftAnalytics." };
         var allPermissionNames = await db.Permissions.Select(p => p.Name).ToListAsync();

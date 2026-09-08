@@ -14,11 +14,11 @@ public class OrderCreateVm
     [Required] public int OrderTypeId { get; set; }
     public DateTime? DueDate { get; set; }
 
-    /// <summary>"User" or "Team" — which side of the toggle is active when AssignmentMode=="Either".
-    /// Ignored (server re-derives from OrderType.AssignmentMode) when the mode is EmployeeOnly/TeamOnly.</summary>
-    public string AssigneeType { get; set; } = "Team";
+    /// <summary>"User" or "Group" — which side of the toggle is active when AssignmentMode=="Either".
+    /// Ignored (server re-derives from OrderType.AssignmentMode) when the mode is EmployeeOnly/GroupOnly.</summary>
+    public string AssigneeType { get; set; } = "Group";
     public string? AssignedToUserId { get; set; }
-    public int? AssignedToTeamId { get; set; }
+    public int? AssignedToGroupId { get; set; }
 
     /// <summary>Used when the type's AllowsMultipleAssets is false.</summary>
     public int AssetId { get; set; }
@@ -42,7 +42,7 @@ public sealed class InspectionOrderRow
 }
 
 /// <summary>One row on the unified "My Orders" page — combines Inspection Orders, Maintenance
-/// Orders, and Work Orders assigned to the current user (or their team, for Inspection Orders)
+/// Orders, and Work Orders assigned to the current user (or their group, for Inspection Orders)
 /// into a single list, with Category identifying which one it actually is. Replaces what used to
 /// be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work Orders).</summary>
 public sealed class MyWorkOrderRow
@@ -67,7 +67,7 @@ public sealed class MyWorkOrderRow
     public DateTime CreatedAt { get; init; }
     /// <summary>Controller to route "View" to — InspectionOrders / MaintenanceOrders / WorkOrders.</summary>
     public string DetailsController { get; init; } = "";
-    /// <summary>Assignee display text (a name, "Team: X", or null) — only populated where the
+    /// <summary>Assignee display text (a name, "Group: X", or null) — only populated where the
     /// caller needs to show who an order belongs to (e.g. an org-wide recent-orders feed).</summary>
     public string? AssignedToLabel { get; init; }
 }

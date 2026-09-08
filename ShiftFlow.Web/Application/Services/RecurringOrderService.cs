@@ -23,41 +23,41 @@ public class RecurringOrderService : IRecurringOrderService
             throw new InvalidOperationException("Invalid cadence.");
 
         var hasUser = !string.IsNullOrEmpty(schedule.AssignedToUserId);
-        var hasTeam = schedule.AssignedToTeamId.HasValue;
+        var hasGroup = schedule.AssignedToGroupId.HasValue;
         if (orderType.RequiresVendor)
         {
             // Mirrors OrdersController.Create's manual RequiresVendor branch exactly: needs an
-            // individual employee overseeing the vendor's work (no team-assignment concept for a
+            // individual employee overseeing the vendor's work (no group-assignment concept for a
             // vendor-routed work order) plus the vendor itself.
-            if (!hasUser || hasTeam)
-                throw new InvalidOperationException("This order type requires a vendor, which needs an individual employee assignee — team assignment isn't supported for vendor-routed work orders yet.");
+            if (!hasUser || hasGroup)
+                throw new InvalidOperationException("This order type requires a vendor, which needs an individual employee assignee — group assignment isn't supported for vendor-routed work orders yet.");
             if (schedule.VendorId == null || !await _db.Vendors.AnyAsync(v => v.Id == schedule.VendorId && v.Status == "Active"))
                 throw new InvalidOperationException("Selected vendor not found or inactive.");
         }
         else
         {
-            if (hasUser == hasTeam)
-                throw new InvalidOperationException("Exactly one assignee (employee or team) is required.");
+            if (hasUser == hasGroup)
+                throw new InvalidOperationException("Exactly one assignee (employee or group) is required.");
             schedule.VendorId = null;
         }
         // Same as RecurringOrdersController's old check: can't just silently drop whichever side the
-        // OrderType's AssignmentMode disallows — reject the mismatch instead so a TeamOnly type never
+        // OrderType's AssignmentMode disallows — reject the mismatch instead so a GroupOnly type never
         // ends up with an individual employee baked into every future occurrence. RequiresVendor
-        // overrides AssignmentMode's team preference entirely (handled above), so TeamOnly doesn't
+        // overrides AssignmentMode's group preference entirely (handled above), so GroupOnly doesn't
         // apply once a type is also vendor-required.
-        if (orderType.AssignmentMode == "EmployeeOnly" && hasTeam)
-            throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to an employee, not a team.");
-        if (orderType.AssignmentMode == "TeamOnly" && hasUser && !orderType.RequiresVendor)
-            throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to a team, not an employee.");
+        if (orderType.AssignmentMode == "EmployeeOnly" && hasGroup)
+            throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to an employee, not a group.");
+        if (orderType.AssignmentMode == "GroupOnly" && hasUser && !orderType.RequiresVendor)
+            throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to a group, not an employee.");
 
         // Same bug class as ContractService's VendorId/AssetId checks: a stale multi-select or
-        // tampered POST with a non-existent employee/team id otherwise hits the DB's FK constraint
-        // on RecurringOrders.AssignedToUserId/AssignedToTeamId and raises an unhandled
+        // tampered POST with a non-existent employee/group id otherwise hits the DB's FK constraint
+        // on RecurringOrders.AssignedToUserId/AssignedToGroupId and raises an unhandled
         // DbUpdateException instead of a clean message.
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == schedule.AssignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == schedule.AssignedToTeamId))
-            throw new InvalidOperationException("Selected team not found.");
+        if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == schedule.AssignedToGroupId))
+            throw new InvalidOperationException("Selected group not found.");
 
         if (assetIds.Count == 0)
             throw new InvalidOperationException("Select at least one asset.");
@@ -108,7 +108,7 @@ public class RecurringOrderService : IRecurringOrderService
 
         existing.OrderTypeId = schedule.OrderTypeId;
         existing.AssignedToUserId = schedule.AssignedToUserId;
-        existing.AssignedToTeamId = schedule.AssignedToTeamId;
+        existing.AssignedToGroupId = schedule.AssignedToGroupId;
         existing.VendorId = schedule.VendorId;
         existing.Cadence = schedule.Cadence;
         existing.StartDate = schedule.StartDate;

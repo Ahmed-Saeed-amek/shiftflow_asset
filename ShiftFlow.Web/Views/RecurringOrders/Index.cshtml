@@ -21,7 +21,7 @@
                         <td>@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</td>
                         <td class="small">@r.AssetLinks.Count</td>
                         <td class="small d-none d-md-table-cell">
-                            @(r.AssignedToUser?.FullName ?? (r.AssignedToTeam != null ? Loc.T("Team") + ": " + r.AssignedToTeam.Name : "—"))
+                            @(r.AssignedToUser?.FullName ?? (r.AssignedToGroup != null ? Loc.T("Group") + ": " + r.AssignedToGroup.Name : "—"))
                             @if (r.Vendor != null)
                             {
                                 <span class="text-muted"> · @r.Vendor.Name</span>

@@ -24,10 +24,10 @@ public sealed class EmployeeProfileViewModel
 
     public List<InspectionOrderRow> Orders { get; init; } = new();
     public List<EmpAuditRow>        AuditLog { get; init; } = new();
-    public List<EmpTeamRow> Teams { get; init; } = new();
+    public List<EmpGroupRow> Groups { get; init; } = new();
 }
 
-public sealed class EmpTeamRow
+public sealed class EmpGroupRow
 {
     public int      Id     { get; init; }
     public string   Name   { get; init; } = "";

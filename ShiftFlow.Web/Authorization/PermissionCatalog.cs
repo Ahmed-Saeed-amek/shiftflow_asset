@@ -16,9 +16,9 @@ public static class PermissionCatalog
     public const string InspectionOrderReport = "InspectionOrder.Report";
     public const string InspectionOrderExport = "InspectionOrder.Export";
 
-    // ── Teams ──────────────────────────────────────────────────────────────────
-    public const string TeamView              = "Team.View";
-    public const string TeamManage            = "Team.Manage";
+    // ── Groups ──────────────────────────────────────────────────────────────────
+    public const string GroupView              = "Group.View";
+    public const string GroupManage            = "Group.Manage";
 
     // ── AI Assistant ────────────────────────────────────────────────────────────
     public const string AiAssistantUse              = "AiAssistant.Use";
@@ -66,7 +66,7 @@ public static class PermissionCatalog
     [
         UserManage, UserView,
         InspectionOrderView, InspectionOrderManage, InspectionOrderReport, InspectionOrderExport,
-        TeamView, TeamManage,
+        GroupView, GroupManage,
         AiAssistantUse,
         AuditLogView,
         RbacManage,

@@ -247,7 +247,7 @@ public class RbacController : Controller
             .Select(rp => rp.PermissionName)
             .ToHashSet();
 
-        // Same lost-update race round 19 fixed for Team membership: this diffs the posted list
+        // Same lost-update race round 19 fixed for Group membership: this diffs the posted list
         // against whatever is live in the DB right now, with no check that the submitting admin's
         // page actually reflected that state — a concurrent grant/revoke by someone else gets
         // silently treated as "unchecked" and wiped out. Reject a stale submit instead (confirmed
@@ -331,7 +331,7 @@ public class RbacController : Controller
         var allPerms = PermissionCatalog.All;
         var existingOverrides = await _permissions.GetUserPermissionOverridesAsync(userId);
 
-        // Same lost-update race fixed for Team membership (round 19) and role permissions above —
+        // Same lost-update race fixed for Group membership (round 19) and role permissions above —
         // reject a submit whose snapshot of what was actually in effect no longer matches the DB.
         if (originalAllowList != null && originalDenyList != null)
         {

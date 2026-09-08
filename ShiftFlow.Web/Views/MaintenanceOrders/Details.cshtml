@@ -62,7 +62,7 @@
             <div class="card-body">
                 <dl class="row small mb-0 gy-2">
                     <dt class="col-5 text-muted fw-normal">@Loc.T("Assigned To")</dt>
-                    <dd class="col-7 text-end mb-0">@(Model.AssignedToUser?.FullName ?? (Model.AssignedToTeam != null ? $"{Loc.T("Team")}: {Model.AssignedToTeam.Name}" : "—"))</dd>
+                    <dd class="col-7 text-end mb-0">@(Model.AssignedToUser?.FullName ?? (Model.AssignedToGroup != null ? $"{Loc.T("Group")}: {Model.AssignedToGroup.Name}" : "—"))</dd>
                     <dt class="col-5 text-muted fw-normal">@Loc.T("Created By")</dt>
                     <dd class="col-7 text-end mb-0">@(Model.CreatedByUser?.FullName ?? "—")</dd>
                     @if (Model.DueDate.HasValue)
@@ -224,9 +224,9 @@
                                 <div style="min-width:220px" class="flex-grow-1">
                                     <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
                                 </div>
-                                <select name="assignedToTeamId" class="form-select form-select-sm" style="max-width:200px">
-                                    <option value="">@Loc.T("— or select a team —")</option>
-                                    @foreach (var t in (List<Team>)(ViewBag.Teams ?? new List<Team>()))
+                                <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px">
+                                    <option value="">@Loc.T("— or select a group —")</option>
+                                    @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
                                     {
                                         <option value="@t.Id">@t.Name</option>
                                     }

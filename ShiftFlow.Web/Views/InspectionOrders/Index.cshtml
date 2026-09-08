@@ -13,7 +13,7 @@
     if (canManage) actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm me-2'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
     if (canExport) actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Export") + "</a>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Inspection Orders"),Subtitle=Loc.T("Assign inspections to employees or teams"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Inspection Orders"),Subtitle=Loc.T("Assign inspections to employees or groups"),ActionsHtml=actionsHtml})" />
 
 @if (overdue)
 {
@@ -62,7 +62,7 @@
                         <tr>
                             <td class="fw-semibold">@o.OrderNumber</td>
                             <td class="d-none d-lg-table-cell"><partial name="_StatusBadge" model="@o.OrderType?.Name" /></td>
-                            <td>@(o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? Loc.T("Team") + ": " + o.AssignedToTeam.Name : "—"))</td>
+                            <td>@(o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? Loc.T("Group") + ": " + o.AssignedToGroup.Name : "—"))</td>
                             <td><partial name="_StatusBadge" model="@o.Status" /></td>
                             <td class="d-none d-xl-table-cell">@items.Count(i => i.Outcome != "Pending")/@items.Count</td>
                             <td class="d-none d-md-table-cell">@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>

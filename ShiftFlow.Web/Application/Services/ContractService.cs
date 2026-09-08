@@ -55,7 +55,7 @@ public class ContractService : IContractService
     {
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
-        // Same lost-update race rounds 19-20 fixed for Team membership and RBAC permissions: this
+        // Same lost-update race rounds 19-20 fixed for Group membership and RBAC permissions: this
         // diffs the posted asset list against whatever is live in ContractAssets right now, with no
         // check that the editor's page snapshot is still current — a concurrent edit's asset link
         // gets silently deleted by an unrelated save (confirmed live: Admin B's Notes-only edit

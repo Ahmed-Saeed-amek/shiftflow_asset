@@ -2,7 +2,7 @@
 @using ShiftFlow.Domain.Entities
 @{
     var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
-    var teams = (List<Team>)ViewBag.Teams;
+    var groups = (List<Group>)ViewBag.Groups;
     var vendors = (List<Vendor>)ViewBag.Vendors;
 }
 <div class="card border-0 shadow-sm">
@@ -43,17 +43,17 @@
                     <div class="btn-group btn-group-sm mb-2" role="group" id="roAssigneeToggle">
                         <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeUser" value="User" checked />
                         <label class="btn btn-outline-secondary" for="roAssigneeUser">@Loc.T("Employee")</label>
-                        <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeTeam" value="Team" />
-                        <label class="btn btn-outline-secondary" for="roAssigneeTeam">@Loc.T("Team")</label>
+                        <input type="radio" class="btn-check" name="roAssigneeType" id="roAssigneeGroup" value="Group" />
+                        <label class="btn btn-outline-secondary" for="roAssigneeGroup">@Loc.T("Group")</label>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-6" id="roAssigneeUserRow">
                             <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=(string?)ViewBag.SelectedEmployeeLabel})" />
                         </div>
-                        <div class="col-md-6 d-none" id="roAssigneeTeamRow">
-                            <select asp-for="AssignedToTeamId" class="form-select">
-                                <option value="">@Loc.T("Select a team")</option>
-                                @foreach (var t in teams)
+                        <div class="col-md-6 d-none" id="roAssigneeGroupRow">
+                            <select asp-for="AssignedToGroupId" class="form-select">
+                                <option value="">@Loc.T("Select a group")</option>
+                                @foreach (var t in groups)
                                 {
                                     <option value="@t.Id">@t.Name</option>
                                 }
@@ -111,7 +111,7 @@
 </div>
 <script>
     // [orderTypeId]: { requiresVendor, allowsMultipleAssets, assignmentMode } — mirrors Orders/Create.cshtml's
-    // meta map, so this form can't submit an employee against a TeamOnly type (or vice versa), shows/requires
+    // meta map, so this form can't submit an employee against a GroupOnly type (or vice versa), shows/requires
     // the Vendor field only for a RequiresVendor type, and switches asset pickers by cardinality — same
     // rules RecurringOrderService/RecurringOrdersController enforce server-side.
     const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.RequiresVendor, allowsMultipleAssets = t.AllowsMultipleAssets, assignmentMode = t.AssignmentMode })));
@@ -124,7 +124,7 @@
     function applyRoAssigneeType() {
         const showUser = document.getElementById('roAssigneeUser').checked;
         document.getElementById('roAssigneeUserRow').classList.toggle('d-none', !showUser);
-        document.getElementById('roAssigneeTeamRow').classList.toggle('d-none', showUser);
+        document.getElementById('roAssigneeGroupRow').classList.toggle('d-none', showUser);
     }
     document.querySelectorAll('input[name="roAssigneeType"]').forEach(r => r.addEventListener('change', applyRoAssigneeType));
 
@@ -141,27 +141,27 @@
     function applyRoOrderTypeMeta() {
         const meta = roOrderTypeMeta[document.getElementById('roOrderTypeId').value] || { requiresVendor: false, allowsMultipleAssets: false, assignmentMode: 'Either' };
         const userRadio = document.getElementById('roAssigneeUser');
-        const teamRadio = document.getElementById('roAssigneeTeam');
+        const groupRadio = document.getElementById('roAssigneeGroup');
         document.getElementById('roVendorWrap').classList.toggle('d-none', !meta.requiresVendor);
         applyRoCardinality(!!meta.allowsMultipleAssets);
         if (meta.requiresVendor) {
-            // A vendor-routed work order has no team-assignment concept — force employee-only.
-            userRadio.checked = true; userRadio.disabled = false; teamRadio.disabled = true;
+            // A vendor-routed work order has no group-assignment concept — force employee-only.
+            userRadio.checked = true; userRadio.disabled = false; groupRadio.disabled = true;
             document.getElementById('roAssigneeToggle').classList.add('d-none');
             applyRoAssigneeType();
             return;
         }
-        userRadio.disabled = meta.assignmentMode === 'TeamOnly';
-        teamRadio.disabled = meta.assignmentMode === 'EmployeeOnly';
+        userRadio.disabled = meta.assignmentMode === 'GroupOnly';
+        groupRadio.disabled = meta.assignmentMode === 'EmployeeOnly';
         document.getElementById('roAssigneeToggle').classList.toggle('d-none', meta.assignmentMode !== 'Either');
-        if (meta.assignmentMode === 'TeamOnly' && !teamRadio.checked) { teamRadio.checked = true; applyRoAssigneeType(); }
+        if (meta.assignmentMode === 'GroupOnly' && !groupRadio.checked) { groupRadio.checked = true; applyRoAssigneeType(); }
         if (meta.assignmentMode === 'EmployeeOnly' && !userRadio.checked) { userRadio.checked = true; applyRoAssigneeType(); }
     }
     applyRoOrderTypeMeta();
     applyRoAssigneeType();
 
-    @if (Model.AssignedToTeamId.HasValue)
+    @if (Model.AssignedToGroupId.HasValue)
     {
-        <text>document.getElementById('roAssigneeTeam').checked = true; applyRoAssigneeType();</text>
+        <text>document.getElementById('roAssigneeGroup').checked = true; applyRoAssigneeType();</text>
     }
 </script>

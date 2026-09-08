@@ -14,10 +14,10 @@ public static class MyWorkOrderRowBuilder
     public static async Task<List<MyWorkOrderRow>> BuildAsync(ApplicationDbContext db, ILanguageService loc,
         string userId, bool showAll, DateTime? from = null, DateTime? to = null)
     {
-        var myTeamIds = await db.TeamMembers.Where(m => m.UserId == userId).Select(m => m.TeamId).ToListAsync();
+        var myGroupIds = await db.GroupMembers.Where(m => m.UserId == userId).Select(m => m.GroupId).ToListAsync();
 
         var inspectionQuery = db.InspectionOrders.AsNoTracking()
-            .Where(o => o.AssignedToUserId == userId || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
+            .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)));
         if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done" && o.Status != "Cancelled");
         if (from.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt <= to.Value);
@@ -37,7 +37,7 @@ public static class MyWorkOrderRowBuilder
         }).ToList();
 
         var maintenanceQuery = db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset)
-            .Where(m => m.AssignedToUserId == userId || (m.AssignedToTeamId != null && myTeamIds.Contains(m.AssignedToTeamId.Value)));
+            .Where(m => m.AssignedToUserId == userId || (m.AssignedToGroupId != null && myGroupIds.Contains(m.AssignedToGroupId.Value)));
         if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == "Open");
         if (from.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate >= from.Value);
         if (to.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate <= to.Value);

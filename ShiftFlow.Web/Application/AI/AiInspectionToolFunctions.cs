@@ -9,18 +9,18 @@ namespace ShiftFlow.Application.AI;
 public class AiInspectionToolFunctions : IAiInspectionToolFunctions
 {
     private readonly IInspectionOrderService _orders;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly IDashboardService _dashboard;
     private readonly IWorkOrderService _workOrders;
     private readonly ApplicationDbContext _db;
     private readonly IPermissionService _permissions;
     private readonly IAssetScopeService _scope;
 
-    public AiInspectionToolFunctions(IInspectionOrderService orders, ITeamService teams,
+    public AiInspectionToolFunctions(IInspectionOrderService orders, IGroupService groups,
         IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db, IPermissionService permissions, IAssetScopeService scope)
     {
         _orders = orders;
-        _teams = teams;
+        _groups = groups;
         _dashboard = dashboard;
         _workOrders = workOrders;
         _db = db;
@@ -33,7 +33,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         id = o.Id,
         orderNumber = o.OrderNumber,
         status = o.Status,
-        assignedTo = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null),
+        assignedTo = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"Group: {o.AssignedToGroup.Name}" : null),
         dueDate = o.DueDate?.ToString("yyyy-MM-dd"),
         totalAssets = o.InspectionRun?.Items.Count ?? 0,
         checkedAssets = o.InspectionRun?.Items.Count(i => i.Outcome != "Pending") ?? 0,
@@ -57,19 +57,19 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         // full detail via the assistant, bypassing the identical restriction
         // InspectionOrdersController.Details enforces for the same data.
         var isManager = await _permissions.HasPermissionAsync(userId, PermissionCatalog.InspectionOrderManage);
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
-        if (!isManager && order.AssignedToUserId != userId && !isTeamMember)
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, userId);
+        if (!isManager && order.AssignedToUserId != userId && !isGroupMember)
             throw new InvalidOperationException("This inspection order isn't assigned to you.");
 
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — InspectionOrdersController.Details enforces this (round 12)
         // with no manager exception, so this tool must too, or the AI assistant becomes a
         // scope-bypass side channel for a scoped manager. Exempted for the order's own assignee/
-        // team member (same as the controller) — a scope narrowed/added after assignment must not
+        // group member (same as the controller) — a scope narrowed/added after assignment must not
         // lock them out of viewing their own already-assigned work.
-        var isAssigneeOrTeamMember = order.AssignedToUserId == userId || isTeamMember;
+        var isAssigneeOrGroupMember = order.AssignedToUserId == userId || isGroupMember;
         var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
-        if (!isAssigneeOrTeamMember && assetIds.Count > 0)
+        if (!isAssigneeOrGroupMember && assetIds.Count > 0)
         {
             var inScopeCount = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).CountAsync(a => assetIds.Contains(a.Id));
             if (inScopeCount != assetIds.Count) return new { error = "not_found", message = "Inspection order not found." };
@@ -82,7 +82,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
             description = order.Description,
             status = order.Status,
             dueDate = order.DueDate?.ToString("yyyy-MM-dd"),
-            assignedTo = order.AssignedToUser?.FullName ?? (order.AssignedToTeam != null ? $"Team: {order.AssignedToTeam.Name}" : null),
+            assignedTo = order.AssignedToUser?.FullName ?? (order.AssignedToGroup != null ? $"Group: {order.AssignedToGroup.Name}" : null),
             items = order.InspectionRun?.Items.Select(i => new
             {
                 itemId = i.Id,
@@ -101,7 +101,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         {
             openInspectionOrders = kpis.OpenInspectionOrders,
             inspectionOrdersOverdue = kpis.InspectionOrdersOverdue,
-            activeTeams = kpis.ActiveTeams,
+            activeGroups = kpis.ActiveGroups,
             totalEngineers = kpis.TotalEngineers,
             totalAssets = kpis.TotalAssets,
             defectiveAssets = kpis.DefectiveAssets,
@@ -122,27 +122,27 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         return new { results = users };
     }
 
-    public async Task<object> ListTeamsAsync(string userId, CancellationToken ct)
+    public async Task<object> ListGroupsAsync(string userId, CancellationToken ct)
     {
-        var teams = await _teams.GetAllAsync();
-        return new { teams = teams.Select(t => new { id = t.Id, name = t.Name, memberCount = t.Members.Count }) };
+        var groups = await _groups.GetAllAsync();
+        return new { groups = groups.Select(t => new { id = t.Id, name = t.Name, memberCount = t.Members.Count }) };
     }
 
-    public async Task<object> GetTeamDetailAsync(int teamId, string userId, CancellationToken ct)
+    public async Task<object> GetGroupDetailAsync(int groupId, string userId, CancellationToken ct)
     {
-        var team = await _teams.GetByIdAsync(teamId);
-        if (team == null) return new { error = "not_found", message = "Team not found." };
+        var group = await _groups.GetByIdAsync(groupId);
+        if (group == null) return new { error = "not_found", message = "Group not found." };
         return new
         {
-            id = team.Id,
-            name = team.Name,
-            isActive = team.IsActive,
-            members = team.Members.Select(m => new { userId = m.UserId, fullName = m.User.FullName }),
+            id = group.Id,
+            name = group.Name,
+            isActive = group.IsActive,
+            members = group.Members.Select(m => new { userId = m.UserId, fullName = m.User.FullName }),
         };
     }
 
     public async Task<object> CreateInspectionOrderAsync(string? description, string? assignedToUserId,
-        int? assignedToTeamId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct)
+        int? assignedToGroupId, int? zoneId, List<int>? assetIds, DateTime? dueDate, string userId, CancellationToken ct)
     {
         // zoneId is an AI-facing convenience ("inspect zone X") — resolve it to concrete asset ids
         // here since the service now always takes a resolved AssetIds list.
@@ -166,7 +166,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
             .Select(t => t.Id).FirstOrDefaultAsync(ct);
         if (orderTypeId == 0)
             throw new InvalidOperationException("No active inspection-style order type is configured.");
-        var order = await _orders.CreateAsync(orderTypeId, description, assignedToUserId, assignedToTeamId, resolvedAssetIds, dueDate, userId);
+        var order = await _orders.CreateAsync(orderTypeId, description, assignedToUserId, assignedToGroupId, resolvedAssetIds, dueDate, userId);
         return new { success = true, id = order.Id, orderNumber = order.OrderNumber };
     }
 
@@ -174,7 +174,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     {
         // InspectionOrderReport is a broad role permission (Engineer/Technician/etc.), not a
         // per-order grant — the human path (InspectionOrdersController.UpdateItem) additionally
-        // requires the caller be the order's assignee, a member of its assigned team, or hold
+        // requires the caller be the order's assignee, a member of its assigned group, or hold
         // InspectionOrder.Manage. Without the same check here, any holder of the broad permission
         // could ask the assistant to report outcomes on an item from an order assigned to someone
         // else entirely, which the equivalent UI action would 403.
@@ -184,8 +184,8 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         var order = item.InspectionRun.InspectionOrder;
         var isManager = await _permissions.HasPermissionAsync(userId, PermissionCatalog.InspectionOrderManage);
         var isAssignee = order.AssignedToUserId == userId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, userId);
-        if (!isManager && !isAssignee && !isTeamMember)
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, userId);
+        if (!isManager && !isAssignee && !isGroupMember)
             throw new InvalidOperationException("This inspection order isn't assigned to you.");
 
         int? workOrderId = null;
@@ -214,21 +214,21 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         return new { success = true };
     }
 
-    public async Task<object> CreateTeamAsync(string name, string? description, List<string>? memberUserIds, string userId, CancellationToken ct)
+    public async Task<object> CreateGroupAsync(string name, string? description, List<string>? memberUserIds, string userId, CancellationToken ct)
     {
-        var team = await _teams.CreateAsync(name, null, description, memberUserIds ?? [], userId);
-        return new { success = true, id = team.Id, name = team.Name };
+        var group = await _groups.CreateAsync(name, null, description, memberUserIds ?? [], userId);
+        return new { success = true, id = group.Id, name = group.Name };
     }
 
-    public async Task<object> AddTeamMemberAsync(int teamId, string memberUserId, string userId, CancellationToken ct)
+    public async Task<object> AddGroupMemberAsync(int groupId, string memberUserId, string userId, CancellationToken ct)
     {
-        await _teams.AddMemberAsync(teamId, memberUserId, userId);
+        await _groups.AddMemberAsync(groupId, memberUserId, userId);
         return new { success = true };
     }
 
-    public async Task<object> RemoveTeamMemberAsync(int teamId, string memberUserId, string userId, CancellationToken ct)
+    public async Task<object> RemoveGroupMemberAsync(int groupId, string memberUserId, string userId, CancellationToken ct)
     {
-        await _teams.RemoveMemberAsync(teamId, memberUserId, userId);
+        await _groups.RemoveMemberAsync(groupId, memberUserId, userId);
         return new { success = true };
     }
 }

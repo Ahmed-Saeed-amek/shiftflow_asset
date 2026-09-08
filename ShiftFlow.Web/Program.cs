@@ -161,7 +161,7 @@ builder.Services.AddHttpContextAccessor();
 
 // Application services
 builder.Services.AddScoped<IInspectionOrderService, InspectionOrderService>();
-builder.Services.AddScoped<ITeamService, TeamService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ILanguageService, LanguageService>();

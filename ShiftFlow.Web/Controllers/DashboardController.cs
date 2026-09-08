@@ -64,7 +64,7 @@ public class DashboardController : Controller
         // so the card and the list under it can never visibly disagree on the same page load.
         ViewBag.OverdueOrderCount = await overdueQuery.CountAsync();
         ViewBag.OverdueOrders = await overdueQuery
-            .Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam)
+            .Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup)
             .OrderBy(o => o.DueDate).Take(6).ToListAsync();
 
         return View(kpis);
@@ -76,7 +76,7 @@ public class DashboardController : Controller
     /// viewer's UserAssetScope, same as everywhere else scope is enforced (see Index above).</summary>
     private async Task<List<MyWorkOrderRow>> BuildRecentOrdersAsync(List<int>? scopedAssetIds)
     {
-        var inspectionQuery = _db.InspectionOrders.AsNoTracking().Include(o => o.AssignedToUser).Include(o => o.AssignedToTeam).AsQueryable();
+        var inspectionQuery = _db.InspectionOrders.AsNoTracking().Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup).AsQueryable();
         if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
         var inspectionRows = (await inspectionQuery
             .OrderByDescending(o => o.CreatedAt).Take(6)
@@ -86,11 +86,11 @@ public class DashboardController : Controller
                 Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
                 AssignedToLabel = o.AssignedToUser != null ? o.AssignedToUser.FullName
-                    : o.AssignedToTeam != null ? _loc.T("Team") + ": " + o.AssignedToTeam.Name : null,
+                    : o.AssignedToGroup != null ? _loc.T("Group") + ": " + o.AssignedToGroup.Name : null,
             })
             .ToList();
 
-        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.AssignedToUser).Include(m => m.AssignedToTeam).AsQueryable();
+        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.AssignedToUser).Include(m => m.AssignedToGroup).AsQueryable();
         if (scopedAssetIds != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssetIds.Contains(m.AssetId));
         var maintenanceRows = (await maintenanceQuery
             .OrderByDescending(m => m.CreatedDate).Take(6)
@@ -100,7 +100,7 @@ public class DashboardController : Controller
                 Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
                 Status = m.Status, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
                 AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName
-                    : m.AssignedToTeam != null ? _loc.T("Team") + ": " + m.AssignedToTeam.Name : null,
+                    : m.AssignedToGroup != null ? _loc.T("Group") + ": " + m.AssignedToGroup.Name : null,
             })
             .ToList();
 

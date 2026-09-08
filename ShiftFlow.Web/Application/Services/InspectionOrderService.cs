@@ -11,14 +11,14 @@ public class InspectionOrderService : IInspectionOrderService
 {
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly IAssetScopeService _scope;
 
-    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, ITeamService teams, IAssetScopeService scope)
+    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, IGroupService groups, IAssetScopeService scope)
     {
         _db = db;
         _audit = audit;
-        _teams = teams;
+        _groups = groups;
         _scope = scope;
     }
 
@@ -26,13 +26,13 @@ public class InspectionOrderService : IInspectionOrderService
     /// the manual-create path — every other caller (RecurringOrderSchedulerService, and now
     /// ReassignAsync) reaches this service directly, so the check belongs here too or it's silently
     /// bypassable (confirmed live for Reassign: an EmployeeOnly-typed order could be reassigned to a
-    /// Team with no error).</summary>
-    private static void ValidateAssignmentMode(string? mode, bool hasUser, bool hasTeam)
+    /// Group with no error).</summary>
+    private static void ValidateAssignmentMode(string? mode, bool hasUser, bool hasGroup)
     {
-        if (mode == "EmployeeOnly" && hasTeam)
-            throw new InvalidOperationException("This order type can only be assigned to an employee, not a team.");
-        if (mode == "TeamOnly" && hasUser)
-            throw new InvalidOperationException("This order type can only be assigned to a team, not an employee.");
+        if (mode == "EmployeeOnly" && hasGroup)
+            throw new InvalidOperationException("This order type can only be assigned to an employee, not a group.");
+        if (mode == "GroupOnly" && hasUser)
+            throw new InvalidOperationException("This order type can only be assigned to a group, not an employee.");
     }
 
     // A stale/tampered maintenance-action-type checkbox value otherwise hits the DB's Restrict FK
@@ -49,24 +49,24 @@ public class InspectionOrderService : IInspectionOrderService
             throw new InvalidOperationException("One or more selected maintenance actions were not found.");
     }
 
-    public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToTeamId,
+    public async Task<InspectionOrder> CreateAsync(int orderTypeId, string? description, string? assignedToUserId, int? assignedToGroupId,
         List<int>? assetIds, DateTime? dueDate, string createdByUserId, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
         var orderType = await _db.OrderTypes.FirstOrDefaultAsync(t => t.Id == orderTypeId && t.IsActive)
             ?? throw new InvalidOperationException("Invalid order type.");
 
         var hasUser = !string.IsNullOrEmpty(assignedToUserId);
-        var hasTeam = assignedToTeamId.HasValue;
-        if (hasUser == hasTeam)
-            throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
-        ValidateAssignmentMode(orderType.AssignmentMode, hasUser, hasTeam);
-        // A nonexistent user/team ID (stale form repost, hallucinated AI tool argument) otherwise
+        var hasGroup = assignedToGroupId.HasValue;
+        if (hasUser == hasGroup)
+            throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
+        ValidateAssignmentMode(orderType.AssignmentMode, hasUser, hasGroup);
+        // A nonexistent user/group ID (stale form repost, hallucinated AI tool argument) otherwise
         // reaches an unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync —
         // same bug class as the VendorId existence check already added elsewhere (ContractService).
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
-            throw new InvalidOperationException("Selected team not found.");
+        if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == assignedToGroupId))
+            throw new InvalidOperationException("Selected group not found.");
 
         var resolvedAssetIds = assetIds ?? [];
         if (resolvedAssetIds.Count == 0)
@@ -98,7 +98,7 @@ public class InspectionOrderService : IInspectionOrderService
             Description = description,
             OrderTypeId = orderType.Id,
             AssignedToUserId = hasUser ? assignedToUserId : null,
-            AssignedToTeamId = hasTeam ? assignedToTeamId : null,
+            AssignedToGroupId = hasGroup ? assignedToGroupId : null,
             CreatedByUserId = createdByUserId,
             CreatedAt = DateTime.UtcNow,
             DueDate = dueDate,
@@ -163,7 +163,7 @@ public class InspectionOrderService : IInspectionOrderService
         await _db.InspectionOrders
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
-            .Include(o => o.AssignedToTeam).ThenInclude(t => t!.Members).ThenInclude(m => m.User)
+            .Include(o => o.AssignedToGroup).ThenInclude(t => t!.Members).ThenInclude(m => m.User)
             .Include(o => o.CreatedByUser)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Zone)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items).ThenInclude(i => i.Asset).ThenInclude(a => a.Zone)
@@ -175,14 +175,14 @@ public class InspectionOrderService : IInspectionOrderService
 
     public async Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null)
     {
-        var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == userId).Select(m => m.TeamId).ToListAsync();
+        var myGroupIds = await _db.GroupMembers.Where(m => m.UserId == userId).Select(m => m.GroupId).ToListAsync();
 
         var query = _db.InspectionOrders
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
-            .Include(o => o.AssignedToTeam)
+            .Include(o => o.AssignedToGroup)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
-            .Where(o => o.AssignedToUserId == userId || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
+            .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)));
 
         if (!includeDone)
             query = query.Where(o => o.Status != "Done" && o.Status != "Cancelled");
@@ -197,7 +197,7 @@ public class InspectionOrderService : IInspectionOrderService
         var query = _db.InspectionOrders
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
-            .Include(o => o.AssignedToTeam)
+            .Include(o => o.AssignedToGroup)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
             .AsQueryable();
 
@@ -243,13 +243,13 @@ public class InspectionOrderService : IInspectionOrderService
         var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
         // A scope narrowed/added after the order was assigned must not lock the legitimate
-        // assignee/team member out of reporting on their own already-assigned work — scope
+        // assignee/group member out of reporting on their own already-assigned work — scope
         // restricts new discovery, not access already legitimately granted (same exemption as
         // MaintenanceOrderService.CompleteAsync). A manager reporting on someone else's order (via
         // the AI assistant or a direct call) still gets the strict check.
-        var isAssigneeOrTeamMember = order.AssignedToUserId == updatedByUserId
-            || (order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, updatedByUserId));
-        if (!isAssigneeOrTeamMember && !await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
+        var isAssigneeOrGroupMember = order.AssignedToUserId == updatedByUserId
+            || (order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, updatedByUserId));
+        if (!isAssigneeOrGroupMember && !await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
             throw new InvalidOperationException("Inspection item not found.");
         if (order.Status is "Done" or "PendingApproval" or "Cancelled")
             throw new InvalidOperationException("This inspection order is already closed.");
@@ -373,43 +373,43 @@ public class InspectionOrderService : IInspectionOrderService
         await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: oldStatus, newValue: "Cancelled", details: reason);
     }
 
-    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
+    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToGroupId, string managerUserId)
     {
         var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
         await EnsureOrderInScopeAsync(orderId, managerUserId);
         if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed inspection order can't be reassigned.");
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
-        var hasTeam = assignedToTeamId.HasValue;
-        if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
+        var hasGroup = assignedToGroupId.HasValue;
+        if (hasUser == hasGroup) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
         var assignmentMode = await _db.OrderTypes.Where(t => t.Id == order.OrderTypeId).Select(t => t.AssignmentMode).FirstOrDefaultAsync();
-        ValidateAssignmentMode(assignmentMode, hasUser, hasTeam);
+        ValidateAssignmentMode(assignmentMode, hasUser, hasGroup);
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
-            throw new InvalidOperationException("Selected team not found.");
+        if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == assignedToGroupId))
+            throw new InvalidOperationException("Selected group not found.");
 
-        var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
+        var oldLabel = order.AssignedToUserId ?? (order.AssignedToGroupId.HasValue ? $"Group #{order.AssignedToGroupId}" : "—");
         // Claim atomically against the DB's current status, not the copy loaded above — a concurrent
         // Cancel or item-outcome update (which can independently drive the order to Done via
         // UpdateInspectionItemAsync) could otherwise close the order between that load and this
         // write, and this Reassign would still apply, permanently misattributing a closed order to
         // someone who never touched it. Same race class Cancel/Complete already guard against.
         var newAssignedToUserId = hasUser ? assignedToUserId : null;
-        var newAssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        var newAssignedToGroupId = hasGroup ? assignedToGroupId : null;
         var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "Cancelled")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.AssignedToUserId, newAssignedToUserId)
-                .SetProperty(o => o.AssignedToTeamId, newAssignedToTeamId));
+                .SetProperty(o => o.AssignedToGroupId, newAssignedToGroupId));
         if (claimed == 0) throw new InvalidOperationException("A closed inspection order can't be reassigned.");
         await _audit.LogAsync("Reassign", "InspectionOrder", order.Id.ToString(), managerUserId,
-            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
+            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Group #{assignedToGroupId}");
     }
 
     public async Task<byte[]> ExportToExcelAsync(string userId)
     {
         var query = _db.InspectionOrders
             .Include(o => o.AssignedToUser)
-            .Include(o => o.AssignedToTeam)
+            .Include(o => o.AssignedToGroup)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
             .AsQueryable();
         // Same scope enforcement as GetAllAsync — an export must not dump orders the exporting
@@ -434,7 +434,7 @@ public class InspectionOrderService : IInspectionOrderService
             var items = o.InspectionRun?.Items ?? [];
             ws.Cells[row, 1].Value = o.OrderNumber;
             ws.Cells[row, 2].Value = o.Status;
-            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : "");
+            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"Group: {o.AssignedToGroup.Name}" : "");
             ws.Cells[row, 4].Value = items.Count;
             ws.Cells[row, 5].Value = items.Count(i => i.Outcome != "Pending");
             ws.Cells[row, 6].Value = o.DueDate?.ToString("yyyy-MM-dd");

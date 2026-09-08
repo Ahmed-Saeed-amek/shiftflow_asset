@@ -1,13 +1,13 @@
-@model ShiftFlow.Web.ViewModels.TeamCreateVm
-@using ShiftFlow.Web.ViewModels
+@model ShiftFlow.Web.ViewModels.GroupEditVm
 @{
-    ViewData["Title"] = Loc.T("New Team");
+    ViewData["Title"] = Loc.T("Edit Group");
+    var currentMembers = (List<GroupMemberChip>)ViewBag.CurrentMembers;
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Team"),Subtitle=Loc.T("Create a reusable group of employees")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Edit Group")})" />
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
-        <form asp-action="Create" method="post">
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
             @if (!ViewData.ModelState.IsValid)
             {
                 <div class="alert alert-danger py-2 small">
@@ -16,6 +16,15 @@
                         <div>@e.ErrorMessage</div>
                     }
                 </div>
+            }
+            <input type="hidden" asp-for="Id" />
+            @* Snapshot of the membership this form was loaded with — lets SetMembersAsync detect a
+               concurrent edit (someone else changed membership since this page loaded) instead of
+               silently overwriting it. Must survive a validation-error redisplay unchanged, so it's
+               bound straight from the model rather than rebuilt from ViewBag.CurrentMembers. *@
+            @foreach (var originalId in Model.OriginalMemberUserIds)
+            {
+                <input type="hidden" name="OriginalMemberUserIds" value="@originalId" />
             }
             <div class="row g-3">
                 <div class="col-md-6">
@@ -31,6 +40,12 @@
                     <textarea asp-for="Description" class="form-control" rows="2"></textarea>
                 </div>
                 <div class="col-12">
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                        <label asp-for="IsActive" class="form-check-label">@Loc.T("Active")</label>
+                    </div>
+                </div>
+                <div class="col-12">
                     <label class="form-label">@Loc.T("Members")</label>
                     <div class="position-relative">
                         <input type="text" id="memberSearch" class="form-control" autocomplete="off" placeholder="@Loc.T("Search by name or email…")" />
@@ -40,8 +55,8 @@
                 </div>
             </div>
             <div class="mt-4">
-                <button type="submit" class="btn btn-primary" id="submitBtn"><i class="bi bi-check-lg me-1"></i>@Loc.T("Create Team")</button>
-                <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>@Loc.T("Save")</button>
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>
         </form>
     </div>
@@ -55,6 +70,11 @@
     const results = document.getElementById('memberResults');
     const selected = new Map();
     let timer = null;
+
+    @foreach (var m in currentMembers)
+    {
+        @:selected.set(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.UserId)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.Label)));
+    }
 
     function renderChips() {
         chipsEl.innerHTML = '';
@@ -89,6 +109,8 @@
     search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(query, 220); });
     search.addEventListener('focus', query);
     document.addEventListener('click', e => { if (!results.contains(e.target) && e.target !== search) results.classList.add('d-none'); });
+
+    renderChips();
 })();
 </script>
 }

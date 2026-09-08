@@ -391,7 +391,7 @@ public class RecurringOrderViewModel : IValidatableObject
     /// Empty/absent on Create, where there's nothing to compare against yet.</summary>
     public List<int>? OriginalAssetIds { get; set; }
     public string? AssignedToUserId { get; set; }
-    public int? AssignedToTeamId { get; set; }
+    public int? AssignedToGroupId { get; set; }
     /// <summary>Required, employee-only, when the picked OrderType.RequiresVendor is true — see RecurringOrder.VendorId.</summary>
     public int? VendorId { get; set; }
     [Required] public string Cadence { get; set; } = "Monthly";

@@ -382,7 +382,7 @@
     <i class="bi bi-robot"></i>
     <div>
         <h4>@Loc.T("AI Assistant")</h4>
-        <p>@Loc.T("Ask about inspection orders, teams, and more — by voice or text.")</p>
+        <p>@Loc.T("Ask about inspection orders, groups, and more — by voice or text.")</p>
     </div>
 </div>
 
@@ -412,7 +412,7 @@
 
         <div class="ai-messages" id="aiMessages">
             <div class="ai-bubble assistant">
-                @Loc.T("Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage teams, report on assets, and more. What can I do for you today?")
+                @Loc.T("Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage groups, report on assets, and more. What can I do for you today?")
             </div>
             <div class="ai-typing" id="aiTyping">
                 <span></span><span></span><span></span>
@@ -443,7 +443,7 @@
         <div class="ai-quick-chips">
             <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Show me my inspection orders")))">@Loc.T("My Orders")</button>
             <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Which of my inspection orders are overdue?")))">@Loc.T("Overdue Orders")</button>
-            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("List my teams")))">@Loc.T("My Teams")</button>
+            <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("List my groups")))">@Loc.T("My Groups")</button>
             <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("Help me create a new inspection order")))">@Loc.T("New Order")</button>
             <button class="ai-chip" onclick="sendQuick(@System.Text.Json.JsonSerializer.Serialize(Loc.T("What are the dashboard KPIs?")))">@Loc.T("Dashboard KPIs")</button>
         </div>

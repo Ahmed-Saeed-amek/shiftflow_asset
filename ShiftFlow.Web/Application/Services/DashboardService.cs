@@ -41,7 +41,7 @@ public class DashboardService : IDashboardService
         var openInspectionOrders = await inspectionQuery.CountAsync();
         var inspectionOrdersOverdue = await inspectionQuery.CountAsync(o => o.DueDate != null && o.DueDate < today);
 
-        var activeTeams = await _db.Teams.AsNoTracking().CountAsync(t => t.IsActive);
+        var activeGroups = await _db.Groups.AsNoTracking().CountAsync(t => t.IsActive);
 
         var assetQuery = _db.Assets.AsNoTracking().AsQueryable();
         if (scopedAssetIds != null) assetQuery = assetQuery.Where(a => scopedAssetIds.Contains(a.Id));
@@ -61,7 +61,7 @@ public class DashboardService : IDashboardService
             TotalEngineers          = totalEngineers,
             OpenInspectionOrders    = openInspectionOrders,
             InspectionOrdersOverdue = inspectionOrdersOverdue,
-            ActiveTeams             = activeTeams,
+            ActiveGroups             = activeGroups,
             TotalAssets             = totalAssets,
             DefectiveAssets         = defectiveAssets,
             OpenWorkOrders          = openWorkOrders,

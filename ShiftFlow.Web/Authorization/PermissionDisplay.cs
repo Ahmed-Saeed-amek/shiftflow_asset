@@ -17,7 +17,7 @@ public static class PermissionDisplay
     [
         new("Users",              PermissionCatalog.UserView,             PermissionCatalog.UserManage),
         new("Inspection Orders",  PermissionCatalog.InspectionOrderView,  PermissionCatalog.InspectionOrderManage),
-        new("Teams",              PermissionCatalog.TeamView,             PermissionCatalog.TeamManage),
+        new("Groups",              PermissionCatalog.GroupView,             PermissionCatalog.GroupManage),
     ];
 
     /// <summary>Permission names covered by a pair above — used to skip them when rendering standalone checkboxes.</summary>
@@ -33,8 +33,8 @@ public static class PermissionDisplay
         [PermissionCatalog.InspectionOrderManage]    = "Manage Inspection Orders",
         [PermissionCatalog.InspectionOrderReport]    = "Report Inspection Outcomes",
         [PermissionCatalog.InspectionOrderExport]    = "Export Inspection Orders",
-        [PermissionCatalog.TeamView]                 = "View Teams",
-        [PermissionCatalog.TeamManage]                = "Manage Teams",
+        [PermissionCatalog.GroupView]                 = "View Groups",
+        [PermissionCatalog.GroupManage]                = "Manage Groups",
         [PermissionCatalog.AiAssistantUse]           = "Use AI Assistant",
         [PermissionCatalog.AuditLogView]             = "View Audit Log",
         [PermissionCatalog.RbacManage]                = "Manage Roles & Permissions",

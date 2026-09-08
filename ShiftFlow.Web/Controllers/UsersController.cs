@@ -131,7 +131,7 @@ public class UsersController : Controller
     }
 
     // No blanket [Authorize(Policy=UserView)] here — a role without that permission (e.g.
-    // Engineer) must still be able to view their OWN profile (it's the only place team
+    // Engineer) must still be able to view their OWN profile (it's the only place group
     // membership is shown), so the check below allows the caller's own id through regardless.
     [Authorize]
     public async Task<IActionResult> Profile(string id)
@@ -146,10 +146,10 @@ public class UsersController : Controller
     }
 
     // Read-only list of inspection orders assigned to the current user (directly, or via a
-    // Team they belong to). Open work by default; showAll=true also includes Done.
+    // Group they belong to). Open work by default; showAll=true also includes Done.
     // Employees see only this month's tasks by default (range=null -> "month"); pass range=all
     // for the full history (no date bound).
-    // Unified "what's assigned to me" list — combines Inspection Orders (direct or via team),
+    // Unified "what's assigned to me" list — combines Inspection Orders (direct or via group),
     // Maintenance Orders, and Work Orders into one list with a Category badge, replacing what
     // used to be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work
     // Orders) that all did the same "show me my open work" job for a different order type.
@@ -188,16 +188,16 @@ public class UsersController : Controller
     public async Task<IActionResult> MyHistory()
     {
         var id = _um.GetUserId(User)!;
-        var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == id).Select(m => m.TeamId).ToListAsync();
+        var myGroupIds = await _db.GroupMembers.Where(m => m.UserId == id).Select(m => m.GroupId).ToListAsync();
 
         var inspectionGroups = await _db.InspectionOrders.AsNoTracking()
-            .Where(o => o.AssignedToUserId == id || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)))
+            .Where(o => o.AssignedToUserId == id || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)))
             .GroupBy(o => new { o.CreatedAt.Year, o.CreatedAt.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
             .ToListAsync();
 
         var maintenanceGroups = await _db.MaintenanceOrders.AsNoTracking()
-            .Where(m => m.AssignedToUserId == id || (m.AssignedToTeamId != null && myTeamIds.Contains(m.AssignedToTeamId.Value)))
+            .Where(m => m.AssignedToUserId == id || (m.AssignedToGroupId != null && myGroupIds.Contains(m.AssignedToGroupId.Value)))
             .GroupBy(m => new { m.CreatedDate.Year, m.CreatedDate.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
             .ToListAsync();
@@ -249,13 +249,13 @@ public class UsersController : Controller
 
         var roles = await _um.GetRolesAsync(user);
 
-        var myTeamIds = await _db.TeamMembers.Where(m => m.UserId == id).Select(m => m.TeamId).ToListAsync();
-        var teamRows = await _db.Teams.AsNoTracking()
-            .Where(t => myTeamIds.Contains(t.Id))
-            .Select(t => new EmpTeamRow { Id = t.Id, Name = t.Name, NameAr = t.NameAr })
+        var myGroupIds = await _db.GroupMembers.Where(m => m.UserId == id).Select(m => m.GroupId).ToListAsync();
+        var groupRows = await _db.Groups.AsNoTracking()
+            .Where(t => myGroupIds.Contains(t.Id))
+            .Select(t => new EmpGroupRow { Id = t.Id, Name = t.Name, NameAr = t.NameAr })
             .ToListAsync();
         var orderQuery = _db.InspectionOrders.AsNoTracking()
-            .Where(o => o.AssignedToUserId == id || (o.AssignedToTeamId != null && myTeamIds.Contains(o.AssignedToTeamId.Value)));
+            .Where(o => o.AssignedToUserId == id || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)));
         if (from.HasValue) orderQuery = orderQuery.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue)   orderQuery = orderQuery.Where(o => o.CreatedAt <= to.Value);
 
@@ -281,7 +281,7 @@ public class UsersController : Controller
                 OrderNumber     = o.OrderNumber,
                 Status          = o.Status,
                 DueDate         = o.DueDate,
-                AssignedContext = o.AssignedToUserId == id ? "Me" : "Team",
+                AssignedContext = o.AssignedToUserId == id ? "Me" : "Group",
                 CreatedAt       = o.CreatedAt,
                 TotalAssets     = o.InspectionRun!.Items.Count,
                 CheckedAssets   = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending"),
@@ -326,7 +326,7 @@ public class UsersController : Controller
 
             Orders     = orders,
             AuditLog   = auditLog,
-            Teams      = teamRows,
+            Groups      = groupRows,
         };
 
         return vm;
@@ -543,7 +543,7 @@ public class UsersController : Controller
         }
         catch (DbUpdateException)
         {
-            // Inspection order assignments/reports, team memberships, and audit log entries are
+            // Inspection order assignments/reports, group memberships, and audit log entries are
             // deliberately Restrict/NoAction on the user FK, so deleting anyone with real activity
             // history fails at the DB level — that's intentional, it protects those records from
             // being silently orphaned or lost. Deactivating instead revokes access without touching

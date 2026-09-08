@@ -1,22 +1,22 @@
-@model List<ShiftFlow.Domain.Entities.Team>
+@model List<ShiftFlow.Domain.Entities.Group>
 @using Microsoft.AspNetCore.Authorization
 @using ShiftFlow.Web.Authorization
 @inject IAuthorizationService AuthZ
 @{
-    ViewData["Title"] = Loc.T("Teams");
-    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
+    ViewData["Title"] = Loc.T("Groups");
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.GroupManage)).Succeeded;
     string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Team") + "</a>"
+        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Group") + "</a>"
         : "";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Teams"),Subtitle=Loc.T("Reusable groups of employees for inspection orders"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Groups"),Subtitle=Loc.T("Reusable groups of employees for inspection orders"),ActionsHtml=actionsHtml})" />
 
 <div class="card border-0 shadow-sm">
     @if (Model.Count == 0)
     {
         <div class="card-body text-center text-muted py-5">
             <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
-            @Loc.T("No teams yet.")
+            @Loc.T("No groups yet.")
         </div>
     }
     else

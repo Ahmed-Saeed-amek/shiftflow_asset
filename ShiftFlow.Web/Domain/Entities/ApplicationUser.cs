@@ -14,6 +14,6 @@ public class ApplicationUser : IdentityUser
     public DateTime? LastLoginDate{get;set;}
     public virtual Location? Location{get;set;}
     public virtual ICollection<AuditLog> AuditLogs{get;set;}=new List<AuditLog>();
-    public virtual ICollection<TeamMember> TeamMemberships{get;set;}=new List<TeamMember>();
+    public virtual ICollection<GroupMember> GroupMemberships{get;set;}=new List<GroupMember>();
     public virtual ICollection<InspectionOrder> AssignedInspectionOrders{get;set;}=new List<InspectionOrder>();
 }

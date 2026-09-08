@@ -6,7 +6,7 @@
     ViewData["Title"] = Loc.T("Inspection Order");
     var run = Model.InspectionRun!;
     var assignedTo = Model.AssignedToUser?.FullName
-        ?? (Model.AssignedToTeam != null ? Loc.T("Team") + ": " + Model.AssignedToTeam.Name : "—");
+        ?? (Model.AssignedToGroup != null ? Loc.T("Group") + ": " + Model.AssignedToGroup.Name : "—");
     var tracksDefectOutcome = Model.OrderType!.TracksDefectOutcome;
     var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
     var isManager = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
@@ -189,9 +189,9 @@
                         <div style="min-width:220px" class="flex-grow-1">
                             <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
                         </div>
-                        <select name="assignedToTeamId" class="form-select form-select-sm" style="max-width:200px">
-                            <option value="">@Loc.T("— or select a team —")</option>
-                            @foreach (var t in (List<Team>)(ViewBag.Teams ?? new List<Team>()))
+                        <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px">
+                            <option value="">@Loc.T("— or select a group —")</option>
+                            @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
                             {
                                 <option value="@t.Id">@t.Name</option>
                             }

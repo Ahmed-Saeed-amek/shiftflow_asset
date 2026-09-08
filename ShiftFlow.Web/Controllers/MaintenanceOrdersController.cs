@@ -18,12 +18,12 @@ public class MaintenanceOrdersController : Controller
 {
     private readonly IMaintenanceOrderService _orders;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly IAssetScopeService _scope;
 
-    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager, ITeamService teams, IAssetScopeService scope)
+    public MaintenanceOrdersController(IMaintenanceOrderService orders, UserManager<ApplicationUser> userManager, IGroupService groups, IAssetScopeService scope)
     {
-        _orders = orders; _userManager = userManager; _teams = teams; _scope = scope;
+        _orders = orders; _userManager = userManager; _groups = groups; _scope = scope;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -41,20 +41,20 @@ public class MaintenanceOrdersController : Controller
         var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
             .AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
         var isAssignee = order.AssignedToUserId == CurrentUserId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
-        if (!isManager && !isAssignee && !isTeamMember) return Forbid();
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isGroupMember) return Forbid();
 
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — AssetsController enforces this uniformly for every viewer,
         // with no manager exception, so this must too or a scoped manager can view an out-of-scope
         // asset's maintenance history just by knowing an order ID. Exempted for the order's own
-        // assignee/team member — a scope narrowed/added after assignment must not lock them out of
+        // assignee/group member — a scope narrowed/added after assignment must not lock them out of
         // viewing (and completing) their own already-assigned work.
-        if (!isAssignee && !isTeamMember && order.Asset != null && !await _scope.IsInScopeAsync(order.Asset, CurrentUserId)) return NotFound();
+        if (!isAssignee && !isGroupMember && order.Asset != null && !await _scope.IsInScopeAsync(order.Asset, CurrentUserId)) return NotFound();
 
         ViewBag.IsManager = isManager;
-        ViewBag.IsAssignee = isAssignee || isTeamMember;
-        if (isManager) ViewBag.Teams = await _teams.GetAllAsync();
+        ViewBag.IsAssignee = isAssignee || isGroupMember;
+        if (isManager) ViewBag.Groups = await _groups.GetAllAsync();
         return View(order);
     }
 
@@ -113,14 +113,14 @@ public class MaintenanceOrdersController : Controller
 
     /// <summary>Manager-only recovery path for an order whose sole assignee has since been
     /// deactivated (Complete has no manager override — it's gated on being the current assignee or
-    /// a member of the assigned Team) — moves the order to a different employee or Team instead of
+    /// a member of the assigned Group) — moves the order to a different employee or Group instead of
     /// leaving the work permanently un-actionable.</summary>
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
-    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToTeamId)
+    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToGroupId)
     {
         try
         {
-            await _orders.ReassignAsync(id, assignedToUserId, assignedToTeamId, CurrentUserId);
+            await _orders.ReassignAsync(id, assignedToUserId, assignedToGroupId, CurrentUserId);
             TempData["Success"] = "Maintenance order reassigned.";
         }
         catch (InvalidOperationException ex)

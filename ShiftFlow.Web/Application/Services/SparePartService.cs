@@ -25,7 +25,7 @@ public class SparePartService : ISparePartService
             throw new InvalidOperationException("One or more selected assets were not found.");
     }
 
-    // Unlike every other named catalog entity (Team, AssetCategory, Zone, OrderType, Vendor,
+    // Unlike every other named catalog entity (Group, AssetCategory, Zone, OrderType, Vendor,
     // MaintenanceActionType), SparePart had no uniqueness check at all — two spare parts with the
     // identical Name/Sku were trivially creatable (confirmed live), leaving fix-report pickers with
     // indistinguishable duplicate entries.

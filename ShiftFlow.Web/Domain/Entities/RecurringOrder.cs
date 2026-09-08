@@ -17,10 +17,10 @@ public class RecurringOrder
     // RecurringOrderService rather than a DB CHECK (this table is admin-config, not a hot path) except
     // for the "exactly one" shape itself, which IS a DB CHECK below.
     public string? AssignedToUserId { get; set; } public virtual ApplicationUser? AssignedToUser { get; set; }
-    public int? AssignedToTeamId { get; set; } public virtual Team? AssignedToTeam { get; set; }
+    public int? AssignedToGroupId { get; set; } public virtual Group? AssignedToGroup { get; set; }
 
-    /// <summary>Required, and AssignedToTeamId must be null, when OrderType.RequiresVendor is true —
-    /// same "vendor-routed work orders need an individual employee, not a team" rule
+    /// <summary>Required, and AssignedToGroupId must be null, when OrderType.RequiresVendor is true —
+    /// same "vendor-routed work orders need an individual employee, not a group" rule
     /// OrdersController.Create already enforces for a manual RequiresVendor order. Null for every
     /// other order type.</summary>
     public int? VendorId { get; set; } public virtual Vendor? Vendor { get; set; }

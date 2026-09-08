@@ -101,9 +101,9 @@
                         <div class="col-12">
                             <label class="form-label small">@Loc.T("Assign To")</label>
                             <select name="AssignmentMode" id="otAssignmentMode" class="form-select">
-                                <option value="Either">@Loc.T("Either (Employee or Team)")</option>
+                                <option value="Either">@Loc.T("Either (Employee or Group)")</option>
                                 <option value="EmployeeOnly">@Loc.T("Employee only")</option>
-                                <option value="TeamOnly">@Loc.T("Team only")</option>
+                                <option value="GroupOnly">@Loc.T("Group only")</option>
                             </select>
                         </div>
                     </div>
@@ -129,8 +129,8 @@
         if (requiresVendor) approvalCb.checked = false;
         document.getElementById('otRequiresApprovalHint').style.display = requiresVendor ? '' : 'none';
 
-        // A vendor-required type creates a WorkOrder, which has no team-assignment concept —
-        // force Employee-only so a team pick at Orders/Create time is never silently discarded.
+        // A vendor-required type creates a WorkOrder, which has no group-assignment concept —
+        // force Employee-only so a group pick at Orders/Create time is never silently discarded.
         // (Left enabled, not disabled — a disabled <select> doesn't post its value at all, which
         // would submit no AssignmentMode and fall back to the "Either" model default instead.)
         const assignmentSel = document.getElementById('otAssignmentMode');

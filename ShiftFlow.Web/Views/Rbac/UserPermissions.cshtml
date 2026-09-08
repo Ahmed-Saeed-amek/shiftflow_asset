@@ -50,7 +50,7 @@
     @Html.AntiForgeryToken()
     @* Snapshot of the overrides actually in effect right now — lets SaveUserPermissions detect a
        concurrent edit (someone else changed this user's overrides since this page loaded) instead
-       of silently discarding their change the way the round-19 Team-membership bug did. *@
+       of silently discarding their change the way the round-19 Group-membership bug did. *@
     @foreach (var perm in allowOverrides)
     {
         <input type="hidden" name="originalAllowList" value="@perm" />

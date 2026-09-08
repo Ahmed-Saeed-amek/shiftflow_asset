@@ -35,10 +35,10 @@ public class OrderType
     /// survey-style type can be locked to exactly one asset if that reads more naturally for it.</summary>
     public bool AllowsMultipleAssets { get; set; }
     /// <summary>Which assignee kinds this type's Create form offers — independent of IsDirectFix.
-    /// Maintenance-style orders gained team assignment (AssignedToTeamId on MaintenanceOrder)
-    /// specifically to make "TeamOnly"/"Either" meaningful for direct-fix types too, not just survey ones.</summary>
+    /// Maintenance-style orders gained group assignment (AssignedToGroupId on MaintenanceOrder)
+    /// specifically to make "GroupOnly"/"Either" meaningful for direct-fix types too, not just survey ones.</summary>
     public string AssignmentMode { get; set; } = "Either";
-    public static readonly string[] AssignmentModes = ["EmployeeOnly", "TeamOnly", "Either"];
+    public static readonly string[] AssignmentModes = ["EmployeeOnly", "GroupOnly", "Either"];
     /// <summary>Adds an extra manager sign-off gate before an order of this type can finalize —
     /// MaintenanceOrder/InspectionOrder completion lands at "PendingApproval" instead of "Done"
     /// until a manager explicitly approves it. Has no additional effect for a RequiresVendor type:

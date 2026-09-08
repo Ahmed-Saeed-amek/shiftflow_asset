@@ -14,15 +14,15 @@ namespace ShiftFlow.Web.Controllers;
 public class InspectionOrdersController : Controller
 {
     private readonly IInspectionOrderService _orders;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly IWorkOrderService _workOrderService;
     private readonly ApplicationDbContext _db;
     private readonly IAssetScopeService _scope;
 
-    public InspectionOrdersController(IInspectionOrderService orders, ITeamService teams, IWorkOrderService workOrderService, ApplicationDbContext db, IAssetScopeService scope)
+    public InspectionOrdersController(IInspectionOrderService orders, IGroupService groups, IWorkOrderService workOrderService, ApplicationDbContext db, IAssetScopeService scope)
     {
         _orders = orders;
-        _teams = teams;
+        _groups = groups;
         _workOrderService = workOrderService;
         _db = db;
         _scope = scope;
@@ -46,11 +46,11 @@ public class InspectionOrdersController : Controller
 
     // Create moved to the unified OrdersController (Orders/Create) — see that controller.
 
-    // No policy attribute here — access is decided below by manager/assignee/team-member
+    // No policy attribute here — access is decided below by manager/assignee/group-member
     // status instead, since InspectionOrder.Report is a role-level permission that doesn't
-    // account for team membership (a team can include members outside roles that normally
-    // hold it, e.g. HR on a mixed team — they should still be able to open an order their
-    // team is assigned).
+    // account for group membership (a group can include members outside roles that normally
+    // hold it, e.g. HR on a mixed group — they should still be able to open an order their
+    // group is assigned).
     public async Task<IActionResult> Details(int id)
     {
         var order = await _orders.GetByIdAsync(id);
@@ -58,17 +58,17 @@ public class InspectionOrdersController : Controller
 
         var isManager = await IsManagerAsync();
         var isAssignee = order.AssignedToUserId == CurrentUserId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
-        if (!isManager && !isAssignee && !isTeamMember)
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isGroupMember)
             return Forbid();
 
         // UserAssetScope restricts which assets a user can see even when they'd otherwise have
         // access via role/assignment — AssetsController enforces this uniformly for every viewer,
         // with no manager exception, so this must too or a scoped manager can view an out-of-scope
         // asset's full inspection history just by knowing an order ID. Exempted for the order's own
-        // assignee/team member — a scope narrowed/added after assignment must not lock them out of
+        // assignee/group member — a scope narrowed/added after assignment must not lock them out of
         // viewing (and reporting on) their own already-assigned work.
-        if (!isAssignee && !isTeamMember)
+        if (!isAssignee && !isGroupMember)
         {
             var assetIds = order.InspectionRun?.Items.Select(i => i.AssetId).Distinct().ToList() ?? [];
             if (assetIds.Count > 0)
@@ -78,7 +78,7 @@ public class InspectionOrdersController : Controller
             }
         }
 
-        if (isManager) ViewBag.Teams = await _teams.GetAllAsync();
+        if (isManager) ViewBag.Groups = await _groups.GetAllAsync();
         return View(order);
     }
 
@@ -104,8 +104,8 @@ public class InspectionOrdersController : Controller
 
         var isManager = await IsManagerAsync();
         var isAssignee = order.AssignedToUserId == CurrentUserId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
-        if (!isManager && !isAssignee && !isTeamMember)
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isGroupMember)
             return Forbid();
 
         try
@@ -151,8 +151,8 @@ public class InspectionOrdersController : Controller
 
         var isManager = await IsManagerAsync();
         var isAssignee = order.AssignedToUserId == CurrentUserId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, CurrentUserId);
-        if (!isManager && !isAssignee && !isTeamMember)
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, CurrentUserId);
+        if (!isManager && !isAssignee && !isGroupMember)
             return Forbid();
 
         try
@@ -197,14 +197,14 @@ public class InspectionOrdersController : Controller
     }
 
     /// <summary>Manager-only recovery path for an order whose sole assignee has since been
-    /// deactivated (UpdateItem has no manager override for the assignee/team-member gate) — moves
-    /// the order to a different employee or Team instead of leaving it permanently un-actionable.</summary>
+    /// deactivated (UpdateItem has no manager override for the assignee/group-member gate) — moves
+    /// the order to a different employee or Group instead of leaving it permanently un-actionable.</summary>
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.InspectionOrderManage)]
-    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToTeamId)
+    public async Task<IActionResult> Reassign(int id, string? assignedToUserId, int? assignedToGroupId)
     {
         try
         {
-            await _orders.ReassignAsync(id, assignedToUserId, assignedToTeamId, CurrentUserId);
+            await _orders.ReassignAsync(id, assignedToUserId, assignedToGroupId, CurrentUserId);
             TempData["Success"] = "Inspection order reassigned.";
         }
         catch (InvalidOperationException ex)

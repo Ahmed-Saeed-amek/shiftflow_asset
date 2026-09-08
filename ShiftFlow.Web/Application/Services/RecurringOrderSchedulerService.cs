@@ -138,12 +138,12 @@ public class RecurringOrderSchedulerService : BackgroundService
                         }
                         else if (schedule.OrderType.IsDirectFix)
                         {
-                            await maintenanceOrders.CreateAsync(link.AssetId, schedule.AssignedToUserId, schedule.AssignedToTeamId,
+                            await maintenanceOrders.CreateAsync(link.AssetId, schedule.AssignedToUserId, schedule.AssignedToGroupId,
                                 null, dueDate, creatorUserId, schedule.OrderTypeId, schedule.Id, dueDate);
                         }
                         else
                         {
-                            await inspectionOrders.CreateAsync(schedule.OrderTypeId, null, schedule.AssignedToUserId, schedule.AssignedToTeamId,
+                            await inspectionOrders.CreateAsync(schedule.OrderTypeId, null, schedule.AssignedToUserId, schedule.AssignedToGroupId,
                                 [link.AssetId], dueDate, creatorUserId, schedule.Id, dueDate);
                         }
                         generatedThisTick++;

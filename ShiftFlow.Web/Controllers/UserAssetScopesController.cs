@@ -51,7 +51,7 @@ public class UserAssetScopesController : Controller
     // CategoryId otherwise hits the DB's Restrict FK constraints at SaveChangesAsync and raises an
     // unhandled DbUpdateException, leaking the full EF/SqlClient stack trace, error number, and
     // table/column names to the client — same bug class as the FK checks already added elsewhere
-    // (RecurringOrdersController.ValidateAsync, ContractService, employee/vendor/team assignment).
+    // (RecurringOrdersController.ValidateAsync, ContractService, employee/vendor/group assignment).
     private async Task ValidateScopeReferencesAsync(UserAssetScopeViewModel vm)
     {
         if (vm.ZoneId.HasValue && !await _db.Zones.AnyAsync(z => z.Id == vm.ZoneId))
@@ -86,7 +86,7 @@ public class UserAssetScopesController : Controller
         {
             await PopulateLookupsAsync();
             // Redisplay needs the picker's search box populated with a name, not just the hidden
-            // UserId — same as Teams' member-chip redisplay, otherwise the box goes blank even
+            // UserId — same as Groups' member-chip redisplay, otherwise the box goes blank even
             // though the submitted selection is still there under the hood.
             ViewBag.SelectedUserName = (await _db.Users.FindAsync(vm.UserId))?.FullName;
             return View(vm);

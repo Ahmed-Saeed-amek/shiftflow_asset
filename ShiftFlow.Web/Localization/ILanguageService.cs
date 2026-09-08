@@ -7,7 +7,7 @@ public interface ILanguageService
     string Lang { get; }
     bool IsRTL { get; }
     string T(string key);
-    /// <summary>Translates a format-string template (e.g. "A team named '{0}' already exists.")
+    /// <summary>Translates a format-string template (e.g. "A group named '{0}' already exists.")
     /// and substitutes args — for messages that interpolate user data, which can't be translated
     /// after the fact once the value is already baked into the string.</summary>
     string T(string key, params object[] args);

@@ -23,17 +23,17 @@ public class OrdersController : Controller
     private readonly IInspectionOrderService _inspectionOrders;
     private readonly IMaintenanceOrderService _maintenanceOrders;
     private readonly IWorkOrderService _workOrders;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILanguageService _loc;
 
     public OrdersController(IInspectionOrderService inspectionOrders, IMaintenanceOrderService maintenanceOrders,
-        IWorkOrderService workOrders, ITeamService teams, ApplicationDbContext db, UserManager<ApplicationUser> userManager,
+        IWorkOrderService workOrders, IGroupService groups, ApplicationDbContext db, UserManager<ApplicationUser> userManager,
         ILanguageService loc)
     {
         _inspectionOrders = inspectionOrders; _maintenanceOrders = maintenanceOrders;
-        _workOrders = workOrders; _teams = teams; _db = db; _userManager = userManager; _loc = loc;
+        _workOrders = workOrders; _groups = groups; _db = db; _userManager = userManager; _loc = loc;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -57,7 +57,7 @@ public class OrdersController : Controller
                 OrderTypeColor = o.OrderType?.Color ?? "#6c757d",
                 AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? _loc.T("asset") : _loc.T("assets")),
                 Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
-                AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"{_loc.T("Team")}: {o.AssignedToTeam.Name}" : null),
+                AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"{_loc.T("Group")}: {o.AssignedToGroup.Name}" : null),
             }));
         }
         // overdue is an Inspection-only concept (DueDate + Status != Done) - a request for the
@@ -74,7 +74,7 @@ public class OrdersController : Controller
                 OrderTypeColor = m.OrderType?.Color ?? "#6c757d",
                 AssetLabel = m.Asset?.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
                 DetailsController = "MaintenanceOrders",
-                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToTeam != null ? $"{_loc.T("Team")}: {m.AssignedToTeam.Name}" : null),
+                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToGroup != null ? $"{_loc.T("Group")}: {m.AssignedToGroup.Name}" : null),
             }));
         }
 
@@ -139,11 +139,11 @@ public class OrdersController : Controller
             ? (vm.AssetIds ?? []).Distinct().ToList()
             : (vm.AssetId > 0 ? [vm.AssetId] : []);
 
-        string? assignedToUserId = orderType.AssignmentMode == "TeamOnly" ? null : vm.AssignedToUserId;
-        int? assignedToTeamId = orderType.AssignmentMode == "EmployeeOnly" ? null : vm.AssignedToTeamId;
+        string? assignedToUserId = orderType.AssignmentMode == "GroupOnly" ? null : vm.AssignedToUserId;
+        int? assignedToGroupId = orderType.AssignmentMode == "EmployeeOnly" ? null : vm.AssignedToGroupId;
         if (orderType.AssignmentMode == "Either")
         {
-            if (vm.AssigneeType == "User") assignedToTeamId = null; else assignedToUserId = null;
+            if (vm.AssigneeType == "User") assignedToGroupId = null; else assignedToUserId = null;
         }
 
         if (!orderType.IsDirectFix)
@@ -151,7 +151,7 @@ public class OrdersController : Controller
             try
             {
                 var order = await _inspectionOrders.CreateAsync(orderType.Id, null,
-                    assignedToUserId, assignedToTeamId, assetIds, vm.DueDate, CurrentUserId);
+                    assignedToUserId, assignedToGroupId, assetIds, vm.DueDate, CurrentUserId);
                 TempData["Success"] = $"Order {order.OrderNumber} created.";
                 return RedirectToAction("Details", "InspectionOrders", new { id = order.Id });
             }
@@ -185,13 +185,13 @@ public class OrdersController : Controller
                 // common single-asset case, or the Orders list with a count for a real batch.
                 if (orderType.RequiresVendor)
                 {
-                    // WorkOrder has no team-assignment concept (unlike InspectionOrder/
-                    // MaintenanceOrder) — a TeamOnly/Either type that resolves to a team here would
-                    // otherwise silently create an unassigned work order with the team picked in the
+                    // WorkOrder has no group-assignment concept (unlike InspectionOrder/
+                    // MaintenanceOrder) — a GroupOnly/Either type that resolves to a group here would
+                    // otherwise silently create an unassigned work order with the group picked in the
                     // UI simply discarded. Require an employee instead of letting that happen quietly.
                     if (string.IsNullOrWhiteSpace(assignedToUserId))
                     {
-                        ModelState.AddModelError("", "This order type requires a vendor, which needs an individual employee assignee — team assignment isn't supported for vendor-routed work orders yet.");
+                        ModelState.AddModelError("", "This order type requires a vendor, which needs an individual employee assignee — group assignment isn't supported for vendor-routed work orders yet.");
                         await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
                         return View(vm);
                     }
@@ -235,7 +235,7 @@ public class OrdersController : Controller
                 {
                     foreach (var assetId in assetIds)
                     {
-                        var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToTeamId,
+                        var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToGroupId,
                             null, vm.DueDate, CurrentUserId, orderType.Id);
                         firstOrder ??= order;
                     }
@@ -270,7 +270,7 @@ public class OrdersController : Controller
     {
         ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
-        ViewBag.Teams = await _teams.GetAllAsync();
+        ViewBag.Groups = await _groups.GetAllAsync();
 
         // ThenBy(Id) breaks ties deterministically - SortOrder alone isn't unique (e.g. the seeded
         // Inspection and Standard rows both default to 0), and without a tiebreaker the picker's

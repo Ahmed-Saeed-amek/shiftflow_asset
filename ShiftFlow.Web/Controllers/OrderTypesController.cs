@@ -34,12 +34,12 @@ public class OrderTypesController : Controller
             TempData["Error"] = "Name and prefix are required.";
             return RedirectToAction(nameof(Index));
         }
-        // WorkOrder (what a RequiresVendor type actually creates) has no team-assignment concept —
-        // TeamOnly/Either here would let an admin configure a type that silently drops the team an
+        // WorkOrder (what a RequiresVendor type actually creates) has no group-assignment concept —
+        // GroupOnly/Either here would let an admin configure a type that silently drops the group an
         // employee picks at Orders/Create time.
         if (vm.RequiresVendor && vm.AssignmentMode != "EmployeeOnly")
         {
-            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a team — team assignment isn't supported for vendor-routed work orders yet.";
+            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a group — group assignment isn't supported for vendor-routed work orders yet.";
             return RedirectToAction(nameof(Index));
         }
         if (await _db.OrderTypes.AnyAsync(t => t.Prefix == vm.Prefix))
@@ -72,7 +72,7 @@ public class OrderTypesController : Controller
         }
         if (vm.RequiresVendor && vm.AssignmentMode != "EmployeeOnly")
         {
-            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a team — team assignment isn't supported for vendor-routed work orders yet.";
+            TempData["Error"] = "A vendor-required order type can only be assigned to an employee, not a group — group assignment isn't supported for vendor-routed work orders yet.";
             return RedirectToAction(nameof(Index));
         }
         var type = await _db.OrderTypes.FindAsync(vm.Id);

@@ -1,10 +1,10 @@
-@model ShiftFlow.Domain.Entities.Team
+@model ShiftFlow.Domain.Entities.Group
 @using Microsoft.AspNetCore.Authorization
 @using ShiftFlow.Web.Authorization
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Model.Name;
-    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.TeamManage)).Succeeded;
+    var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.GroupManage)).Succeeded;
     var canViewProfiles = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     string actionsHtml = canManage
         ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-pencil me-1\"></i>" + Loc.T("Edit") + "</a>"

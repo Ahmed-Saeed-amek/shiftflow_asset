@@ -1,7 +1,7 @@
 namespace ShiftFlow.Domain.Entities;
 
 /// <summary>An admin-created assignment: inspect a set of assets (picked directly or via a Zone
-/// snapshot) either individually or as a Team. Replaces the old ShiftTask+InspectionRun pairing
+/// snapshot) either individually or as a Group. Replaces the old ShiftTask+InspectionRun pairing
 /// with a standalone header not tied to any shift/roster machinery.</summary>
 public class InspectionOrder
 {
@@ -11,7 +11,7 @@ public class InspectionOrder
 
     // Exactly one of these two is set — enforced in the service layer + a DB CHECK constraint.
     public string? AssignedToUserId { get; set; } public virtual ApplicationUser? AssignedToUser { get; set; }
-    public int? AssignedToTeamId { get; set; } public virtual Team? AssignedToTeam { get; set; }
+    public int? AssignedToGroupId { get; set; } public virtual Group? AssignedToGroup { get; set; }
 
     public string CreatedByUserId { get; set; } = ""; public virtual ApplicationUser CreatedByUser { get; set; } = null!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

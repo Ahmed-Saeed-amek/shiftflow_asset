@@ -3,7 +3,7 @@
 @using ShiftFlow.Web.ViewModels
 @{
     ViewData["Title"] = Loc.T("New Order");
-    var teams = (List<Team>)ViewBag.Teams;
+    var groups = (List<Group>)ViewBag.Groups;
     var categories = (List<AssetCategory>)ViewBag.Categories;
     var locationCategories = (List<LocationCategory>)ViewBag.LocationCategories;
     var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
@@ -55,7 +55,7 @@
                 </div>
 
                 @* Assign To and Assets are each ONE shared area now — cardinality (single/multiple
-                   assets) and assignment mode (employee/team/either) are properties of the selected
+                   assets) and assignment mode (employee/group/either) are properties of the selected
                    Order Type, independent of whether it's survey-style or direct-fix, so there's no
                    longer a reason to duplicate these blocks per style (as the old
                    inspectionFields/maintenanceFields split did). *@
@@ -64,17 +64,17 @@
                     <div class="btn-group btn-group-sm mb-2" role="group" id="assigneeToggle">
                         <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
                         <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
-                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeTeam" value="Team" checked="@(Model.AssigneeType != "User")" />
-                        <label class="btn btn-outline-secondary" for="assigneeTeam">@Loc.T("Team")</label>
+                        <input type="radio" class="btn-check" name="AssigneeType" id="assigneeGroup" value="Group" checked="@(Model.AssigneeType != "User")" />
+                        <label class="btn btn-outline-secondary" for="assigneeGroup">@Loc.T("Group")</label>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6" id="assigneeUserRow">
                             <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=ViewBag.SelectedEmployeeLabel as string,Placeholder=Loc.T("Search by name or email…")})" />
                         </div>
-                        <div class="col-md-6" id="assigneeTeamRow">
-                            <select asp-for="AssignedToTeamId" class="form-select">
-                                <option value="">@Loc.T("Select a team")</option>
-                                @foreach (var t in teams)
+                        <div class="col-md-6" id="assigneeGroupRow">
+                            <select asp-for="AssignedToGroupId" class="form-select">
+                                <option value="">@Loc.T("Select a group")</option>
+                                @foreach (var t in groups)
                                 {
                                     <option value="@t.Id">@t.Name (@t.Members.Count)</option>
                                 }
@@ -115,9 +115,9 @@
 
     const assigneeToggle = document.getElementById('assigneeToggle');
     const userRow = document.getElementById('assigneeUserRow');
-    const teamRow = document.getElementById('assigneeTeamRow');
+    const groupRow = document.getElementById('assigneeGroupRow');
     const userHidden = userRow.querySelector('[data-ep-value]');
-    const teamSelect = teamRow.querySelector('select[name="AssignedToTeamId"]');
+    const groupSelect = groupRow.querySelector('select[name="AssignedToGroupId"]');
 
     const assetSingleWrap = document.getElementById('assetSingleWrap');
     const assetMultiWrap = document.getElementById('assetMultiWrap');
@@ -128,13 +128,13 @@
         const isEither = mode === 'Either';
         assigneeToggle.classList.toggle('d-none', !isEither);
         const showUser = mode === 'EmployeeOnly' || (isEither && document.getElementById('assigneeUser').checked);
-        const showTeam = mode === 'TeamOnly' || (isEither && !document.getElementById('assigneeUser').checked);
+        const showGroup = mode === 'GroupOnly' || (isEither && !document.getElementById('assigneeUser').checked);
         userRow.classList.toggle('d-none', !showUser);
-        teamRow.classList.toggle('d-none', !showTeam);
+        groupRow.classList.toggle('d-none', !showGroup);
         // Clear whichever side is hidden so a stale value from a previous type's selection never
         // posts alongside the visible one.
         if (!showUser && userHidden) userHidden.value = '';
-        if (!showTeam && teamSelect) teamSelect.value = '';
+        if (!showGroup && groupSelect) groupSelect.value = '';
     }
 
     function applyCardinality(allowsMultiple) {

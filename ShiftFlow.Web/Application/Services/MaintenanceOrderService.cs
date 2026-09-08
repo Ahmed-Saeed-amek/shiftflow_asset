@@ -12,9 +12,9 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly ISparePartService _spareParts;
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly IAssetScopeService _scope;
-    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, ITeamService teams, IAssetScopeService scope) { _db = db; _audit = audit; _spareParts = spareParts; _teams = teams; _scope = scope; }
+    public MaintenanceOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IGroupService groups, IAssetScopeService scope) { _db = db; _audit = audit; _spareParts = spareParts; _groups = groups; _scope = scope; }
 
     // Stages/statuses (across both entities) that mean "this asset still has open work" —
     // checked before restoring Asset.Status to "Working" so a second, unrelated issue on the
@@ -45,32 +45,32 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     /// the manual-create path — every OTHER caller (RecurringOrderSchedulerService, and now
     /// ReassignAsync) reaches CreateAsync/updates the assignee directly, so the check belongs here
     /// too or it's silently bypassable (confirmed live for Reassign: an EmployeeOnly-typed order
-    /// could be reassigned to a Team with no error). orderTypeId null (legacy rows with no catalog
+    /// could be reassigned to a Group with no error). orderTypeId null (legacy rows with no catalog
     /// entry) skips the check — there's no AssignmentMode to enforce.</summary>
-    private async Task ValidateAssignmentModeAsync(int? orderTypeId, bool hasUser, bool hasTeam)
+    private async Task ValidateAssignmentModeAsync(int? orderTypeId, bool hasUser, bool hasGroup)
     {
         if (orderTypeId == null) return;
         var mode = await _db.OrderTypes.Where(t => t.Id == orderTypeId).Select(t => t.AssignmentMode).FirstOrDefaultAsync();
-        if (mode == "EmployeeOnly" && hasTeam)
-            throw new InvalidOperationException("This order type can only be assigned to an employee, not a team.");
-        if (mode == "TeamOnly" && hasUser)
-            throw new InvalidOperationException("This order type can only be assigned to a team, not an employee.");
+        if (mode == "EmployeeOnly" && hasGroup)
+            throw new InvalidOperationException("This order type can only be assigned to an employee, not a group.");
+        if (mode == "GroupOnly" && hasUser)
+            throw new InvalidOperationException("This order type can only be assigned to a group, not an employee.");
     }
 
-    public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToTeamId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
+    public async Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToGroupId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null)
     {
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
-        var hasTeam = assignedToTeamId.HasValue;
-        if (hasUser == hasTeam)
-            throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
-        await ValidateAssignmentModeAsync(orderTypeId, hasUser, hasTeam);
-        // A nonexistent user/team ID (stale form repost, hallucinated AI tool argument) otherwise
+        var hasGroup = assignedToGroupId.HasValue;
+        if (hasUser == hasGroup)
+            throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
+        await ValidateAssignmentModeAsync(orderTypeId, hasUser, hasGroup);
+        // A nonexistent user/group ID (stale form repost, hallucinated AI tool argument) otherwise
         // reaches an unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync —
         // same bug class as the VendorId existence check already added elsewhere (ContractService).
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
-            throw new InvalidOperationException("Selected team not found.");
+        if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == assignedToGroupId))
+            throw new InvalidOperationException("Selected group not found.");
         if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
             throw new InvalidOperationException("This asset is retired and can't have new orders opened against it.");
         // AssetsController routes every single-asset read through ScopedAssetsAsync so a
@@ -85,7 +85,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         {
             AssetId = assetId,
             AssignedToUserId = hasUser ? assignedToUserId : null,
-            AssignedToTeamId = hasTeam ? assignedToTeamId : null,
+            AssignedToGroupId = hasGroup ? assignedToGroupId : null,
             Description = description,
             DueDate = dueDate,
             CreatedByUserId = createdByUserId,
@@ -141,13 +141,13 @@ public class MaintenanceOrderService : IMaintenanceOrderService
     {
         var order = await _db.MaintenanceOrders.Include(m => m.Parts).Include(m => m.OrderType).FirstOrDefaultAsync(m => m.Id == orderId)
             ?? throw new InvalidOperationException("Maintenance order not found.");
-        // Same "assignee or team member" rule as InspectionOrder — a Team-assigned order can be
+        // Same "assignee or group member" rule as InspectionOrder — a Group-assigned order can be
         // completed by any member, not just whoever happens to be recorded as AssignedToUserId
-        // (which is null for a Team-assigned order in the first place).
+        // (which is null for a Group-assigned order in the first place).
         var isAssignee = order.AssignedToUserId == employeeUserId;
-        var isTeamMember = order.AssignedToTeamId.HasValue && await _teams.IsMemberAsync(order.AssignedToTeamId.Value, employeeUserId);
-        if (!isAssignee && !isTeamMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
-        // No scope check here: the assignee/team-member check above already confirms this is the
+        var isGroupMember = order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, employeeUserId);
+        if (!isAssignee && !isGroupMember) throw new InvalidOperationException("This maintenance order isn't assigned to you.");
+        // No scope check here: the assignee/group-member check above already confirms this is the
         // order's own legitimate assignee — a scope narrowed/added after assignment must not lock
         // them out of finishing their own already-assigned work (scope restricts new discovery of
         // work, not access already legitimately granted; see EnsureOrderInScopeAsync's callers below,
@@ -250,35 +250,35 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         await _audit.LogAsync("Cancel", "MaintenanceOrder", order.Id.ToString(), userId, oldValue: "Open", newValue: "Cancelled", details: reason);
     }
 
-    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToTeamId, string managerUserId)
+    public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToGroupId, string managerUserId)
     {
         var order = await _db.MaintenanceOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Maintenance order not found.");
         await EnsureOrderInScopeAsync(order.AssetId, managerUserId);
         if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed maintenance order can't be reassigned.");
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
-        var hasTeam = assignedToTeamId.HasValue;
-        if (hasUser == hasTeam) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Team.");
-        await ValidateAssignmentModeAsync(order.OrderTypeId, hasUser, hasTeam);
+        var hasGroup = assignedToGroupId.HasValue;
+        if (hasUser == hasGroup) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
+        await ValidateAssignmentModeAsync(order.OrderTypeId, hasUser, hasGroup);
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
-        if (hasTeam && !await _db.Teams.AnyAsync(t => t.Id == assignedToTeamId))
-            throw new InvalidOperationException("Selected team not found.");
+        if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == assignedToGroupId))
+            throw new InvalidOperationException("Selected group not found.");
 
-        var oldLabel = order.AssignedToUserId ?? (order.AssignedToTeamId.HasValue ? $"Team #{order.AssignedToTeamId}" : "—");
+        var oldLabel = order.AssignedToUserId ?? (order.AssignedToGroupId.HasValue ? $"Group #{order.AssignedToGroupId}" : "—");
         // Claim atomically against the DB's current status, not the copy loaded above — a concurrent
         // Complete/Cancel could otherwise close the order between that load and this write, and this
         // Reassign would still apply, permanently misattributing a completed order to someone who
         // never touched it (confirmed live: a concurrent Complete+Reassign pair left the order Done
         // but assigned to the Reassign's target, erasing who actually did the work).
         var newAssignedToUserId = hasUser ? assignedToUserId : null;
-        var newAssignedToTeamId = hasTeam ? assignedToTeamId : null;
+        var newAssignedToGroupId = hasGroup ? assignedToGroupId : null;
         var claimed = await _db.MaintenanceOrders.Where(m => m.Id == orderId && m.Status != "Done" && m.Status != "Cancelled")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(m => m.AssignedToUserId, newAssignedToUserId)
-                .SetProperty(m => m.AssignedToTeamId, newAssignedToTeamId));
+                .SetProperty(m => m.AssignedToGroupId, newAssignedToGroupId));
         if (claimed == 0) throw new InvalidOperationException("A closed maintenance order can't be reassigned.");
         await _audit.LogAsync("Reassign", "MaintenanceOrder", order.Id.ToString(), managerUserId,
-            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Team #{assignedToTeamId}");
+            oldValue: oldLabel, newValue: hasUser ? assignedToUserId : $"Group #{assignedToGroupId}");
     }
 
     public async Task<MaintenanceOrder?> GetByIdAsync(int id) =>
@@ -286,7 +286,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
             .Include(m => m.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Include(m => m.Asset).ThenInclude(a => a!.Category)
             .Include(m => m.AssignedToUser)
-            .Include(m => m.AssignedToTeam)
+            .Include(m => m.AssignedToGroup)
             .Include(m => m.CreatedByUser)
             .Include(m => m.Parts)
             .FirstOrDefaultAsync(m => m.Id == id);
@@ -296,7 +296,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
-            .Include(m => m.AssignedToTeam)
+            .Include(m => m.AssignedToGroup)
             .Include(m => m.OrderType)
             .AsQueryable();
 
@@ -326,7 +326,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         var query = _db.MaintenanceOrders
             .Include(m => m.Asset)
             .Include(m => m.AssignedToUser)
-            .Include(m => m.AssignedToTeam)
+            .Include(m => m.AssignedToGroup)
             .AsQueryable();
         // Same scope enforcement as GetAllAsync — an export must not dump orders the exporting
         // user can't even see in the list, matching round 3's fix for Assets export.
@@ -349,7 +349,7 @@ public class MaintenanceOrderService : IMaintenanceOrderService
         {
             ws.Cells[row, 1].Value = o.OrderNumber;
             ws.Cells[row, 2].Value = o.Asset?.AssetTag;
-            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToTeam != null ? $"Team: {o.AssignedToTeam.Name}" : null);
+            ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"Group: {o.AssignedToGroup.Name}" : null);
             ws.Cells[row, 4].Value = o.Status;
             ws.Cells[row, 5].Value = o.Cost;
             ws.Cells[row, 6].Value = o.CompletedDate?.ToString("yyyy-MM-dd");

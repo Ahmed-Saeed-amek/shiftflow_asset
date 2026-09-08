@@ -12,10 +12,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-    // ── Inspection Orders / Teams ────────────────────────────────────────────
+    // ── Inspection Orders / Groups ────────────────────────────────────────────
     public DbSet<InspectionOrder> InspectionOrders => Set<InspectionOrder>();
-    public DbSet<Team> Teams => Set<Team>();
-    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<Group> Groups => Set<Group>();
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<InspectionRun> InspectionRuns => Set<InspectionRun>();
     public DbSet<InspectionRunAsset> InspectionRunAssets => Set<InspectionRunAsset>();
     public DbSet<MaintenanceActionType> MaintenanceActionTypes => Set<MaintenanceActionType>();
@@ -77,27 +77,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(a => a.User).WithMany(u => u.AuditLogs)
                 .HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.NoAction));
 
-        // ── Team / TeamMember ────────────────────────────────────────────────
-        b.Entity<Team>(e =>
+        // ── Group / GroupMember ────────────────────────────────────────────────
+        b.Entity<Group>(e =>
         {
             e.HasKey(t => t.Id);
             e.Property(t => t.Name).HasMaxLength(200).IsRequired();
             e.Property(t => t.NameAr).HasMaxLength(200);
             // Unlike every other named catalog entity (AssetCategories, Zones, OrderTypes, Vendors),
-            // Team had no DB-level uniqueness backing its app-level check — two identically-named
-            // teams were trivially creatable (confirmed live). This is the last line of defense
+            // Group had no DB-level uniqueness backing its app-level check — two identically-named
+            // groups were trivially creatable (confirmed live). This is the last line of defense
             // against a genuine race between two concurrent Create requests.
             e.HasIndex(t => t.Name).IsUnique();
             e.HasOne(t => t.CreatedByUser).WithMany()
                 .HasForeignKey(t => t.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
-        b.Entity<TeamMember>(e =>
+        b.Entity<GroupMember>(e =>
         {
             e.HasKey(m => m.Id);
-            e.HasIndex(m => new { m.TeamId, m.UserId }).IsUnique();
-            e.HasOne(m => m.Team).WithMany(t => t.Members)
-                .HasForeignKey(m => m.TeamId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(m => m.User).WithMany(u => u.TeamMemberships)
+            e.HasIndex(m => new { m.GroupId, m.UserId }).IsUnique();
+            e.HasOne(m => m.Group).WithMany(t => t.Members)
+                .HasForeignKey(m => m.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(m => m.User).WithMany(u => u.GroupMemberships)
                 .HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -111,8 +111,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(o => o.Status);
             e.HasOne(o => o.AssignedToUser).WithMany(u => u.AssignedInspectionOrders)
                 .HasForeignKey(o => o.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(o => o.AssignedToTeam).WithMany()
-                .HasForeignKey(o => o.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(o => o.AssignedToGroup).WithMany()
+                .HasForeignKey(o => o.AssignedToGroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.CreatedByUser).WithMany()
                 .HasForeignKey(o => o.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.OrderType).WithMany()
@@ -127,10 +127,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             // in-memory (AssetId, date) check before each CreateAsync call is the only guard for this
             // path — accepted as sufficient since this app runs the scheduler as a single instance;
             // WorkOrder/MaintenanceOrder's DB-level index remains the real safety net for those two.
-            // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
+            // Exactly one of AssignedToUserId/AssignedToGroupId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_InspectionOrder_ExactlyOneAssignee",
-                "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
+                "([AssignedToUserId] IS NOT NULL AND [AssignedToGroupId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToGroupId] IS NOT NULL)"));
         });
 
         // ── InspectionRun / InspectionRunAsset ──────────────────────────────
@@ -340,8 +340,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(m => m.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.AssignedToUser).WithMany()
                 .HasForeignKey(m => m.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(m => m.AssignedToTeam).WithMany()
-                .HasForeignKey(m => m.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(m => m.AssignedToGroup).WithMany()
+                .HasForeignKey(m => m.AssignedToGroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.CreatedByUser).WithMany()
                 .HasForeignKey(m => m.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.OrderType).WithMany()
@@ -354,10 +354,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(m => new { m.SourceRecurringOrderId, m.AssetId, m.ScheduledDate })
                 .IsUnique()
                 .HasFilter("[SourceRecurringOrderId] IS NOT NULL");
-            // Exactly one of AssignedToUserId/AssignedToTeamId must be set.
+            // Exactly one of AssignedToUserId/AssignedToGroupId must be set.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_MaintenanceOrder_ExactlyOneAssignee",
-                "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
+                "([AssignedToUserId] IS NOT NULL AND [AssignedToGroupId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToGroupId] IS NOT NULL)"));
         });
         b.Entity<RecurringOrder>(e =>
         {
@@ -368,17 +368,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasForeignKey(r => r.OrderTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.AssignedToUser).WithMany()
                 .HasForeignKey(r => r.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(r => r.AssignedToTeam).WithMany()
-                .HasForeignKey(r => r.AssignedToTeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.AssignedToGroup).WithMany()
+                .HasForeignKey(r => r.AssignedToGroupId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.Vendor).WithMany()
                 .HasForeignKey(r => r.VendorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(r => r.CreatedByUser).WithMany()
                 .HasForeignKey(r => r.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
-            // Exactly one of AssignedToUserId/AssignedToTeamId must be set — same rule as
+            // Exactly one of AssignedToUserId/AssignedToGroupId must be set — same rule as
             // InspectionOrder/MaintenanceOrder, enforced in RecurringOrderService.
             e.ToTable(tb => tb.HasCheckConstraint(
                 "CK_RecurringOrder_ExactlyOneAssignee",
-                "([AssignedToUserId] IS NOT NULL AND [AssignedToTeamId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToTeamId] IS NOT NULL)"));
+                "([AssignedToUserId] IS NOT NULL AND [AssignedToGroupId] IS NULL) OR ([AssignedToUserId] IS NULL AND [AssignedToGroupId] IS NOT NULL)"));
         });
         b.Entity<RecurringOrderAsset>(e =>
         {

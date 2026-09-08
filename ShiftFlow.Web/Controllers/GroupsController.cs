@@ -11,47 +11,47 @@ using ShiftFlow.Web.ViewModels;
 namespace ShiftFlow.Web.Controllers;
 
 [Authorize]
-public class TeamsController : Controller
+public class GroupsController : Controller
 {
-    private readonly ITeamService _teams;
+    private readonly IGroupService _groups;
     private readonly UserManager<ApplicationUser> _um;
 
-    public TeamsController(ITeamService teams, UserManager<ApplicationUser> um)
+    public GroupsController(IGroupService groups, UserManager<ApplicationUser> um)
     {
-        _teams = teams;
+        _groups = groups;
         _um = um;
     }
 
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
-    [Authorize(Policy = PermissionCatalog.TeamView)]
+    [Authorize(Policy = PermissionCatalog.GroupView)]
     public async Task<IActionResult> Index()
     {
-        var teams = await _teams.GetAllAsync(includeInactive: true);
-        return View(teams);
+        var groups = await _groups.GetAllAsync(includeInactive: true);
+        return View(groups);
     }
 
-    [Authorize(Policy = PermissionCatalog.TeamView)]
+    [Authorize(Policy = PermissionCatalog.GroupView)]
     public async Task<IActionResult> Details(int id)
     {
-        var team = await _teams.GetByIdAsync(id);
-        if (team == null) return NotFound();
-        return View(team);
+        var group = await _groups.GetByIdAsync(id);
+        if (group == null) return NotFound();
+        return View(group);
     }
 
-    [Authorize(Policy = PermissionCatalog.TeamManage)]
-    public IActionResult Create() => View(new TeamCreateVm());
+    [Authorize(Policy = PermissionCatalog.GroupManage)]
+    public IActionResult Create() => View(new GroupCreateVm());
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
-    public async Task<IActionResult> Create(TeamCreateVm vm)
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.GroupManage)]
+    public async Task<IActionResult> Create(GroupCreateVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
 
         try
         {
-            var team = await _teams.CreateAsync(vm.Name, vm.NameAr, vm.Description, vm.MemberUserIds, CurrentUserId);
-            TempData["Success"] = $"Team \"{team.Name}\" created.";
-            return RedirectToAction(nameof(Details), new { id = team.Id });
+            var group = await _groups.CreateAsync(vm.Name, vm.NameAr, vm.Description, vm.MemberUserIds, CurrentUserId);
+            TempData["Success"] = $"Group \"{group.Name}\" created.";
+            return RedirectToAction(nameof(Details), new { id = group.Id });
         }
         catch (InvalidOperationException ex)
         {
@@ -60,33 +60,33 @@ public class TeamsController : Controller
         }
     }
 
-    [Authorize(Policy = PermissionCatalog.TeamManage)]
+    [Authorize(Policy = PermissionCatalog.GroupManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var team = await _teams.GetByIdAsync(id);
-        if (team == null) return NotFound();
-        ViewBag.CurrentMembers = team.Members.Select(m => new TeamMemberChip { UserId = m.UserId, Label = m.User.FullName }).ToList();
-        var memberIds = team.Members.Select(m => m.UserId).ToList();
-        return View(new TeamEditVm
+        var group = await _groups.GetByIdAsync(id);
+        if (group == null) return NotFound();
+        ViewBag.CurrentMembers = group.Members.Select(m => new GroupMemberChip { UserId = m.UserId, Label = m.User.FullName }).ToList();
+        var memberIds = group.Members.Select(m => m.UserId).ToList();
+        return View(new GroupEditVm
         {
-            Id = team.Id, Name = team.Name, NameAr = team.NameAr, Description = team.Description, IsActive = team.IsActive,
+            Id = group.Id, Name = group.Name, NameAr = group.NameAr, Description = group.Description, IsActive = group.IsActive,
             MemberUserIds = memberIds,
             OriginalMemberUserIds = memberIds,
         });
     }
 
-    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.TeamManage)]
-    public async Task<IActionResult> Edit(int id, TeamEditVm vm)
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.GroupManage)]
+    public async Task<IActionResult> Edit(int id, GroupEditVm vm)
     {
         if (id != vm.Id) return BadRequest();
         if (!ModelState.IsValid) { await PopulateCurrentMembersAsync(vm); return View(vm); }
 
         try
         {
-            await _teams.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
-            await _teams.SetActiveAsync(id, vm.IsActive, CurrentUserId);
-            await _teams.SetMembersAsync(id, vm.MemberUserIds ?? new(), vm.OriginalMemberUserIds ?? new(), CurrentUserId);
-            TempData["Success"] = "Team updated.";
+            await _groups.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
+            await _groups.SetActiveAsync(id, vm.IsActive, CurrentUserId);
+            await _groups.SetMembersAsync(id, vm.MemberUserIds ?? new(), vm.OriginalMemberUserIds ?? new(), CurrentUserId);
+            TempData["Success"] = "Group updated.";
             return RedirectToAction(nameof(Details), new { id });
         }
         catch (InvalidOperationException ex)
@@ -108,16 +108,16 @@ public class TeamsController : Controller
     // Edit.cshtml's chip picker always reads ViewBag.CurrentMembers (@foreach with no null
     // check) — every redisplay path above must populate it or the view throws a
     // NullReferenceException instead of showing the validation error. Rebuilt from the
-    // submitted MemberUserIds (not re-fetched from the team) so the user's in-progress
+    // submitted MemberUserIds (not re-fetched from the group) so the user's in-progress
     // selection survives the redisplay, same as the rest of the form's fields already do.
-    private async Task PopulateCurrentMembersAsync(TeamEditVm vm)
+    private async Task PopulateCurrentMembersAsync(GroupEditVm vm)
     {
         var ids = vm.MemberUserIds ?? new();
         var users = await _um.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
         ViewBag.CurrentMembers = ids
             .Select(id => users.FirstOrDefault(u => u.Id == id))
             .Where(u => u != null)
-            .Select(u => new TeamMemberChip { UserId = u!.Id, Label = u.FullName })
+            .Select(u => new GroupMemberChip { UserId = u!.Id, Label = u.FullName })
             .ToList();
     }
 }
