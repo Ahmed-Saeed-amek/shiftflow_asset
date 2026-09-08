@@ -129,7 +129,13 @@
                 }
             }
 
-            @if (canViewUsers || canManageRbac || canViewAuditLogs || canManageAssetScope)
+            // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one
+            // Settings item instead of each being its own flat sidebar item — folded into
+            // Administration (no separate "Settings" section header) per feedback. Auto-expanded
+            // when the user is actually on one of these pages.
+            var hasAssetSettingsLinks = canViewAssets || canManageAssetCategories || canManageOrderTypes;
+            var hasSettingsItem = hasAssetSettingsLinks || canViewGroups;
+            @if (canViewUsers || canManageRbac || canViewAuditLogs || canManageAssetScope || hasSettingsItem)
             {
                 <li class="nav-section-label mt-3">@Loc.T("Administration")</li>
                 @if (canViewUsers)
@@ -148,50 +154,41 @@
                 {
                     <li><a class="nav-link" asp-controller="AuditLogs" asp-action="Index"><i class="bi bi-journal-text me-2"></i>@Loc.T("Audit Logs")</a></li>
                 }
-            }
-
-            // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one
-            // group instead of each being its own flat sidebar item. Standalone (not nested
-            // under Asset Management) so it still shows up for a role like HR that can see
-            // Groups but holds none of the asset permissions above. Auto-expanded when the
-            // user is actually on one of these pages. Placed after Administration (moved down
-            // per feedback) rather than right after Asset Management.
-            var hasAssetSettingsLinks = canViewAssets || canManageAssetCategories || canManageOrderTypes;
-            @if (hasAssetSettingsLinks || canViewGroups)
-            {
-                var settingsControllers = new[] { "AssetCategories", "Zones", "WorkOrderBlockReasons", "MaintenanceActionTypes", "OrderTypes", "RecurringOrders", "Groups" };
-                var isOnSettingsPage = settingsControllers.Contains(ViewContext.RouteData.Values["controller"] as string, StringComparer.OrdinalIgnoreCase);
-                <li class="nav-section-label mt-3">@Loc.T("Settings")</li>
-                <li>
-                    <a class="nav-link" href="#assetSettingsGroup" data-bs-toggle="collapse" role="button"
-                       aria-expanded="@(isOnSettingsPage ? "true" : "false")" aria-controls="assetSettingsGroup">
-                        <i class="bi bi-sliders me-2"></i>@Loc.T("Settings")
-                        <i class="bi bi-chevron-down ms-auto small nav-group-chevron"></i>
-                    </a>
-                    <div class="collapse @(isOnSettingsPage ? "show" : "")" id="assetSettingsGroup">
-                        <ul class="nav flex-column gap-1 ps-3">
-                            @if (canViewAssets)
-                            {
-                                <li><a class="nav-link" asp-controller="AssetCategories" asp-action="Index"><i class="bi bi-diagram-2 me-2"></i>@Loc.T("Asset Categories")</a></li>
-                                <li><a class="nav-link" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Asset Locations")</a></li>
-                            }
-                            @if (canManageAssetCategories)
-                            {
-                                <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
-                                <li><a class="nav-link" asp-controller="MaintenanceActionTypes" asp-action="Index"><i class="bi bi-wrench me-2"></i>@Loc.T("Maintenance Action Types")</a></li>
-                            }
-                            @if (canManageOrderTypes)
-                            {
-                                <li><a class="nav-link" asp-controller="OrderTypes" asp-action="Index"><i class="bi bi-tags me-2"></i>@Loc.T("Order Types")</a></li>
-                                <li><a class="nav-link" asp-controller="RecurringOrders" asp-action="Index"><i class="bi bi-arrow-repeat me-2"></i>@Loc.T("Recurring Orders")</a></li>
-                            }
-                            @if (canViewGroups)
-                            {
-                                <li><a class="nav-link" asp-controller="Groups" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Groups")</a></li>
-                            }
-                        </ul>
-                    </div>
-                </li>
+                @if (hasSettingsItem)
+                {
+                    var settingsControllers = new[] { "AssetCategories", "Zones", "WorkOrderBlockReasons", "MaintenanceActionTypes", "OrderTypes", "RecurringOrders", "Groups" };
+                    var isOnSettingsPage = settingsControllers.Contains(ViewContext.RouteData.Values["controller"] as string, StringComparer.OrdinalIgnoreCase);
+                    <li>
+                        <a class="nav-link" href="#assetSettingsGroup" data-bs-toggle="collapse" role="button"
+                           aria-expanded="@(isOnSettingsPage ? "true" : "false")" aria-controls="assetSettingsGroup">
+                            <i class="bi bi-sliders me-2"></i>@Loc.T("Settings")
+                            <i class="bi bi-chevron-down ms-auto small nav-group-chevron"></i>
+                        </a>
+                        <div class="collapse @(isOnSettingsPage ? "show" : "")" id="assetSettingsGroup">
+                            <ul class="nav flex-column gap-1 ps-3">
+                                @if (canViewAssets)
+                                {
+                                    <li><a class="nav-link" asp-controller="AssetCategories" asp-action="Index"><i class="bi bi-diagram-2 me-2"></i>@Loc.T("Asset Categories")</a></li>
+                                    <li><a class="nav-link" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Asset Locations")</a></li>
+                                }
+                                @if (canManageAssetCategories)
+                                {
+                                    <li><a class="nav-link" asp-controller="WorkOrderBlockReasons" asp-action="Index"><i class="bi bi-slash-circle me-2"></i>@Loc.T("Block Reasons")</a></li>
+                                    <li><a class="nav-link" asp-controller="MaintenanceActionTypes" asp-action="Index"><i class="bi bi-wrench me-2"></i>@Loc.T("Maintenance Action Types")</a></li>
+                                }
+                                @if (canManageOrderTypes)
+                                {
+                                    <li><a class="nav-link" asp-controller="OrderTypes" asp-action="Index"><i class="bi bi-tags me-2"></i>@Loc.T("Order Types")</a></li>
+                                    <li><a class="nav-link" asp-controller="RecurringOrders" asp-action="Index"><i class="bi bi-arrow-repeat me-2"></i>@Loc.T("Recurring Orders")</a></li>
+                                }
+                                @if (canViewGroups)
+                                {
+                                    <li><a class="nav-link" asp-controller="Groups" asp-action="Index"><i class="bi bi-people me-2"></i>@Loc.T("Groups")</a></li>
+                                }
+                            </ul>
+                        </div>
+                    </li>
+                }
             }
 
             @if (canUseAi)
