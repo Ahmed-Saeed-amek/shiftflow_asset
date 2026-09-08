@@ -27,6 +27,7 @@
             <a class="btn @(!showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="false" asp-route-range="@range" asp-route-category="@category">@Loc.T("Open")</a>
             <a class="btn @(showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="@range" asp-route-category="@category">@Loc.T("All")</a>
         </div>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="MyHistory"><i class="bi bi-clock-history me-1"></i>@Loc.T("History")</a>
     </div>
 </div>
 

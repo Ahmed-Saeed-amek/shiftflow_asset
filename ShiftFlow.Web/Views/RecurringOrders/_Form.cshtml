@@ -112,9 +112,13 @@
 <script>
     // [orderTypeId]: { requiresVendor, allowsMultipleAssets, assignmentMode } — mirrors Orders/Create.cshtml's
     // meta map, so this form can't submit an employee against a GroupOnly type (or vice versa), shows/requires
-    // the Vendor field only for a RequiresVendor type, and switches asset pickers by cardinality — same
-    // rules RecurringOrderService/RecurringOrdersController enforce server-side.
-    const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.RequiresVendor, allowsMultipleAssets = t.AllowsMultipleAssets, assignmentMode = t.AssignmentMode })));
+    // the Vendor field only for a type that's actually vendor-routed, and switches asset pickers by
+    // cardinality — same rules RecurringOrderService/RecurringOrdersController enforce server-side.
+    // requiresVendor here is IsDirectFix && RequiresVendor, not the raw flag — a survey-style
+    // (Inspection/Quick Check) type's RequiresVendor governs a later, separate flow (a reported
+    // Defective outcome spawning its own Work Order), not whether this schedule itself needs a
+    // vendor, same as Orders/Create never asks those types for a vendor at creation either.
+    const roOrderTypeMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(orderTypes.ToDictionary(t => t.Id, t => new { requiresVendor = t.IsDirectFix && t.RequiresVendor, allowsMultipleAssets = t.AllowsMultipleAssets, assignmentMode = t.AssignmentMode })));
 
     const roAssetSingleWrap = document.getElementById('roAssetSingleWrap');
     const roAssetMultiWrap = document.getElementById('roAssetMultiWrap');

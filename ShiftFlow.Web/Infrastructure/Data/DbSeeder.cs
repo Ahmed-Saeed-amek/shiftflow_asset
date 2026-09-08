@@ -449,12 +449,31 @@ public static class DbSeeder
         var teamToGroupRename = new Dictionary<string, string> { ["Team.View"] = "Group.View", ["Team.Manage"] = "Group.Manage" };
         foreach (var (oldName, newName) in teamToGroupRename)
         {
+            // PermissionName is part of RolePermission's/UserPermission's composite key — EF refuses
+            // to just reassign it in place ("part of a key and so cannot be modified"), so this
+            // renames by deleting the old-named row and inserting an equivalent new-named one
+            // (skipping any role/user that — implausibly — already has both).
             var stalePermission = await db.Permissions.FirstOrDefaultAsync(p => p.Name == oldName);
             if (stalePermission != null) stalePermission.Name = newName;
+
             var staleGrants = await db.RolePermissions.Where(rp => rp.PermissionName == oldName).ToListAsync();
-            foreach (var g in staleGrants) g.PermissionName = newName;
+            var existingNewGrantRoleIds = await db.RolePermissions.Where(rp => rp.PermissionName == newName).Select(rp => rp.RoleId).ToListAsync();
+            foreach (var g in staleGrants)
+            {
+                db.RolePermissions.Remove(g);
+                if (!existingNewGrantRoleIds.Contains(g.RoleId))
+                    db.RolePermissions.Add(new RolePermission { RoleId = g.RoleId, PermissionName = newName });
+            }
+
             var staleOverrides = await db.UserPermissions.Where(up => up.PermissionName == oldName).ToListAsync();
-            foreach (var o in staleOverrides) o.PermissionName = newName;
+            var existingNewOverrideUserIds = await db.UserPermissions.Where(up => up.PermissionName == newName).Select(up => up.UserId).ToListAsync();
+            foreach (var o in staleOverrides)
+            {
+                db.UserPermissions.Remove(o);
+                if (!existingNewOverrideUserIds.Contains(o.UserId))
+                    db.UserPermissions.Add(new UserPermission { UserId = o.UserId, PermissionName = newName, IsGranted = o.IsGranted });
+            }
+
             if (stalePermission != null || staleGrants.Count > 0 || staleOverrides.Count > 0)
                 await db.SaveChangesAsync();
         }

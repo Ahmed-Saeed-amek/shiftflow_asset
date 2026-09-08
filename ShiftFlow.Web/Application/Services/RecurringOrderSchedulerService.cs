@@ -83,10 +83,15 @@ public class RecurringOrderSchedulerService : BackgroundService
         {
             if (schedule.OrderType is not { IsActive: true }) continue;
             if (schedule.AssetLinks.Count == 0) continue;
-            // A RequiresVendor schedule with no VendorId shouldn't exist (RecurringOrderService
+            // Mirrors RecurringOrderService.ValidateAsync's routesToVendor rule: only a direct-fix
+            // type that also RequiresVendor is actually vendor-routed. For a survey-style (Inspection/
+            // Quick Check) type, RequiresVendor governs a different downstream flow (a reported
+            // Defective outcome later spawning its own Work Order) — not this schedule's own table.
+            var routesToVendor = schedule.OrderType.IsDirectFix && schedule.OrderType.RequiresVendor;
+            // A vendor-routed schedule with no VendorId shouldn't exist (RecurringOrderService
             // requires one), but defend against a stale/invalid row rather than generating a vendor
             // work order with no vendor.
-            if (schedule.OrderType.RequiresVendor && schedule.VendorId == null)
+            if (routesToVendor && schedule.VendorId == null)
             {
                 _logger.LogWarning("Recurring Order: schedule {ScheduleId} requires a vendor but has none set — skipping.", schedule.Id);
                 continue;
@@ -99,7 +104,7 @@ public class RecurringOrderSchedulerService : BackgroundService
             // (AssetId, due date) pairs already generated for this schedule, across whichever table
             // its order type routes to — same per-asset dedup shape ContractService's PM schedule view
             // and PreventiveMaintenanceSchedulerService already use.
-            var generatedSet = schedule.OrderType.RequiresVendor
+            var generatedSet = routesToVendor
                 ? (await db.WorkOrders.Where(w => w.SourceRecurringOrderId == schedule.Id)
                     .Select(w => new { w.AssetId, w.ScheduledDate }).ToListAsync(ct))
                     .Select(g => (g.AssetId, g.ScheduledDate!.Value.Date)).ToHashSet()
@@ -131,7 +136,7 @@ public class RecurringOrderSchedulerService : BackgroundService
                     if (generatedSet.Contains((link.AssetId, dueDate))) continue;
                     try
                     {
-                        if (schedule.OrderType.RequiresVendor)
+                        if (routesToVendor)
                         {
                             await workOrders.CreateRecurringVendorOccurrenceAsync(link.AssetId, schedule.VendorId!.Value,
                                 schedule.AssignedToUserId, schedule.Id, dueDate, creatorUserId);

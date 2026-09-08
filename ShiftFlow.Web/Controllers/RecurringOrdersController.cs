@@ -171,8 +171,13 @@ public class RecurringOrdersController : Controller
         ViewBag.Groups = await _db.Groups.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
         ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        // requiresVendor here means "this schedule is vendor-routed", which mirrors Orders/Create's
+        // own rule: only a direct-fix type that ALSO has RequiresVendor asks for a vendor at
+        // creation. A survey-style (Inspection/Quick Check) type's RequiresVendor flag governs a
+        // different, later flow (a reported Defective outcome spawning its own Work Order) — it
+        // should never make this schedule form ask for a vendor up front.
         ViewBag.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
-            ((List<OrderType>)ViewBag.OrderTypes).ToDictionary(t => t.Id, t => new { t.RequiresVendor, t.AllowsMultipleAssets, t.AssignmentMode }),
+            ((List<OrderType>)ViewBag.OrderTypes).ToDictionary(t => t.Id, t => new { RequiresVendor = t.IsDirectFix && t.RequiresVendor, t.AllowsMultipleAssets, t.AssignmentMode }),
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         // Redisplay after a failed POST needs the picker's search box populated with a name, not
         // just the hidden AssignedToUserId, otherwise the box goes blank even though the submitted

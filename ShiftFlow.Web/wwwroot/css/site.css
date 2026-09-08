@@ -341,6 +341,17 @@ body.sidebar-locked { overflow: hidden; }
   --bs-list-group-bg: hsl(var(--card));
 }
 
+/* Bootstrap's .list-group is display:flex;flex-direction:column. A results dropdown (the asset
+   picker, employee picker, zone search, etc.) height-caps itself with max-height + overflow:auto
+   so it scrolls instead of growing the page — but flex items default to flex-shrink:1, so once
+   the list of buttons is taller than that cap, the browser shrinks every item below its own
+   content height instead of leaving them full-size and scrolling, squashing the two lines of
+   text in each row into an overlapping mess. flex-shrink:0 keeps every row at its natural height
+   so the container scrolls as intended. */
+.list-group-item {
+  flex-shrink: 0;
+}
+
 /* Tables */
 /* Bootstrap's own .table rule sets --bs-table-bg: var(--bs-body-bg) directly on
    the table element, which always wins over a value inherited from :root — so

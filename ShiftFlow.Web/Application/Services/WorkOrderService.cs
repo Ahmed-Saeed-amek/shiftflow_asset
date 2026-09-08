@@ -365,6 +365,12 @@ public class WorkOrderService : IWorkOrderService
         // assignment already does via ValidateVendorAsync.
         if (!string.IsNullOrWhiteSpace(employeeUserId) && !await _db.Users.AnyAsync(u => u.Id == employeeUserId))
             throw new InvalidOperationException("Selected employee not found.");
+        // Same invariant AcceptAsync enforces at creation (vendor or employee, never neither) — this
+        // path let a manager clear the employee off a work order that had no vendor either, leaving
+        // it assigned to nobody with no way to act on it. Only blocks clearing when there's no
+        // vendor to fall back on; a vendor-assigned work order can still have its employee cleared.
+        if (string.IsNullOrWhiteSpace(employeeUserId) && wo.VendorId == null)
+            throw new InvalidOperationException("This work order has no vendor — assign an employee, or send it to a vendor instead of unassigning.");
         wo.AssignedToUserId = string.IsNullOrWhiteSpace(employeeUserId) ? null : employeeUserId;
         await _db.SaveChangesAsync();
 

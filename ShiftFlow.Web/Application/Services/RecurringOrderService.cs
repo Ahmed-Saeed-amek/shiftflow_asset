@@ -24,7 +24,14 @@ public class RecurringOrderService : IRecurringOrderService
 
         var hasUser = !string.IsNullOrEmpty(schedule.AssignedToUserId);
         var hasGroup = schedule.AssignedToGroupId.HasValue;
-        if (orderType.RequiresVendor)
+        // Mirrors Orders/Create's own vendor-at-creation rule exactly: RequiresVendor alone governs
+        // a *different* downstream flow for survey-style (Inspection/Quick Check) types — whether a
+        // reported Defective outcome later spawns a vendor Work Order — not whether the schedule
+        // itself is vendor-routed. Only a direct-fix type that also RequiresVendor asks for a vendor
+        // here; a survey-style type with RequiresVendor=true still just gets Employee/Group assignment,
+        // same as picking it on the one-off New Order screen never asks for a vendor either.
+        var routesToVendor = orderType.IsDirectFix && orderType.RequiresVendor;
+        if (routesToVendor)
         {
             // Mirrors OrdersController.Create's manual RequiresVendor branch exactly: needs an
             // individual employee overseeing the vendor's work (no group-assignment concept for a
@@ -42,12 +49,12 @@ public class RecurringOrderService : IRecurringOrderService
         }
         // Same as RecurringOrdersController's old check: can't just silently drop whichever side the
         // OrderType's AssignmentMode disallows — reject the mismatch instead so a GroupOnly type never
-        // ends up with an individual employee baked into every future occurrence. RequiresVendor
-        // overrides AssignmentMode's group preference entirely (handled above), so GroupOnly doesn't
-        // apply once a type is also vendor-required.
+        // ends up with an individual employee baked into every future occurrence. A vendor-routed
+        // schedule overrides AssignmentMode's group preference entirely (handled above), so GroupOnly
+        // doesn't apply once a type is actually vendor-routed.
         if (orderType.AssignmentMode == "EmployeeOnly" && hasGroup)
             throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to an employee, not a group.");
-        if (orderType.AssignmentMode == "GroupOnly" && hasUser && !orderType.RequiresVendor)
+        if (orderType.AssignmentMode == "GroupOnly" && hasUser && !routesToVendor)
             throw new InvalidOperationException($"'{orderType.Name}' can only be assigned to a group, not an employee.");
 
         // Same bug class as ContractService's VendorId/AssetId checks: a stale multi-select or
