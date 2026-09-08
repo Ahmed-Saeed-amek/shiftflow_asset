@@ -31,7 +31,10 @@
             <div data-zone-wrap class="d-none">
                 <label class="form-label small mb-1">@Loc.T("Zone")</label>
                 <div class="position-relative">
-                    <input type="text" class="form-control form-control-sm" autocomplete="off" placeholder="@Loc.T("Search zones…")" data-zone-search style="min-width:180px">
+                    <div class="input-group input-group-sm" style="min-width:180px">
+                        <input type="text" class="form-control form-control-sm" autocomplete="off" placeholder="@Loc.T("Search zones…")" data-zone-search>
+                        <button type="button" class="btn btn-outline-secondary d-none" data-zone-clear title="@Loc.T("Clear")" aria-label="@Loc.T("Clear")"><i class="bi bi-x"></i></button>
+                    </div>
                     <input type="hidden" data-zone-select>
                     <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1056;max-height:220px;overflow:auto" data-zone-results></div>
                 </div>
@@ -61,15 +64,20 @@
             <button type="button" class="btn btn-sm btn-outline-primary" data-add-by-category disabled>@Loc.T("Add All")</button>
         </div>
     }
-    <div class="d-flex flex-wrap gap-1 mb-2" data-chips>
-        @foreach (var chip in Model.Selected)
-        {
-            <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2" data-chip data-id="@chip.Id">
-                @chip.Label
-                <input type="hidden" name="@Model.Name" value="@chip.Id" />
-                <button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>
-            </span>
-        }
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex flex-wrap gap-1" data-chips>
+            @foreach (var chip in Model.Selected)
+            {
+                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2" data-chip data-id="@chip.Id">
+                    @chip.Label
+                    <input type="hidden" name="@Model.Name" value="@chip.Id" />
+                    <button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>
+                </span>
+            }
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary @(Model.Selected.Count == 0 ? "d-none" : "")" data-clear-all>
+            <i class="bi bi-x-lg me-1"></i>@Loc.T("Clear all")
+        </button>
     </div>
     <div class="input-group">
         <input type="text" class="form-control" autocomplete="off" placeholder="@(Model.Placeholder ?? Loc.T("Search"))" data-search />
@@ -89,6 +97,11 @@
     const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
     let debounceTimer = null;
 
+    const clearAllBtn = root.querySelector('[data-clear-all]');
+    function refreshClearAllVisibility() {
+        clearAllBtn.classList.toggle('d-none', chipsEl.children.length === 0);
+    }
+
     function selectedIds() {
         return Array.from(chipsEl.querySelectorAll('[data-chip]')).map(c => Number(c.dataset.id));
     }
@@ -99,11 +112,13 @@
         chip.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2';
         chip.setAttribute('data-chip', ''); chip.dataset.id = id;
         chip.innerHTML = `${label}<input type="hidden" name="${inputName}" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>`;
-        chip.querySelector('[data-remove]').addEventListener('click', () => chip.remove());
+        chip.querySelector('[data-remove]').addEventListener('click', () => { chip.remove(); refreshClearAllVisibility(); });
         chipsEl.appendChild(chip);
+        refreshClearAllVisibility();
     }
 
-    chipsEl.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => btn.closest('[data-chip]').remove()));
+    chipsEl.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => { btn.closest('[data-chip]').remove(); refreshClearAllVisibility(); }));
+    clearAllBtn.addEventListener('click', () => { chipsEl.innerHTML = ''; refreshClearAllVisibility(); });
 
     const jsNoMatches = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("No matching assets")));
 
@@ -209,8 +224,22 @@
     const zoneSelectHidden = root.querySelector('[data-zone-select]');
     const zoneResultsEl = root.querySelector('[data-zone-results]');
     const zoneWrap = root.querySelector('[data-zone-wrap]');
+    const zoneClearBtn = root.querySelector('[data-zone-clear]');
     const addByLocationBtn = root.querySelector('[data-add-by-location]');
     let zonesInCategory = [];
+
+    function refreshZoneClearVisibility() {
+        if (zoneClearBtn) zoneClearBtn.classList.toggle('d-none', !zoneSearchEl.value);
+    }
+    if (zoneClearBtn) {
+        zoneClearBtn.addEventListener('click', () => {
+            zoneSelectHidden.value = ''; zoneSearchEl.value = '';
+            zoneResultsEl.classList.add('d-none');
+            addByLocationBtn.disabled = true;
+            refreshZoneClearVisibility();
+            zoneSearchEl.focus();
+        });
+    }
 
     function renderZoneResults(term) {
         const filtered = zonesInCategory.filter(z => localName(z).toLowerCase().includes(term.toLowerCase()));
@@ -225,6 +254,7 @@
                 zoneSearchEl.value = localName(z);
                 zoneResultsEl.classList.add('d-none');
                 addByLocationBtn.disabled = false;
+                refreshZoneClearVisibility();
             });
             zoneResultsEl.appendChild(item);
         });
@@ -235,6 +265,7 @@
         locCatSel.addEventListener('change', async () => {
             zoneSelectHidden.value = ''; zoneSearchEl.value = ''; zonesInCategory = [];
             zoneWrap.classList.add('d-none'); addByLocationBtn.disabled = true;
+            refreshZoneClearVisibility();
             if (!locCatSel.value) return;
             zonesInCategory = await (await fetch(`/Zones/ByCategory?locationCategoryId=${locCatSel.value}`)).json();
             zoneWrap.classList.remove('d-none');
@@ -243,6 +274,7 @@
         zoneSearchEl.addEventListener('input', () => {
             zoneSelectHidden.value = '';
             renderZoneResults(zoneSearchEl.value.trim());
+            refreshZoneClearVisibility();
         });
         zoneSearchEl.addEventListener('focus', () => renderZoneResults(zoneSearchEl.value.trim()));
         document.addEventListener('click', e => { if (!zoneWrap.contains(e.target)) zoneResultsEl.classList.add('d-none'); });
