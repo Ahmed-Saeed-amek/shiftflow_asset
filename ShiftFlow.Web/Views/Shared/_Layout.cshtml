@@ -129,11 +129,33 @@
                 }
             }
 
+            @if (canViewUsers || canManageRbac || canViewAuditLogs || canManageAssetScope)
+            {
+                <li class="nav-section-label mt-3">@Loc.T("Administration")</li>
+                @if (canViewUsers)
+                {
+                    <li><a class="nav-link" asp-controller="Users" asp-action="Index"><i class="bi bi-person-badge me-2"></i>@Loc.T("Users")</a></li>
+                }
+                @if (canManageRbac)
+                {
+                    <li><a class="nav-link" asp-controller="Rbac" asp-action="Index"><i class="bi bi-shield-lock me-2"></i>@Loc.T("Permissions")</a></li>
+                }
+                @if (canManageAssetScope)
+                {
+                    <li><a class="nav-link" asp-controller="UserAssetScopes" asp-action="Index"><i class="bi bi-person-lock me-2"></i>@Loc.T("Asset Visibility")</a></li>
+                }
+                @if (canViewAuditLogs)
+                {
+                    <li><a class="nav-link" asp-controller="AuditLogs" asp-action="Index"><i class="bi bi-journal-text me-2"></i>@Loc.T("Audit Logs")</a></li>
+                }
+            }
+
             // Low-traffic admin lookup lists (rarely touched day-to-day) collapsed into one
             // group instead of each being its own flat sidebar item. Standalone (not nested
             // under Asset Management) so it still shows up for a role like HR that can see
             // Groups but holds none of the asset permissions above. Auto-expanded when the
-            // user is actually on one of these pages.
+            // user is actually on one of these pages. Placed after Administration (moved down
+            // per feedback) rather than right after Asset Management.
             var hasAssetSettingsLinks = canViewAssets || canManageAssetCategories || canManageOrderTypes;
             @if (hasAssetSettingsLinks || canViewGroups)
             {
@@ -170,27 +192,6 @@
                         </ul>
                     </div>
                 </li>
-            }
-
-            @if (canViewUsers || canManageRbac || canViewAuditLogs || canManageAssetScope)
-            {
-                <li class="nav-section-label mt-3">@Loc.T("Administration")</li>
-                @if (canViewUsers)
-                {
-                    <li><a class="nav-link" asp-controller="Users" asp-action="Index"><i class="bi bi-person-badge me-2"></i>@Loc.T("Users")</a></li>
-                }
-                @if (canManageRbac)
-                {
-                    <li><a class="nav-link" asp-controller="Rbac" asp-action="Index"><i class="bi bi-shield-lock me-2"></i>@Loc.T("Permissions")</a></li>
-                }
-                @if (canManageAssetScope)
-                {
-                    <li><a class="nav-link" asp-controller="UserAssetScopes" asp-action="Index"><i class="bi bi-person-lock me-2"></i>@Loc.T("Asset Visibility")</a></li>
-                }
-                @if (canViewAuditLogs)
-                {
-                    <li><a class="nav-link" asp-controller="AuditLogs" asp-action="Index"><i class="bi bi-journal-text me-2"></i>@Loc.T("Audit Logs")</a></li>
-                }
             }
 
             @if (canUseAi)
