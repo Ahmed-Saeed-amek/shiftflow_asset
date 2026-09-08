@@ -47,7 +47,10 @@
                     <tr data-item-id="@item.Id" data-category-id="@item.Asset.CategoryId">
                         <td class="small" data-label="@Loc.T("Asset Tag")">
                             <a asp-controller="Assets" asp-action="Details" asp-route-id="@item.AssetId">@item.Asset.AssetTag</a>
-                            <div class="text-muted">@item.Asset.Name</div>
+                            @* An asset name is free-text with no length limit, so a pathological value
+                               (one long unbroken token, no spaces) would otherwise overflow the cell
+                               and blow out the whole table's width instead of wrapping. *@
+                            <div class="text-muted text-break">@item.Asset.Name</div>
                         </td>
                         <td class="small" data-label="@Loc.T("Location")">
                             @if (item.Asset.Zone != null)
@@ -115,7 +118,7 @@
                                         <select class="form-select form-select-sm cause-select" disabled><option value="">—</option></select>
                                     </div>
                                 }
-                                <div class="col-md-3">
+                                <div class="col-md-3 maintenance-action-col">
                                     <label class="form-label small mb-1">@Loc.T("Maintenance Actions")</label>
                                     <div class="dropdown maintenance-action-dropdown">
                                         <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle w-100 text-start text-truncate"
@@ -398,6 +401,8 @@ else
         formRow.dataset.mode = 'maintenance';
         delete formRow.dataset.outcome;
         formRow.querySelectorAll('.defect-only').forEach(el => el.classList.add('d-none'));
+        const maintenanceCol = formRow.querySelector('.maintenance-action-col');
+        if (maintenanceCol) maintenanceCol.classList.remove('d-none');
         // Auto-save (see the checkbox 'change' listener below) replaces the need for an explicit
         // Save click in this mode — the button would just be a confusing extra step now.
         const saveBtn = formRow.querySelector('.save-outcome-btn');
@@ -434,8 +439,10 @@ else
             formRow.classList.remove('d-none');
             formRow.dataset.mode = 'outcome';
             formRow.dataset.outcome = outcome;
-            await loadMaintenanceActionChecklist(formRow);
-            updateMaintenanceCount(formRow);
+            // Maintenance actions are only ever set via the standalone "Maintenance" button now —
+            // confirming OK/Defective doesn't touch them, so there's nothing to load/show here.
+            const maintenanceCol = formRow.querySelector('.maintenance-action-col');
+            if (maintenanceCol) maintenanceCol.classList.add('d-none');
 
             const isDefect = outcome === 'Defective';
             formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
@@ -474,42 +481,32 @@ else
         });
     });
 
+    // Only ever visible in mode='outcome' now — the standalone Maintenance flow (mode='maintenance')
+    // hides this button and auto-saves instead (see performMaintenanceSave above), so this handler
+    // no longer needs to branch on mode or touch maintenance actions at all.
     document.querySelectorAll('.save-outcome-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const formRow = btn.closest('tr.inline-form-row');
             const itemId = formRow.dataset.formFor;
-            const maintenanceActionTypeIds = Array.from(formRow.querySelectorAll('.maintenance-action-check:checked')).map(c => c.value);
 
-            let r;
             btn.disabled = true;
-            if (formRow.dataset.mode === 'maintenance') {
-                const body = new URLSearchParams({ itemId });
-                maintenanceActionTypeIds.forEach(id => body.append('maintenanceActionTypeIds', id));
-                r = await fetch('/InspectionOrders/UpdateMaintenanceActions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
-                    body,
-                });
-            } else {
-                const outcome = formRow.dataset.outcome;
-                const tracksDefect = formRow.dataset.tracksDefect === 'true';
-                const actionTypeId = formRow.querySelector('.action-type-select')?.value || '';
-                const causeId = formRow.querySelector('.cause-select')?.value || '';
+            const outcome = formRow.dataset.outcome;
+            const tracksDefect = formRow.dataset.tracksDefect === 'true';
+            const actionTypeId = formRow.querySelector('.action-type-select')?.value || '';
+            const causeId = formRow.querySelector('.cause-select')?.value || '';
 
-                if (tracksDefect && outcome === 'Defective' && (!actionTypeId || !causeId)) {
-                    alertBox.innerHTML = `<div class="alert alert-danger small">${jsActionTypeRequired}</div>`;
-                    btn.disabled = false;
-                    return;
-                }
-
-                const body = new URLSearchParams({ itemId, outcome, actionTypeId, causeId });
-                maintenanceActionTypeIds.forEach(id => body.append('maintenanceActionTypeIds', id));
-                r = await fetch('/InspectionOrders/UpdateItem', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
-                    body,
-                });
+            if (tracksDefect && outcome === 'Defective' && (!actionTypeId || !causeId)) {
+                alertBox.innerHTML = `<div class="alert alert-danger small">${jsActionTypeRequired}</div>`;
+                btn.disabled = false;
+                return;
             }
+
+            const body = new URLSearchParams({ itemId, outcome, actionTypeId, causeId });
+            const r = await fetch('/InspectionOrders/UpdateItem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                body,
+            });
             btn.disabled = false;
 
             if (!r.ok) {

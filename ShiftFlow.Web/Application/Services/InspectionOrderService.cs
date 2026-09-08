@@ -230,13 +230,12 @@ public class InspectionOrderService : IInspectionOrderService
         return await query.OrderByDescending(o => o.CreatedAt).Take(500).ToListAsync();
     }
 
-    public async Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, List<int>? maintenanceActionTypeIds, string updatedByUserId)
+    public async Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, string updatedByUserId)
     {
         var item = await _db.InspectionRunAssets.FindAsync(itemId)
             ?? throw new InvalidOperationException("Inspection item not found.");
         if (outcome == "Pending" || !InspectionRunAsset.Outcomes.Contains(outcome))
             throw new InvalidOperationException("Invalid outcome.");
-        await EnsureMaintenanceActionTypesExistAsync(maintenanceActionTypeIds);
 
         var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
             .Select(r => r.InspectionOrderId).FirstAsync();
@@ -271,11 +270,11 @@ public class InspectionOrderService : IInspectionOrderService
         item.InspectedAt = DateTime.UtcNow;
         item.WorkOrderId = workOrderId;
 
-        _db.InspectionItemMaintenanceActions.RemoveRange(
-            await _db.InspectionItemMaintenanceActions.Where(m => m.InspectionRunAssetId == itemId).ToListAsync());
-        foreach (var maintenanceActionTypeId in maintenanceActionTypeIds ?? [])
-            _db.InspectionItemMaintenanceActions.Add(new InspectionItemMaintenanceAction { InspectionRunAssetId = itemId, MaintenanceActionTypeId = maintenanceActionTypeId });
-
+        // Maintenance actions are recorded and saved entirely through the standalone Maintenance
+        // button/UpdateMaintenanceActionsAsync now — this method never touches them, so confirming
+        // OK/Defective can't silently wipe out actions already logged for this item (it used to
+        // unconditionally delete-and-replace them here, which zeroed them out on every outcome
+        // confirmation unless the same selection happened to be resubmitted alongside it).
         await _db.SaveChangesAsync();
 
         var runId = item.InspectionRunId;

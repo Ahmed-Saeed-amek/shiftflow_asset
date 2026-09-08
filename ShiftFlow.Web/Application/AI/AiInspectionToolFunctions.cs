@@ -204,7 +204,7 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
             workOrderId = wo.Id;
         }
 
-        await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, null, userId);
+        await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, userId);
         return new { success = true, outcome, workOrderId };
     }
 

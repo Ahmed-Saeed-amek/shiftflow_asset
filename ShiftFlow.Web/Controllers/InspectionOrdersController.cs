@@ -92,7 +92,7 @@ public class InspectionOrdersController : Controller
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateItem(int itemId, string outcome, int? actionTypeId, int? causeId, List<int>? maintenanceActionTypeIds)
+    public async Task<IActionResult> UpdateItem(int itemId, string outcome, int? actionTypeId, int? causeId)
     {
         if (!InspectionRunAsset.Outcomes.Contains(outcome) || outcome == "Pending")
             return BadRequest(new { error = "Invalid outcome." });
@@ -128,7 +128,7 @@ public class InspectionOrdersController : Controller
                 workOrderId = wo.Id;
             }
 
-            await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, maintenanceActionTypeIds, CurrentUserId);
+            await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, CurrentUserId);
             return Ok(new { outcome, workOrderId });
         }
         catch (InvalidOperationException ex)

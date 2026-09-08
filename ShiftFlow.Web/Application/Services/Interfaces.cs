@@ -39,17 +39,17 @@ public interface IInspectionOrderService
     Task<InspectionOrder?> GetByIdAsync(int id);
     Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
     Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue, string userId);
-    Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
+    Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, string updatedByUserId);
     /// <summary>Records maintenance actions performed on an asset independent of the OK/Defective
-    /// outcome decision — logs what maintenance was done without requiring (or changing) an
+    /// outcome decision ï¿½ logs what maintenance was done without requiring (or changing) an
     /// outcome, unlike UpdateInspectionItemAsync. Safe to call on an item at any point, including
     /// after its outcome is already recorded, since it never touches Outcome/WorkOrderId or the
     /// order's completion status.</summary>
     Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId);
     Task CancelAsync(int orderId, string? reason, string userId);
-    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — PendingApproval -> Done.</summary>
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true ï¿½ PendingApproval -> Done.</summary>
     Task ApproveAsync(int orderId, string managerUserId);
-    /// <summary>Manager-only re-assignment to a different employee or Group — the only way to recover
+    /// <summary>Manager-only re-assignment to a different employee or Group ï¿½ the only way to recover
     /// an order whose sole assignee has since been deactivated, since report/complete actions are
     /// otherwise gated on being the current assignee or a member of the assigned Group with no
     /// manager override. Exactly one of assignedToUserId/assignedToGroupId must be set.</summary>
@@ -67,7 +67,7 @@ public interface IGroupService
     Task AddMemberAsync(int groupId, string userId, string actingUserId);
     Task RemoveMemberAsync(int groupId, string userId, string actingUserId);
     Task<bool> IsMemberAsync(int groupId, string userId);
-    /// <summary>Reconciles a group's membership to exactly the given list — used by the Edit page
+    /// <summary>Reconciles a group's membership to exactly the given list ï¿½ used by the Edit page
     /// instead of separate AddMember/RemoveMember calls. originalMemberUserIds is the snapshot the
     /// edit form was loaded with; rejects the call if the DB's current membership no longer matches
     /// it (someone else changed it concurrently), instead of silently discarding their change.</summary>
@@ -81,7 +81,7 @@ public interface IAssetService
     Task UpdateAsync(Asset asset, string userId);
     Task DeleteAsync(int id, string userId);
     /// <summary>Both exports respect the caller's UserAssetScope (Zone/LocationCategory/Category),
-    /// same as Assets/Index — a scoped user must not be able to pull the full, unscoped inventory
+    /// same as Assets/Index ï¿½ a scoped user must not be able to pull the full, unscoped inventory
     /// just by hitting the export link directly instead of the (correctly scoped) list page.</summary>
     Task<byte[]> ExportToExcelAsync(string userId);
     Task<byte[]> ExportToPdfAsync(string userId);
@@ -113,7 +113,7 @@ public interface IContractService
     /// <summary>Picks the vendor from the asset's most recently-started contract that's currently active (EndDate null or in the future); falls back to the most recent contract overall; null if the asset has no contracts.</summary>
     Task<Vendor?> GetDerivedVendorAsync(int assetId);
     Task<Dictionary<int, Vendor?>> GetDerivedVendorsAsync(IEnumerable<int> assetIds);
-    /// <summary>Active (EndDate null or in the future) Service-type contracts covering this asset — the candidate pool a Work Order's vendor must be resolved from. Empty means the asset isn't covered by any Service contract yet.</summary>
+    /// <summary>Active (EndDate null or in the future) Service-type contracts covering this asset ï¿½ the candidate pool a Work Order's vendor must be resolved from. Empty means the asset isn't covered by any Service contract yet.</summary>
     Task<List<ServiceVendorCandidate>> GetActiveServiceVendorsAsync(int assetId);
     /// <summary>Every computed due date for a Preventive Maintenance contract, per linked asset, cross-referenced
     /// against work orders already generated for it. Empty list if the contract isn't PM-type or is missing
@@ -145,9 +145,9 @@ public interface ISparePartService
     Task<SparePart> CreateAsync(SparePart part, List<int> assetIds, string userId);
     Task UpdateAsync(SparePart part, List<int> assetIds, string userId);
     Task AdjustStockAsync(int sparePartId, int newQuantity, string? reason, string userId);
-    /// <summary>Spare parts linked to this specific asset, active only — backs the fix-report pickers.</summary>
+    /// <summary>Spare parts linked to this specific asset, active only ï¿½ backs the fix-report pickers.</summary>
     Task<List<SparePart>> GetCompatiblePartsAsync(int assetId);
-    /// <summary>Atomic, race-safe decrement guarded by StockQuantity >= quantity — same TOCTOU-safe
+    /// <summary>Atomic, race-safe decrement guarded by StockQuantity >= quantity ï¿½ same TOCTOU-safe
     /// ExecuteUpdateAsync-with-WHERE-guard pattern WorkOrderService uses for stage transitions.
     /// Returns false (0 rows affected) if stock is insufficient.</summary>
     Task<bool> TryDecrementStockAsync(int sparePartId, int quantity);
@@ -156,37 +156,37 @@ public interface ISparePartService
 public interface IWorkOrderService
 {
     Task<WorkOrder> CreateAsync(WorkOrder workOrder, string userId);
-    /// <summary>Employee-facing report — creates a WorkOrder with Stage="Draft", outside the normal pipeline, awaiting admin review.</summary>
+    /// <summary>Employee-facing report ï¿½ creates a WorkOrder with Stage="Draft", outside the normal pipeline, awaiting admin review.</summary>
     Task<WorkOrder> ReportAsync(WorkOrder workOrder, string userId);
-    /// <summary>Admin approves a Draft: sets priority, and either sends it to any active vendor (Stage="Sent to Vendor") or — when only an employee is assigned, no vendor — moves it straight to "New" so the employee's Report Fix action becomes available. Requires at least one of vendorId/the work order's own AssignedToUserId to be set.</summary>
+    /// <summary>Admin approves a Draft: sets priority, and either sends it to any active vendor (Stage="Sent to Vendor") or ï¿½ when only an employee is assigned, no vendor ï¿½ moves it straight to "New" so the employee's Report Fix action becomes available. Requires at least one of vendorId/the work order's own AssignedToUserId to be set.</summary>
     Task AcceptAsync(int workOrderId, int? vendorId, string priority, string userId);
-    /// <summary>Admin dismisses a Draft as not actionable — terminal state, stays out of the active pipeline.</summary>
+    /// <summary>Admin dismisses a Draft as not actionable ï¿½ terminal state, stays out of the active pipeline.</summary>
     Task RejectAsync(int workOrderId, string? reason, string userId);
-    /// <summary>Sends an admin-created ("New") work order to any active vendor — Stage="Sent to Vendor".</summary>
+    /// <summary>Sends an admin-created ("New") work order to any active vendor ï¿½ Stage="Sent to Vendor".</summary>
     Task SendToVendorAsync(int workOrderId, int vendorId, string userId);
-    /// <summary>Admin assigns/reassigns/clears the internal employee on a work order — independent of and combinable with VendorId, usable at any stage.</summary>
+    /// <summary>Admin assigns/reassigns/clears the internal employee on a work order ï¿½ independent of and combinable with VendorId, usable at any stage.</summary>
     Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId);
-    /// <summary>The assigned employee's own equivalent of VendorFixAsync — only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely). FixCost is computed from the parts used, not a manual input.</summary>
+    /// <summary>The assigned employee's own equivalent of VendorFixAsync ï¿½ only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely). FixCost is computed from the parts used, not a manual input.</summary>
     Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
-    /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false — usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
+    /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false ï¿½ usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
     Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false);
-    /// <summary>Admin override — force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
+    /// <summary>Admin override ï¿½ force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
     Task ForceCloseAsync(int workOrderId, string? reason, string userId);
-    /// <summary>Vendor submits a fix — Stage="Fixed - Pending Confirmation". FixCost is computed from the parts used, not a manual input.</summary>
+    /// <summary>Vendor submits a fix ï¿½ Stage="Fixed - Pending Confirmation". FixCost is computed from the parts used, not a manual input.</summary>
     Task VendorFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId);
-    /// <summary>Vendor reports they can't proceed — Stage="Blocked".</summary>
+    /// <summary>Vendor reports they can't proceed ï¿½ Stage="Blocked".</summary>
     Task VendorBlockAsync(int workOrderId, int blockReasonId, string? detail, string vendorUserId);
-    /// <summary>Admin resolves whatever blocked the vendor and sends it back to the same vendor — Stage="Sent to Vendor", block fields cleared.</summary>
+    /// <summary>Admin resolves whatever blocked the vendor and sends it back to the same vendor ï¿½ Stage="Sent to Vendor", block fields cleared.</summary>
     Task ResendToVendorAsync(int workOrderId, string userId);
-    /// <summary>Admin accepts the vendor's fix as complete — Stage="Closed".</summary>
+    /// <summary>Admin accepts the vendor's fix as complete ï¿½ Stage="Closed".</summary>
     Task ConfirmFixAsync(int workOrderId, string userId);
-    /// <summary>Admin re-judges priority while reviewing the work order — allowed only before it's
+    /// <summary>Admin re-judges priority while reviewing the work order ï¿½ allowed only before it's
     /// sent to a vendor (Stage is "Draft" or "New"), not once a vendor is already acting on it.</summary>
     Task UpdatePriorityAsync(int workOrderId, string priority, string userId);
-    /// <summary>Auto-generated by the Preventive Maintenance scheduler — creates a work order already at
+    /// <summary>Auto-generated by the Preventive Maintenance scheduler ï¿½ creates a work order already at
     /// Stage="Sent to Vendor" (no Draft/New review step), vendor taken directly from the PM contract.</summary>
     Task<WorkOrder> CreatePreventiveMaintenanceOccurrenceAsync(int assetId, int vendorId, int sourceContractId, DateTime scheduledDate, string? contractNumber, string systemUserId);
-    /// <summary>Auto-generated by the Recurring Order scheduler for a RequiresVendor order type —
+    /// <summary>Auto-generated by the Recurring Order scheduler for a RequiresVendor order type ï¿½
     /// the single-asset, no-contract counterpart to CreatePreventiveMaintenanceOccurrenceAsync. Also
     /// creates the work order already at Stage="Sent to Vendor", but carries the schedule's own
     /// AssignedToUserId (an internal employee overseeing the vendor's work), which PM contracts have
@@ -198,18 +198,18 @@ public interface IWorkOrderService
 
 public interface IMaintenanceOrderService
 {
-    /// <summary>Admin/manager assigns an employee or a Group to fix an asset in-house — no vendor, no
+    /// <summary>Admin/manager assigns an employee or a Group to fix an asset in-house ï¿½ no vendor, no
     /// Work Order. Exactly one of assignedToUserId/assignedToGroupId must be set. Sets Asset.Status
     /// to "Maintenance" (unless Retired).</summary>
     Task<MaintenanceOrder> CreateAsync(int assetId, string? assignedToUserId, int? assignedToGroupId, string? description, DateTime? dueDate, string createdByUserId, int? orderTypeId = null, int? sourceRecurringOrderId = null, DateTime? scheduledDate = null);
-    /// <summary>The assigned employee reports the fix — Status "Open" -> "Done". Restores Asset.Status
+    /// <summary>The assigned employee reports the fix ï¿½ Status "Open" -> "Done". Restores Asset.Status
     /// to "Working" unless another Work Order or Maintenance Order is still open on the same asset.</summary>
     Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
-    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true — PendingApproval -> Done.</summary>
+    /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true ï¿½ PendingApproval -> Done.</summary>
     Task ApproveAsync(int orderId, string managerUserId);
-    /// <summary>Admin cancels an Open order — same asset-status restore rule as CompleteAsync.</summary>
+    /// <summary>Admin cancels an Open order ï¿½ same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
-    /// <summary>Manager-only re-assignment to a different employee or Group — the only way to recover
+    /// <summary>Manager-only re-assignment to a different employee or Group ï¿½ the only way to recover
     /// an order whose sole assignee has since been deactivated, since Complete is otherwise gated on
     /// being the current assignee or a member of the assigned Group with no manager override. Exactly
     /// one of assignedToUserId/assignedToGroupId must be set.</summary>
