@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = Loc.T("Executive Dashboard");
     var recentOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.RecentOrders;
-    var overdueOrders = (List<InspectionOrder>)ViewBag.OverdueOrders;
+    var overdueOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.OverdueOrders;
 
     // The raw InspectionOrder.Status enum value has no space ("InProgress") — fine for a status
     // badge (which shares this app-wide with a dedicated "InProgress" style), but the chart's own
@@ -48,11 +48,14 @@
                 }
                 @foreach (var o in overdueOrders)
                 {
-                    <a class="list-group-item list-group-item-action" asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.Id">
+                    <a class="list-group-item list-group-item-action" asp-controller="@o.DetailsController" asp-action="Details" asp-route-id="@o.Id">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="small fw-semibold">@o.OrderNumber</div>
-                                <div class="small text-muted">@(o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? Loc.T("Group") + ": " + o.AssignedToGroup.Name : "—")) · @Loc.T("Due") @o.DueDate?.ToString("dd/MM/yyyy")</div>
+                                <div class="small fw-semibold d-flex align-items-center gap-2">
+                                    @o.OrderNumber
+                                    <span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span>
+                                </div>
+                                <div class="small text-muted">@(o.AssignedToLabel ?? "—") · @Loc.T("Due") @o.DueDate?.ToString("dd/MM/yyyy")</div>
                             </div>
                             <partial name="_StatusBadge" model="@o.Status" />
                         </div>

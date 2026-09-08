@@ -55,19 +55,52 @@ public class DashboardController : Controller
 
         ViewBag.RecentOrders = await BuildRecentOrdersAsync(scopedAssetIds);
 
-        var overdueQuery = _db.InspectionOrders.AsNoTracking()
-            .Where(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < DateTime.UtcNow.Date);
-        if (scopedAssetIds != null) overdueQuery = overdueQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
-        // The KPI card's own count comes from GetKpisAsync's 2-minute cache, so it could lag
-        // behind this list — which always queries live — right after creating/closing an
-        // overdue order. Query the live count here too (cheap: same predicate, no .Include/Take)
-        // so the card and the list under it can never visibly disagree on the same page load.
-        ViewBag.OverdueOrderCount = await overdueQuery.CountAsync();
-        ViewBag.OverdueOrders = await overdueQuery
-            .Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup)
-            .OrderBy(o => o.DueDate).Take(6).ToListAsync();
+        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssetIds);
+        ViewBag.OverdueOrderCount = overdueCount;
+        ViewBag.OverdueOrders = overdueOrders;
 
         return View(kpis);
+    }
+
+    /// <summary>Overdue = Inspection or Maintenance order, still open, past its DueDate — combined
+    /// across both categories, same as BuildRecentOrdersAsync, since an executive checking "what's
+    /// overdue" cares about both, not just Inspection Orders (the previous version's scope). Work
+    /// Orders have no DueDate/deadline concept (only ScheduledDate, used for recurring-schedule
+    /// dedup), so there's nothing comparable to include for them.</summary>
+    private async Task<(int Count, List<MyWorkOrderRow> Rows)> BuildOverdueOrdersAsync(List<int>? scopedAssetIds)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var inspectionQuery = _db.InspectionOrders.AsNoTracking()
+            .Where(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < today);
+        if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        var inspectionCount = await inspectionQuery.CountAsync();
+        var inspectionRows = (await inspectionQuery.Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup)
+            .OrderBy(o => o.DueDate).Take(6).ToListAsync())
+            .Select(o => new MyWorkOrderRow
+            {
+                Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+                Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
+                AssignedToLabel = o.AssignedToUser != null ? o.AssignedToUser.FullName
+                    : o.AssignedToGroup != null ? _loc.T("Group") + ": " + o.AssignedToGroup.Name : null,
+            });
+
+        var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking()
+            .Where(m => m.Status != "Done" && m.Status != "Cancelled" && m.DueDate != null && m.DueDate < today);
+        if (scopedAssetIds != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssetIds.Contains(m.AssetId));
+        var maintenanceCount = await maintenanceQuery.CountAsync();
+        var maintenanceRows = (await maintenanceQuery.Include(m => m.AssignedToUser).Include(m => m.AssignedToGroup)
+            .OrderBy(m => m.DueDate).Take(6).ToListAsync())
+            .Select(m => new MyWorkOrderRow
+            {
+                Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
+                Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate, DetailsController = "MaintenanceOrders",
+                AssignedToLabel = m.AssignedToUser != null ? m.AssignedToUser.FullName
+                    : m.AssignedToGroup != null ? _loc.T("Group") + ": " + m.AssignedToGroup.Name : null,
+            });
+
+        var rows = inspectionRows.Concat(maintenanceRows).OrderBy(r => r.DueDate).Take(6).ToList();
+        return (inspectionCount + maintenanceCount, rows);
     }
 
     /// <summary>Org-wide "what's happening" feed — the most recent orders across all three

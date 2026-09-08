@@ -34,7 +34,12 @@ public class DashboardService : IDashboardService
             : null;
 
         // Sequential — a scoped DbContext cannot run these counts concurrently.
-        var totalEngineers = await _db.Users.AsNoTracking().CountAsync(u => u.IsActive);
+        // Field-worker roles only — this card previously counted every active user account
+        // (Admins, HR, OperationsManager, vendor portal logins included), which made "Total
+        // Engineers" a meaningless number with no relationship to actual field headcount.
+        string[] fieldWorkerRoles = ["Engineer", "Senior Engineer", "Operation Engineer", "Technician"];
+        var totalEngineers = await _db.Users.AsNoTracking()
+            .CountAsync(u => u.IsActive && _db.UserRoles.Any(ur => ur.UserId == u.Id && _db.Roles.Any(r => r.Id == ur.RoleId && fieldWorkerRoles.Contains(r.Name))));
 
         var inspectionQuery = _db.InspectionOrders.AsNoTracking().Where(o => o.Status != "Done" && o.Status != "Cancelled");
         if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
