@@ -20,6 +20,9 @@ public static class PermissionCatalog
     public const string GroupView              = "Group.View";
     public const string GroupManage            = "Group.Manage";
 
+    // ── My Work (personal "My Home"/"My Orders" sidebar section) ─────────────────
+    public const string MyWorkView              = "MyWork.View";
+
     // ── AI Assistant ────────────────────────────────────────────────────────────
     public const string AiAssistantUse              = "AiAssistant.Use";
 
@@ -67,6 +70,7 @@ public static class PermissionCatalog
         UserManage, UserView,
         InspectionOrderView, InspectionOrderManage, InspectionOrderReport, InspectionOrderExport,
         GroupView, GroupManage,
+        MyWorkView,
         AiAssistantUse,
         AuditLogView,
         RbacManage,

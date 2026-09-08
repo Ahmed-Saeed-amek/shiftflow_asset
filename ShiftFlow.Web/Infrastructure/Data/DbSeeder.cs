@@ -491,6 +491,8 @@ public static class DbSeeder
             // Groups
             new Permission { Name = "Group.View",                    Category = "Groups", Description = "See the list of groups and their members" },
             new Permission { Name = "Group.Manage",                  Category = "Groups", Description = "Create groups and manage their membership" },
+            // My Work
+            new Permission { Name = "MyWork.View",                   Category = "My Work", Description = "See the 'My Home' and 'My Orders' personal-work section in the sidebar — note: an Admin (System.IsAdmin) always sees it regardless of this setting" },
             // AI Assistant
             new Permission { Name = "AiAssistant.Use",              Category = "AI Assistant", Description = "Access the AI assistant for inspection-order-related questions and actions" },
             // Administration
@@ -566,6 +568,7 @@ public static class DbSeeder
                 "User.View",
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report", "InspectionOrder.Export",
                 "Group.View", "Group.Manage",
+                "MyWork.View",
                 "AiAssistant.Use",
                 // AssetCategory.Manage and OrderType.Manage were missing despite this role already
                 // holding Asset.Manage / WorkOrder.Manage / MaintenanceOrder.Manage — a fresh-eyes
@@ -585,6 +588,7 @@ public static class DbSeeder
             [
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report",
                 "Group.View",
+                "MyWork.View",
                 "Asset.View", "Asset.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
@@ -595,6 +599,7 @@ public static class DbSeeder
             ["Section Head"] =
             [
                 "InspectionOrder.View", "Group.View",
+                "MyWork.View",
                 "Asset.View", "Vendor.View", "WorkOrder.View",
                 "MaintenanceOrder.View",
                 "SparePart.View",
@@ -602,6 +607,7 @@ public static class DbSeeder
             ["Senior Engineer"] =
             [
                 "InspectionOrder.View", "InspectionOrder.Report",
+                "MyWork.View",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
                 "SparePart.View",
@@ -609,6 +615,7 @@ public static class DbSeeder
             ["Engineer"] =
             [
                 "InspectionOrder.Report",
+                "MyWork.View",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
                 "SparePart.View",
@@ -616,6 +623,7 @@ public static class DbSeeder
             ["Operation Engineer"] =
             [
                 "InspectionOrder.Report",
+                "MyWork.View",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
                 "SparePart.View",
@@ -623,6 +631,7 @@ public static class DbSeeder
             ["Technician"] =
             [
                 "InspectionOrder.Report",
+                "MyWork.View",
                 "Asset.View", "Asset.ReportAction", "WorkOrder.View", "WorkOrder.Manage",
                 "MaintenanceOrder.Report",
                 "SparePart.View",

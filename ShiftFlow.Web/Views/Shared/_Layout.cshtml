@@ -16,6 +16,7 @@
     var canViewInspectionOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded;
     var canManageMaintenanceOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
     var canViewGroups = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.GroupView)).Succeeded;
+    var canViewMyWork = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MyWorkView)).Succeeded;
     var canViewAssets = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetView)).Succeeded;
     var canViewVendors = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorView)).Succeeded;
     var canViewWorkOrders = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderView)).Succeeded;
@@ -73,7 +74,7 @@
         }
         else
         {
-            @if (!User.IsInRole("HR") && !User.IsInRole("Admin"))
+            @if (canViewMyWork)
             {
                 <li class="nav-section-label">@Loc.T("My Work")</li>
                 <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
