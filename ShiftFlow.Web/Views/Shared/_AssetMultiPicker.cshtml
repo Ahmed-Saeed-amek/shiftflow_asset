@@ -71,7 +71,10 @@
             </span>
         }
     </div>
-    <input type="text" class="form-control" autocomplete="off" placeholder="@(Model.Placeholder ?? Loc.T("Search"))" data-search />
+    <div class="input-group">
+        <input type="text" class="form-control" autocomplete="off" placeholder="@(Model.Placeholder ?? Loc.T("Search"))" data-search />
+        <button type="button" class="btn btn-outline-secondary" data-scan title="@Loc.T("Scan QR Code")" aria-label="@Loc.T("Scan QR Code")"><i class="bi bi-qr-code-scan"></i></button>
+    </div>
     <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-results></div>
 </div>
 
@@ -143,6 +146,18 @@
     });
     searchEl.addEventListener('focus', () => search(searchEl.value.trim()));
     document.addEventListener('click', e => { if (!root.contains(e.target)) resultsEl.classList.add('d-none'); });
+
+    const scanBtn = root.querySelector('[data-scan]');
+    if (scanBtn && window.scanAssetQr) {
+        scanBtn.addEventListener('click', () => {
+            window.scanAssetQr(asset => {
+                if (!asset) return;
+                searchEl.value = asset.name;
+                searchEl.focus();
+                search(asset.name);
+            });
+        });
+    }
 
     // "Combine filters" toggle — 'union' (default): Category/Location "Add All" each bulk-add
     // independently, as before. 'intersection': whichever button is clicked, the current selections

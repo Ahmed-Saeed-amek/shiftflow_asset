@@ -2,11 +2,14 @@
 @{
     ViewData["Title"] = Loc.T("Asset Visibility");
     var labels = (Dictionary<int, string>)ViewBag.ScopeValueLabels;
+    var groupScopes = (List<GroupAssetScope>)ViewBag.GroupScopes;
+    var groupLabels = (Dictionary<int, string>)ViewBag.GroupScopeValueLabels;
     string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New") + "</a>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Visibility"),Subtitle=Loc.T("Restrict which assets a specific employee can see"),ActionsHtml=actionsHtml})" />
 
-<div class="card border-0 shadow-sm">
+<h6 class="fw-semibold mb-2">@Loc.T("By Employee")</h6>
+<div class="card border-0 shadow-sm mb-4">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead><tr><th>@Loc.T("User")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
@@ -23,6 +26,39 @@
                         <td>
                             <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
                             <form method="post" asp-action="Delete" asp-route-id="@s.Id" class="d-inline" onsubmit="return confirm('@Loc.T("Are you sure?")')">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger">@Loc.T("Delete")</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h6 class="fw-semibold mb-0">@Loc.T("By Group")</h6>
+    <a asp-action="CreateGroup" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New")</a>
+</div>
+<div class="form-text mb-2">@Loc.T("A member's own individual scope above always overrides their group's scope here.")</div>
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>@Loc.T("Group")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
+            <tbody>
+                @if (groupScopes.Count == 0)
+                {
+                    <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                }
+                @foreach (var s in groupScopes)
+                {
+                    <tr>
+                        <td>@Loc.LocalizedName(s.Group?.Name ?? "", s.Group?.NameAr)</td>
+                        <td>@groupLabels[s.Id]</td>
+                        <td>
+                            <a asp-action="EditGroup" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
+                            <form method="post" asp-action="DeleteGroup" asp-route-id="@s.Id" class="d-inline" onsubmit="return confirm('@Loc.T("Are you sure?")')">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-danger">@Loc.T("Delete")</button>
                             </form>

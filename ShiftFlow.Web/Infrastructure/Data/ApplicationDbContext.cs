@@ -37,6 +37,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractAsset> ContractAssets => Set<ContractAsset>();
     public DbSet<UserAssetScope> UserAssetScopes => Set<UserAssetScope>();
+    public DbSet<GroupAssetScope> GroupAssetScopes => Set<GroupAssetScope>();
     public DbSet<AssetActionType> AssetActionTypes => Set<AssetActionType>();
     public DbSet<AssetActionCause> AssetActionCauses => Set<AssetActionCause>();
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
@@ -471,6 +472,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(s => s.UserId).IsUnique();
             e.HasOne(s => s.User).WithMany()
                 .HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.Zone).WithMany()
+                .HasForeignKey(s => s.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.LocationCategory).WithMany()
+                .HasForeignKey(s => s.LocationCategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(s => s.Category).WithMany()
+                .HasForeignKey(s => s.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<GroupAssetScope>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.HasIndex(s => s.GroupId).IsUnique();
+            e.HasOne(s => s.Group).WithMany()
+                .HasForeignKey(s => s.GroupId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(s => s.Zone).WithMany()
                 .HasForeignKey(s => s.ZoneId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(s => s.LocationCategory).WithMany()

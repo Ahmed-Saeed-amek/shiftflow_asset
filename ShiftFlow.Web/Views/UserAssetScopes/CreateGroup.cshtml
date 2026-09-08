@@ -1,0 +1,4 @@
+@model GroupAssetScopeViewModel
+@{ ViewData["Title"] = Loc.T("Asset Visibility"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New")})" />
+<partial name="_GroupForm" model="Model" />

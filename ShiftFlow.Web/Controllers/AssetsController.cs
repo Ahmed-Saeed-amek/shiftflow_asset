@@ -237,6 +237,21 @@ public class AssetsController : Controller
         return Json(results);
     }
 
+    /// <summary>Single-asset lookup by id, same shape/scope as Search — backs the QR-scan button on
+    /// the asset pickers: the scanned code encodes this asset's Details URL (see QrCode above), the
+    /// scanner extracts the id from it, and this resolves that id to a name for the search box
+    /// without trusting whatever text was actually inside the QR code.</summary>
+    [Authorize(Policy = PermissionCatalog.AssetView)]
+    public async Task<IActionResult> ById(int id)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        var asset = await (await ScopedAssetsAsync(userId))
+            .Where(a => a.Id == id)
+            .Select(a => new { id = a.Id, assetTag = a.AssetTag, name = a.Name }).FirstOrDefaultAsync();
+        if (asset == null) return NotFound();
+        return Json(asset);
+    }
+
     /// <summary>All assets under a category — if categoryId is a top-level category, this also
     /// includes every asset in its subcategories; if it's a subcategory, just its own assets.</summary>
     [Authorize(Policy = PermissionCatalog.AssetView)]

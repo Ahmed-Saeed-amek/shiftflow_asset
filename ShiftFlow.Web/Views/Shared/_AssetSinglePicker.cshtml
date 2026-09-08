@@ -10,8 +10,11 @@
 @model ShiftFlow.Web.ViewModels.AssetSinglePickerModel
 <div class="asset-picker position-relative" data-asset-picker>
     <input type="hidden" name="@Model.Name" value="@Model.SelectedId" data-ap-value />
-    <input type="text" class="form-control @Model.CssClass" autocomplete="off"
-           placeholder="@(Model.Placeholder ?? Loc.T("Search by asset tag or name…"))"
-           value="@Model.SelectedLabel" data-ap-search />
+    <div class="input-group">
+        <input type="text" class="form-control @Model.CssClass" autocomplete="off"
+               placeholder="@(Model.Placeholder ?? Loc.T("Search by asset tag or name…"))"
+               value="@Model.SelectedLabel" data-ap-search />
+        <button type="button" class="btn btn-outline-secondary" data-ap-scan title="@Loc.T("Scan QR Code")" aria-label="@Loc.T("Scan QR Code")"><i class="bi bi-qr-code-scan"></i></button>
+    </div>
     <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-ap-results data-nomatch="@Loc.T("No matches")"></div>
 </div>

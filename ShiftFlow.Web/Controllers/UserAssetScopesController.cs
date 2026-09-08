@@ -24,7 +24,92 @@ public class UserAssetScopesController : Controller
         foreach (var s in scopes)
             labels[s.Id] = await DescribeScopeValueAsync(s);
         ViewBag.ScopeValueLabels = labels;
+
+        var groupScopes = await _db.GroupAssetScopes.Include(s => s.Group).OrderBy(s => s.Group!.Name).ToListAsync();
+        var groupLabels = new Dictionary<int, string>();
+        foreach (var s in groupScopes)
+            groupLabels[s.Id] = await DescribeGroupScopeValueAsync(s);
+        ViewBag.GroupScopeValueLabels = groupLabels;
+        ViewBag.GroupScopes = groupScopes;
+
         return View(scopes);
+    }
+
+    public async Task<IActionResult> CreateGroup()
+    {
+        await PopulateLookupsAsync();
+        ViewBag.Groups = await _db.Groups.Where(g => g.IsActive).OrderBy(g => g.Name).ToListAsync();
+        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
+        return View(new GroupAssetScopeViewModel());
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateGroup(GroupAssetScopeViewModel vm)
+    {
+        if (await _db.GroupAssetScopes.AnyAsync(s => s.GroupId == vm.GroupId))
+            ModelState.AddModelError(nameof(vm.GroupId), _loc.T("This group already has a scope assigned — edit or remove it first."));
+        if (vm.GroupId > 0 && !await _db.Groups.AnyAsync(g => g.Id == vm.GroupId))
+            ModelState.AddModelError(nameof(vm.GroupId), _loc.T("Selected group not found."));
+        await ValidateScopeReferencesAsync(vm.ZoneId, vm.LocationCategoryId, vm.CategoryId);
+        if (!ModelState.IsValid)
+        {
+            await PopulateLookupsAsync();
+            ViewBag.Groups = await _db.Groups.Where(g => g.IsActive).OrderBy(g => g.Name).ToListAsync();
+            return View(vm);
+        }
+        _db.GroupAssetScopes.Add(new GroupAssetScope { GroupId = vm.GroupId, ZoneId = vm.ZoneId, LocationCategoryId = vm.LocationCategoryId, CategoryId = vm.CategoryId });
+        await _db.SaveChangesAsync();
+        TempData["Success"] = _loc.T("Scope assigned.");
+        return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> EditGroup(int id)
+    {
+        var scope = await _db.GroupAssetScopes.Include(s => s.Group).FirstOrDefaultAsync(s => s.Id == id);
+        if (scope == null) return NotFound();
+        await PopulateLookupsAsync();
+        ViewBag.Groups = await _db.Groups.Where(g => g.IsActive || g.Id == scope.GroupId).OrderBy(g => g.Name).ToListAsync();
+        ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
+        return View(new GroupAssetScopeViewModel { Id = scope.Id, GroupId = scope.GroupId, ZoneId = scope.ZoneId, LocationCategoryId = scope.LocationCategoryId, CategoryId = scope.CategoryId });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroup(GroupAssetScopeViewModel vm)
+    {
+        if (await _db.GroupAssetScopes.AnyAsync(s => s.Id != vm.Id && s.GroupId == vm.GroupId))
+            ModelState.AddModelError(nameof(vm.GroupId), _loc.T("This group already has a scope assigned — edit or remove it first."));
+        if (vm.GroupId > 0 && !await _db.Groups.AnyAsync(g => g.Id == vm.GroupId))
+            ModelState.AddModelError(nameof(vm.GroupId), _loc.T("Selected group not found."));
+        await ValidateScopeReferencesAsync(vm.ZoneId, vm.LocationCategoryId, vm.CategoryId);
+        if (!ModelState.IsValid)
+        {
+            await PopulateLookupsAsync();
+            ViewBag.Groups = await _db.Groups.Where(g => g.IsActive || g.Id == vm.GroupId).OrderBy(g => g.Name).ToListAsync();
+            return View(vm);
+        }
+        var scope = await _db.GroupAssetScopes.FindAsync(vm.Id);
+        if (scope == null) return NotFound();
+        scope.GroupId = vm.GroupId; scope.ZoneId = vm.ZoneId; scope.LocationCategoryId = vm.LocationCategoryId; scope.CategoryId = vm.CategoryId;
+        await _db.SaveChangesAsync();
+        TempData["Success"] = _loc.T("Scope updated.");
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroup(int id)
+    {
+        var scope = await _db.GroupAssetScopes.FindAsync(id);
+        if (scope != null) { _db.GroupAssetScopes.Remove(scope); await _db.SaveChangesAsync(); TempData["Success"] = _loc.T("Scope removed."); }
+        return RedirectToAction(nameof(Index));
+    }
+
+    private async Task<string> DescribeGroupScopeValueAsync(GroupAssetScope scope)
+    {
+        var parts = new List<string>();
+        if (scope.ZoneId.HasValue) parts.Add($"{_loc.T("Zone")}: {(await _db.Zones.FindAsync(scope.ZoneId.Value))?.Name ?? "—"}");
+        if (scope.LocationCategoryId.HasValue) parts.Add($"{_loc.T("Location Type")}: {(await _db.LocationCategories.FindAsync(scope.LocationCategoryId.Value))?.Name ?? "—"}");
+        if (scope.CategoryId.HasValue) parts.Add($"{_loc.T("Category")}: {(await _db.AssetCategories.FindAsync(scope.CategoryId.Value))?.Name ?? "—"}");
+        return parts.Count > 0 ? string.Join(" + ", parts) : "—";
     }
 
     public async Task<IActionResult> Create()
@@ -39,7 +124,7 @@ public class UserAssetScopesController : Controller
     {
         if (await _db.UserAssetScopes.AnyAsync(s => s.UserId == vm.UserId))
             ModelState.AddModelError(nameof(vm.UserId), _loc.T("This user already has a scope assigned — edit or remove it first."));
-        await ValidateScopeReferencesAsync(vm);
+        await ValidateScopeReferencesAsync(vm.ZoneId, vm.LocationCategoryId, vm.CategoryId);
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); return View(vm); }
         _db.UserAssetScopes.Add(new UserAssetScope { UserId = vm.UserId, ZoneId = vm.ZoneId, LocationCategoryId = vm.LocationCategoryId, CategoryId = vm.CategoryId });
         await _db.SaveChangesAsync();
@@ -52,14 +137,14 @@ public class UserAssetScopesController : Controller
     // unhandled DbUpdateException, leaking the full EF/SqlClient stack trace, error number, and
     // table/column names to the client — same bug class as the FK checks already added elsewhere
     // (RecurringOrdersController.ValidateAsync, ContractService, employee/vendor/group assignment).
-    private async Task ValidateScopeReferencesAsync(UserAssetScopeViewModel vm)
+    private async Task ValidateScopeReferencesAsync(int? zoneId, int? locationCategoryId, int? categoryId)
     {
-        if (vm.ZoneId.HasValue && !await _db.Zones.AnyAsync(z => z.Id == vm.ZoneId))
-            ModelState.AddModelError(nameof(vm.ZoneId), _loc.T("Selected zone not found."));
-        if (vm.LocationCategoryId.HasValue && !await _db.LocationCategories.AnyAsync(c => c.Id == vm.LocationCategoryId))
-            ModelState.AddModelError(nameof(vm.LocationCategoryId), _loc.T("Selected location type not found."));
-        if (vm.CategoryId.HasValue && !await _db.AssetCategories.AnyAsync(c => c.Id == vm.CategoryId))
-            ModelState.AddModelError(nameof(vm.CategoryId), _loc.T("Selected category not found."));
+        if (zoneId.HasValue && !await _db.Zones.AnyAsync(z => z.Id == zoneId))
+            ModelState.AddModelError("ZoneId", _loc.T("Selected zone not found."));
+        if (locationCategoryId.HasValue && !await _db.LocationCategories.AnyAsync(c => c.Id == locationCategoryId))
+            ModelState.AddModelError("LocationCategoryId", _loc.T("Selected location type not found."));
+        if (categoryId.HasValue && !await _db.AssetCategories.AnyAsync(c => c.Id == categoryId))
+            ModelState.AddModelError("CategoryId", _loc.T("Selected category not found."));
     }
 
     public async Task<IActionResult> Edit(int id)
@@ -81,7 +166,7 @@ public class UserAssetScopesController : Controller
         // own row.
         if (await _db.UserAssetScopes.AnyAsync(s => s.Id != vm.Id && s.UserId == vm.UserId))
             ModelState.AddModelError(nameof(vm.UserId), _loc.T("This user already has a scope assigned — edit or remove it first."));
-        await ValidateScopeReferencesAsync(vm);
+        await ValidateScopeReferencesAsync(vm.ZoneId, vm.LocationCategoryId, vm.CategoryId);
         if (!ModelState.IsValid)
         {
             await PopulateLookupsAsync();

@@ -132,6 +132,17 @@ function initAssetPickers(){
     search.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(query,220);});
     search.addEventListener('focus',function(){query();});
     document.addEventListener('click',function(e){if(!pk.contains(e.target))hide();});
+    var scanBtn=pk.querySelector('[data-ap-scan]');
+    if(scanBtn && window.scanAssetQr){
+      scanBtn.addEventListener('click',function(){
+        window.scanAssetQr(function(asset){
+          if(!asset) return;
+          search.value=asset.name;
+          search.focus();
+          query();
+        });
+      });
+    }
   });
 }
 
@@ -178,3 +189,93 @@ function initZonePickers(){
     if(categorySel.value) loadZones(false);
   });
 }
+
+// Shared "Scan QR" helper for the asset pickers (_AssetSinglePicker/_AssetMultiPicker). An asset's
+// printed QR code encodes a link straight to its Details page (see AssetsController.QrCode) — not
+// the asset tag itself — so this extracts the numeric id out of that URL and resolves it server-side
+// via /Assets/ById (respecting the caller's own asset scope) rather than trusting the raw QR text.
+// window.scanAssetQr(onResolved) opens the shared modal, decodes one frame, resolves the asset, and
+// calls onResolved({id, assetTag, name}) — or onResolved(null) if the modal was dismissed first.
+window.scanAssetQr = function (onResolved) {
+  var modalEl = document.getElementById('assetQrScanModal');
+  var video = document.getElementById('assetQrScanVideo');
+  var statusEl = document.getElementById('assetQrScanStatus');
+  if (!modalEl || !video || !statusEl || typeof jsQR === 'undefined' || typeof bootstrap === 'undefined') {
+    onResolved(null);
+    return;
+  }
+  var messages = {
+    pointCamera: statusEl.textContent,
+    resolving: statusEl.dataset.resolving || 'Looking up asset…',
+    notAnAsset: statusEl.dataset.notAnAsset || "That QR code isn't an asset label — keep scanning…",
+    noSupport: statusEl.dataset.noSupport || "This browser can't access the camera.",
+    noCamera: statusEl.dataset.noCamera || 'Camera access was denied or is unavailable — check your browser/device permissions.',
+  };
+  var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d', { willReadFrequently: true });
+  var stream = null, rafId = null, settled = false;
+
+  function stop() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null;
+    video.srcObject = null;
+  }
+  function finish(result) {
+    if (settled) return;
+    settled = true;
+    stop();
+    modal.hide();
+    onResolved(result);
+  }
+  function tick() {
+    if (settled) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+      if (code && code.data) {
+        var match = code.data.match(/\/Assets\/Details\/(\d+)/i);
+        if (match) {
+          statusEl.textContent = messages.resolving;
+          fetch('/Assets/ById?id=' + match[1], { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (asset) { finish(asset); })
+            .catch(function () { finish(null); });
+          return;
+        }
+        statusEl.textContent = messages.notAnAsset;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+    modalEl.removeEventListener('hidden.bs.modal', onHidden);
+    if (!settled) { settled = true; stop(); onResolved(null); }
+  });
+
+  // Open the modal before requesting the camera (not after) so a denial or "no camera" failure
+  // shows an explanatory message in the modal itself instead of the button silently doing nothing —
+  // the earlier version only opened the modal on success, so a denied permission looked like a
+  // broken button with zero feedback.
+  statusEl.textContent = messages.pointCamera;
+  modal.show();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    statusEl.textContent = messages.noSupport;
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function (s) {
+      if (settled) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+      stream = s;
+      video.srcObject = s;
+      video.play();
+      rafId = requestAnimationFrame(tick);
+    })
+    .catch(function () {
+      if (!settled) statusEl.textContent = messages.noCamera;
+    });
+};

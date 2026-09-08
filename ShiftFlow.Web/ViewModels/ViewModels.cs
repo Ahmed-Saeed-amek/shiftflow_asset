@@ -222,6 +222,26 @@ public class UserAssetScopeViewModel : IValidatableObject
     }
 }
 
+/// <summary>Same shape as UserAssetScopeViewModel, one level up — restricts what every member of a
+/// group can see instead of one specific employee. A member's own individual scope, if they have
+/// one, always overrides this — see AssetScopeService.</summary>
+public class GroupAssetScopeViewModel : IValidatableObject
+{
+    public int Id { get; set; }
+    [Required] public int GroupId { get; set; }
+    public int? ZoneId { get; set; }
+    public int? LocationCategoryId { get; set; }
+    public int? CategoryId { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var t = ValidationHelper.Localizer(validationContext);
+        foreach (var r in ValidationHelper.CheckSelected(GroupId, nameof(GroupId), "Group", t)) yield return r;
+        if (ZoneId == null && LocationCategoryId == null && CategoryId == null)
+            yield return new ValidationResult(t("Pick at least one of Zone, Location Type, or Category."), new[] { nameof(ZoneId) });
+    }
+}
+
 public class ReportActionViewModel : IValidatableObject
 {
     public int AssetId { get; set; }

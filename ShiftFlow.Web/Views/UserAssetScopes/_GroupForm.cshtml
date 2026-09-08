@@ -1,0 +1,58 @@
+@model GroupAssetScopeViewModel
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small">@Loc.T("Group")</label>
+                    <select asp-for="GroupId" class="form-select">
+                        <option value="">@Loc.T("Select a group")</option>
+                        @foreach (var g in (List<Group>)ViewBag.Groups)
+                        {
+                            <option value="@g.Id">@Loc.LocalizedName(g.Name, g.NameAr)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="GroupId" class="text-danger small"></span>
+                </div>
+                <div class="col-12">
+                    <div class="form-text mb-1">@Loc.T("Pick any combination — whichever are set narrow the visible assets together.")</div>
+                    <span asp-validation-for="ZoneId" class="text-danger small d-block mb-2"></span>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Zone")</label>
+                    <select asp-for="ZoneId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
+                        @foreach (var z in (List<Zone>)ViewBag.Zones)
+                        {
+                            <option value="@z.Id">@Loc.LocalizedName(z.Name, z.NameAr)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Location Type")</label>
+                    <select asp-for="LocationCategoryId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
+                        @foreach (var c in (List<LocationCategory>)ViewBag.LocationCategories)
+                        {
+                            <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">@Loc.T("Category")</label>
+                    <select asp-for="CategoryId" class="form-select">
+                        <option value="">@Loc.T("(Any)")</option>
+                        <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=(List<AssetCategory>)ViewBag.Categories})" />
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
+                <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
+            </div>
+        </form>
+    </div>
+</div>
