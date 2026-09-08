@@ -127,6 +127,7 @@
                                 </div>
                                 <div class="col-md-2">
                                     <button type="button" class="btn btn-sm btn-primary w-100 save-outcome-btn">@Loc.T("Save")</button>
+                                    <div class="small text-muted d-none maintenance-save-status"></div>
                                 </div>
                                 <div class="col-12 small text-muted d-none maintenance-only-hint">
                                     <i class="bi bi-info-circle me-1"></i>@Loc.T("This just logs maintenance work performed — the asset still needs OK or Defective recorded separately.")
@@ -248,7 +249,8 @@ else
     // optional when it's actually what commits the OK/Defective decision you just clicked.
     const jsConfirmOk = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Confirm OK")));
     const jsConfirmDefective = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Confirm Defective")));
-    const jsSaveMaintenance = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Save Maintenance Actions")));
+    const jsSaving = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Saving…")));
+    const jsSaved = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Saved")));
     const isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
     const localName = i => (isRTL && i.nameAr) ? i.nameAr : i.name;
 
@@ -317,10 +319,70 @@ else
         else summary.textContent = `${checked.length} ${jsSelected}`;
     }
 
+    // Auto-save for the standalone "Maintenance" flow (mode='maintenance') — checking/unchecking
+    // an action posts on its own, debounced so a quick run of clicks becomes one request instead
+    // of one per checkbox. The combined OK/Defective flow (mode='outcome') is unaffected — that one
+    // still needs its own explicit Confirm click since it also carries the outcome/action/cause.
+    const maintenanceSaveTimers = new WeakMap();
+
+    async function performMaintenanceSave(formRow) {
+        const itemId = formRow.dataset.formFor;
+        const checked = formRow.querySelectorAll('.maintenance-action-check:checked');
+        const ids = Array.from(checked).map(c => c.value);
+        const statusEl = formRow.querySelector('.maintenance-save-status');
+        if (statusEl) { statusEl.textContent = jsSaving; statusEl.classList.remove('d-none'); }
+
+        const body = new URLSearchParams({ itemId });
+        ids.forEach(id => body.append('maintenanceActionTypeIds', id));
+        let r;
+        try {
+            r = await fetch('/InspectionOrders/UpdateMaintenanceActions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                body,
+            });
+        } catch {
+            r = null;
+        }
+        if (!r || !r.ok) {
+            if (statusEl) statusEl.classList.add('d-none');
+            const err = r ? await r.json().catch(() => ({})) : {};
+            alertBox.innerHTML = `<div class="alert alert-danger small">${err.error || jsFailed}</div>`;
+            return;
+        }
+        alertBox.innerHTML = '';
+        if (statusEl) {
+            statusEl.textContent = jsSaved;
+            clearTimeout(statusEl._hideTimer);
+            statusEl._hideTimer = setTimeout(() => statusEl.classList.add('d-none'), 2000);
+        }
+
+        // Reflect the new selection in the row's own badge cell without a full page reload —
+        // reloading here would also close the dropdown mid-selection.
+        const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
+        const cell = row && row.querySelector('.maintenance-actions-cell');
+        if (cell) {
+            const badgesHtml = Array.from(checked).map(c => {
+                const label = document.querySelector(`label[for="${c.id}"]`);
+                return `<span class="badge bg-light text-dark border fw-normal">${label ? label.textContent : ''}</span>`;
+            }).join('');
+            const trailing = Array.from(cell.children).filter(el => el.tagName === 'A' || el.tagName === 'BUTTON');
+            cell.innerHTML = badgesHtml ? `<div class="d-flex flex-wrap gap-1">${badgesHtml}</div>` : '';
+            trailing.forEach(el => cell.appendChild(el));
+        }
+    }
+
+    function scheduleMaintenanceSave(formRow) {
+        clearTimeout(maintenanceSaveTimers.get(formRow));
+        maintenanceSaveTimers.set(formRow, setTimeout(() => performMaintenanceSave(formRow), 400));
+    }
+
     // Delegated so it covers every row's checklist with one listener instead of one per row.
     document.addEventListener('change', e => {
         if (e.target.matches('.maintenance-action-check')) {
-            updateMaintenanceCount(e.target.closest('tr.inline-form-row'));
+            const formRow = e.target.closest('tr.inline-form-row');
+            updateMaintenanceCount(formRow);
+            if (formRow.dataset.mode === 'maintenance') scheduleMaintenanceSave(formRow);
         }
     });
 
@@ -336,12 +398,19 @@ else
         formRow.dataset.mode = 'maintenance';
         delete formRow.dataset.outcome;
         formRow.querySelectorAll('.defect-only').forEach(el => el.classList.add('d-none'));
+        // Auto-save (see the checkbox 'change' listener below) replaces the need for an explicit
+        // Save click in this mode — the button would just be a confusing extra step now.
         const saveBtn = formRow.querySelector('.save-outcome-btn');
-        if (saveBtn) saveBtn.textContent = jsSaveMaintenance;
+        if (saveBtn) saveBtn.classList.add('d-none');
         const hint = formRow.querySelector('.maintenance-only-hint');
         if (hint) hint.classList.toggle('d-none', !stillPending);
         await loadMaintenanceActionChecklist(formRow);
         updateMaintenanceCount(formRow);
+
+        // "Drop from the Maintenance button itself" — open the checklist immediately instead of
+        // making the user click the dropdown toggle as a second step after it's just appeared.
+        const toggle = formRow.querySelector('.maintenance-action-dropdown [data-bs-toggle="dropdown"]');
+        if (toggle) requestAnimationFrame(() => bootstrap.Dropdown.getOrCreateInstance(toggle).show());
     }
 
     document.querySelectorAll('.maintenance-only-btn').forEach(btn => {
@@ -371,7 +440,9 @@ else
             const isDefect = outcome === 'Defective';
             formRow.querySelectorAll('.defect-only').forEach(el => el.classList.toggle('d-none', !isDefect));
             const saveBtn = formRow.querySelector('.save-outcome-btn');
-            if (saveBtn) saveBtn.textContent = isDefect ? jsConfirmDefective : jsConfirmOk;
+            if (saveBtn) { saveBtn.textContent = isDefect ? jsConfirmDefective : jsConfirmOk; saveBtn.classList.remove('d-none'); }
+            const saveStatus = formRow.querySelector('.maintenance-save-status');
+            if (saveStatus) saveStatus.classList.add('d-none');
             const hint = formRow.querySelector('.maintenance-only-hint');
             if (hint) hint.classList.add('d-none');
             const actionTypeSel = formRow.querySelector('.action-type-select');
