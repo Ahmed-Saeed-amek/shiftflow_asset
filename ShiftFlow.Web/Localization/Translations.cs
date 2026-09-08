@@ -364,7 +364,7 @@ public static class Translations
         // English dash-clause structure for a plain Arabic status phrase.
         ["Sent to Vendor"] = "لدى المورد",
         ["Fixed - Pending Confirmation"] = "بانتظار تأكيد الإصلاح",
-        ["Blocked"] = "مسدود",
+        ["Blocked"] = "محظور",
         ["Send to Vendor"] = "إرسال إلى المورد",
         ["Resend"] = "إعادة الإرسال",
         ["Confirm"] = "تأكيد",
@@ -436,14 +436,14 @@ public static class Translations
         ["Maintenance order not found."] = "أمر الصيانة غير موجود.",
         ["Month"] = "الشهر",
         ["Your past orders, grouped by month"] = "طلباتك السابقة، مجمّعة حسب الشهر",
-        ["Zone Overview"] = "نظرة عامة على المواقع",
-        ["Latest orders by zone"] = "أحدث الطلبات حسب الموقع",
+        ["Zone Overview"] = "نظرة عامة على المواضع",
+        ["Latest orders by zone"] = "أحدث الطلبات حسب الموضع",
         ["Dispatched Orders"] = "الطلبات الموجّهة",
-        ["No work orders dispatched to this zone yet."] = "لا توجد طلبات عمل موجّهة لهذا الموقع بعد.",
+        ["No work orders dispatched to this zone yet."] = "لا توجد طلبات عمل موجّهة لهذا الموضع بعد.",
         ["Last Visited"] = "آخر زيارة",
         ["Asset Map"] = "خريطة الأصول",
-        ["No zones match these filters."] = "لا توجد مواقع مطابقة لهذه الفلاتر.",
-        ["No defective or under-maintenance assets in this zone."] = "لا توجد أصول معطلة أو قيد الصيانة في هذا الموقع.",
+        ["No zones match these filters."] = "لا توجد مواضع مطابقة لهذه الفلاتر.",
+        ["No defective or under-maintenance assets in this zone."] = "لا توجد أصول معطلة أو قيد الصيانة في هذا الموضع.",
         ["Order Kind"] = "نوع الأمر",
         ["Maintenance Actions"] = "إجراءات الصيانة",
         ["Select actions"] = "اختر الإجراءات",
@@ -489,28 +489,28 @@ public static class Translations
         ["Failed to save."] = "فشل الحفظ.",
 
         // Groups
-        ["Group"] = "فريق",
-        ["Groups"] = "الفرق",
+        ["Group"] = "مجموعة",
+        ["Groups"] = "المجموعات",
         ["Reusable groups of employees for inspection orders"] = "مجموعات موظفين قابلة لإعادة الاستخدام لأوامر المعاينة",
-        ["New Group"] = "فريق جديد",
+        ["New Group"] = "مجموعة جديدة",
         ["Members"] = "الأعضاء",
         ["Manage Members"] = "إدارة الأعضاء",
         ["Combine filters"] = "دمج الفلاتر",
         ["Both"] = "كلاهما",
         ["Arabic Name"] = "الاسم بالعربية",
-        ["Create Group"] = "إنشاء الفريق",
+        ["Create Group"] = "إنشاء مجموعة",
         ["Create a reusable group of employees"] = "أنشئ مجموعة موظفين قابلة لإعادة الاستخدام",
-        ["Edit Group"] = "تعديل الفريق",
-        ["No groups yet."] = "لا توجد فرق حتى الآن.",
-        ["Could not add that member — the group or user may no longer exist."] = "تعذّرت إضافة هذا العضو — قد يكون الفريق أو المستخدم غير موجود.",
+        ["Edit Group"] = "تعديل المجموعة",
+        ["No groups yet."] = "لا توجد مجموعات حتى الآن.",
+        ["Could not add that member — the group or user may no longer exist."] = "تعذّرت إضافة هذا العضو — قد تكون المجموعة أو المستخدم غير موجود.",
 
         // Inspection Orders
         ["Inspection Order"] = "أمر معاينة",
         ["Inspection Orders"] = "أوامر المعاينة",
         ["New Inspection Order"] = "أمر معاينة جديد",
-        ["Assign one or more assets to an employee or a group"] = "اختر الأصول ووزّعها على موظف أو فريق",
+        ["Assign one or more assets to an employee or a group"] = "اختر الأصول ووزّعها على موظف أو مجموعة",
         ["What needs to be inspected?"] = "ما الذي تريد معاينته؟",
-        ["Select a group"] = "اختر فريق",
+        ["Select a group"] = "اختر مجموعة",
         ["Create Order"] = "إنشاء الأمر",
         ["New Order"] = "أمر جديد",
         ["All Orders"] = "كل الأوامر",
@@ -522,19 +522,19 @@ public static class Translations
         ["No orders in this period."] = "لا توجد أوامر في هذه الفترة.",
         ["Inspection order performance — Work Orders and Maintenance Orders aren't counted here"] = "أداء أوامر المعاينة — لا تُحتسب أوامر العمل وأوامر الصيانة هنا",
         ["Orders Assigned"] = "الأوامر المسندة",
-        ["Assign inspections to employees or groups"] = "وزّع مهام المعاينة على الموظفين أو الفرق",
+        ["Assign inspections to employees or groups"] = "وزّع مهام المعاينة على الموظفين أو المجموعات",
         ["Search by order # or title..."] = "ابحث برقم الأمر أو العنوان...",
         ["No inspection orders found."] = "لا توجد أوامر معاينة حالياً.",
         ["Order #"] = "رقم الأمر",
         ["My Orders"] = "أوامري",
         ["Every inspection, maintenance, and work order assigned to you or your groups, in one place"] = "كل أوامر المعاينة والصيانة والعمل المسندة إليك أو إلى فرقك، في مكان واحد",
-        ["Inspection orders assigned to you or your groups"] = "أوامر المعاينة المسندة لك أو لفريقك",
+        ["Inspection orders assigned to you or your groups"] = "أوامر المعاينة المسندة لك أو لمجموعتك",
         ["No inspection orders assigned to you."] = "لا توجد أوامر معاينة مسندة لك.",
         ["No open inspection orders — you're all caught up."] = "رائع! لا توجد أوامر معاينة قائمة حالياً.",
         ["Assigned to"] = "مسند إلى",
         ["Open Inspection Orders"] = "أوامر المعاينة القائمة",
         ["Overdue Orders"] = "أوامر متأخرة",
-        ["Active Groups"] = "الفرق النشطة",
+        ["Active Groups"] = "المجموعات النشطة",
         ["Inspection Orders by Status"] = "أوامر المعاينة حسب الحالة",
         ["No overdue orders"] = "لا توجد أوامر متأخرة",
         ["Recent Inspection Orders"] = "آخر أوامر المعاينة",
@@ -1213,7 +1213,7 @@ public static class Translations
         Ar["Shift task performance across work areas and groups"] = "أداء مهام النوبات عبر مناطق العمل والمجموعات";
         Ar["Start Time"] = "وقت البدء";
         Ar["Starting rotation:"] = "بدء الدوران:";
-        Ar["Summarise this shift — work completed, status updates, anything the next group needs to know."] = "لخّص هذه النوبة — العمل المنجز، تحديثات الحالة، وأي شيء يحتاج الفريق التالي معرفته.";
+        Ar["Summarise this shift — work completed, status updates, anything the next group needs to know."] = "لخّص هذه النوبة — العمل المنجز، تحديثات الحالة، وأي شيء تحتاج المجموعة التالية معرفته.";
         Ar["Sun"] = "الأحد";
         Ar["Table View"] = "عرض الجدول";
         Ar["task"] = "مهمة";
@@ -1606,14 +1606,14 @@ public static class Translations
         Ar["Spare Parts Analytics"] = "تحليلات قطع الغيار";
         Ar["Low Stock Parts"] = "قطع الغيار منخفضة المخزون";
         Ar["EmployeeOnly"] = "موظف فقط";
-        Ar["GroupOnly"] = "فريق فقط";
+        Ar["GroupOnly"] = "مجموعة فقط";
         Ar["Either"] = "أي منهما";
         Ar["Multiple"] = "متعددة";
         Ar["Single"] = "واحدة";
         Ar["Assets"] = "الأصول";
         Ar["PendingApproval"] = "بانتظار الموافقة";
         Ar["Pending Approval"] = "بانتظار الموافقة";
-        Ar["Approve"] = "الموافقة";
+        Ar["Approve"] = "موافقة";
         Ar["— Select a category —"] = "— اختر فئة —";
         Ar["Most Used"] = "الأكثر استخدامًا";
         Ar["By Asset"] = "حسب الأصل";
@@ -1738,12 +1738,12 @@ public static class Translations
         // AI Assistant chat page
         Ar["Clear"] = "مسح";
         Ar["Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage groups, report on assets, and more. What can I do for you today?"]
-            = "أهلاً! أنا مساعدك الذكي في STEP. أقدر أساعدك تتابع أوامر المعاينة، تدير الفرق، تبلّغ عن حالة الأصول، وأكثر. وش أقدر أساعدك فيه اليوم؟";
-        Ar["My Groups"] = "فرقي";
+            = "مرحبًا! أنا مساعدك الذكي في STEP. يمكنني مساعدتك في متابعة أوامر المعاينة، وإدارة المجموعات، والإبلاغ عن حالة الأصول، وغير ذلك. كيف يمكنني مساعدتك اليوم؟";
+        Ar["My Groups"] = "مجموعاتي";
         Ar["Show me my inspection orders"] = "أظهر لي أوامر المعاينة الخاصة بي";
-        Ar["Which of my inspection orders are overdue?"] = "وش الأوامر المتأخرة عندي؟";
-        Ar["List my groups"] = "أظهر لي فرقي";
-        Ar["Help me create a new inspection order"] = "ساعدني أنشئ أمر معاينة جديد";
+        Ar["Which of my inspection orders are overdue?"] = "ما هي أوامر المعاينة المتأخرة الخاصة بي؟";
+        Ar["List my groups"] = "أظهر لي مجموعاتي";
+        Ar["Help me create a new inspection order"] = "ساعدني في إنشاء أمر معاينة جديد";
         Ar["Dashboard KPIs"] = "مؤشرات الأداء";
         Ar["What are the dashboard KPIs?"] = "ما هي مؤشرات الأداء في لوحة التحكم؟";
         Ar["Voice input"] = "إدخال صوتي";
@@ -1759,7 +1759,7 @@ public static class Translations
         Ar["An error occurred processing your request. Please try again."] = "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.";
         Ar["Connecting avatar…"] = "جارٍ الاتصال بالمساعد المرئي...";
         Ar["Avatar unavailable — voice replies still work."] = "المساعد المرئي غير متاح حالياً — الردود الصوتية لا تزال تعمل.";
-        Ar["Ask about inspection orders, groups, and more — by voice or text."] = "اسأل عن أوامر المعاينة والفرق والمزيد — بالصوت أو بالنص.";
+        Ar["Ask about inspection orders, groups, and more — by voice or text."] = "اسأل عن أوامر المعاينة والمجموعات والمزيد — بالصوت أو بالنص.";
         Ar["Conversation"] = "المحادثة";
         Ar["Powered by"] = "بدعم من";
         Ar["Only employees with a scheduled, not-yet-opened shift that day are shown. They will return automatically after this shift."]
@@ -2103,7 +2103,7 @@ public static class Translations
         Ar["Edit Reason"] = "تعديل السبب";
         Ar["Edit Schedule"] = "تعديل الجدول";
         Ar["Edit User"] = "تعديل المستخدم";
-        Ar["Either (Employee or Group)"] = "أي منهما (موظف أو فريق)";
+        Ar["Either (Employee or Group)"] = "أي منهما (موظف أو مجموعة)";
         Ar["Employee only"] = "موظف فقط";
         Ar["End Date (optional)"] = "تاريخ الانتهاء (اختياري)";
         Ar["Enter your current password and choose a new one."] = "أدخل كلمة المرور الحالية واختر كلمة مرور جديدة.";
@@ -2143,7 +2143,7 @@ public static class Translations
         Ar["Select vendor…"] = "اختر موردًا…";
         Ar["Showing overdue inspection orders only"] = "عرض أوامر المعاينة المتأخرة فقط";
         Ar["Specific Category"] = "فئة محددة";
-        Ar["Group only"] = "فريق فقط";
+        Ar["Group only"] = "مجموعة فقط";
         Ar["This inspection order was cancelled."] = "تم إلغاء أمر المعاينة هذا.";
         Ar["This order type requires a vendor — it will become a Work Order instead."] = "يتطلب نوع الأمر هذا موردًا — سيصبح أمر عمل بدلاً من ذلك.";
         Ar["Total Parts Cost"] = "إجمالي تكلفة القطع";
@@ -2151,7 +2151,7 @@ public static class Translations
         Ar["— None (create as New) —"] = "— بدون (إنشاء كجديد) —";
 
         // ── RBAC Permission.Category values (Loc.T(group.Key) in Rbac views) ──
-        Ar["Groups"] = "الفرق";
+        Ar["Groups"] = "المجموعات";
         Ar["Inspection Orders"] = "أوامر المعاينة";
 
         // ── Round-4 QA audit: TempData Success/Error flash messages with no Arabic entry ──
@@ -2181,13 +2181,13 @@ public static class Translations
         Ar["Recurring order schedule updated."] = "تم تحديث الجدول الزمني المتكرر.";
         Ar["Select a single-asset order type."] = "اختر نوع أمر بأصل واحد.";
         Ar["This asset is retired and can't be scheduled for new orders."] = "هذا الأصل متقاعد ولا يمكن جدولة أوامر جديدة له.";
-        Ar["Exactly one assignee (employee or group) is required."] = "يجب تحديد جهة إسناد واحدة فقط — موظف أو فريق.";
+        Ar["Exactly one assignee (employee or group) is required."] = "يجب تحديد جهة إسناد واحدة فقط — موظف أو مجموعة.";
         Ar["Selected order type not found."] = "نوع الأمر المحدد غير موجود.";
         Ar["Selected order type is not active."] = "نوع الأمر المحدد غير مفعّل.";
         Ar["Invalid cadence."] = "وتيرة التكرار غير صالحة.";
         Ar["Recurring order schedule not found."] = "الجدول الزمني المتكرر غير موجود.";
         Ar["This schedule's linked assets were changed by someone else since you opened this page. Reload and try again."] = "تم تغيير الأصول المرتبطة بهذا الجدول من قِبل شخص آخر منذ فتحك لهذه الصفحة. أعد التحميل وحاول مرة أخرى.";
-        Ar["This order type requires a vendor, which needs an individual employee assignee — group assignment isn't supported for vendor-routed work orders yet."] = "يتطلب نوع الأمر هذا موردًا، وهو ما يستلزم إسناده لموظف فردي — إسناد الفريق غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورّد.";
+        Ar["This order type requires a vendor, which needs an individual employee assignee — group assignment isn't supported for vendor-routed work orders yet."] = "يتطلب نوع الأمر هذا موردًا، وهو ما يستلزم إسناده لموظف فردي — إسناد المجموعة غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورّد.";
         Ar["One or more selected assets are retired and can't be scheduled for new orders."] = "بعض الأصول المحددة متقاعدة ولا يمكن جدولة أوامر جديدة لها.";
         Ar["One or more selected assets were not found."] = "بعض الأصول المحددة غير موجودة.";
         Ar["Auto-generates one order per linked asset on a repeating cadence — any active order type, including vendor-routed ones."] = "ينشئ أمرًا واحدًا تلقائيًا لكل أصل مرتبط بتكرار دوري — أي نوع أمر مفعّل، بما في ذلك الأنواع الموجَّهة إلى مورّد.";
@@ -2198,7 +2198,7 @@ public static class Translations
         Ar["User not found."] = "المستخدم غير موجود.";
         Ar["You cannot deactivate your own account."] = "لا يمكنك إلغاء تفعيل حسابك الخاص.";
         Ar["Missing required fields for import."] = "حقول مطلوبة مفقودة للاستيراد.";
-        Ar["Group updated."] = "تم تحديث الفريق.";
+        Ar["Group updated."] = "تم تحديث المجموعة.";
         Ar["This asset is retired and can't have new work orders opened against it."] = "هذا الأصل متقاعد ولا يمكن فتح أوامر عمل جديدة له.";
         Ar["Accepted."] = "تم القبول.";
         Ar["Employee assignment updated."] = "تم تحديث إسناد الموظف.";
@@ -2224,28 +2224,28 @@ public static class Translations
         Ar["Block reason updated."] = "تم تحديث سبب الحظر.";
 
         // ── Round-4 fixes: new validation messages and the Reassign feature ──
-        Ar["A vendor-required order type can only be assigned to an employee, not a group — group assignment isn't supported for vendor-routed work orders yet."] = "لا يمكن إسناد نوع الأمر الذي يتطلب موردًا إلا لموظف وليس لفريق — الإسناد إلى فريق غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورد.";
+        Ar["A vendor-required order type can only be assigned to an employee, not a group — group assignment isn't supported for vendor-routed work orders yet."] = "لا يمكن إسناد نوع الأمر الذي يتطلب موردًا إلا لموظف وليس لمجموعة — الإسناد إلى مجموعة غير مدعوم بعد لأوامر العمل الموجَّهة إلى مورد.";
         Ar["Vendor-required order types can't be scheduled yet — the recurring generator doesn't support the Work Order/vendor pipeline."] = "لا يمكن جدولة أنواع الأوامر التي تتطلب موردًا بعد — لا يدعم المولّد المتكرر مسار أمر العمل/المورد.";
         Ar["This maintenance order isn't assigned to you."] = "أمر الصيانة هذا غير مسند إليك.";
         Ar["This inspection order isn't assigned to you."] = "أمر المعاينة هذا غير مسند إليك.";
-        Ar["Select exactly one assignee — a single employee or a Group."] = "اختر جهة إسناد واحدة فقط — موظف واحد أو فريق.";
+        Ar["Select exactly one assignee — a single employee or a Group."] = "اختر جهة إسناد واحدة فقط — موظف واحد أو مجموعة.";
         Ar["Selected employee not found."] = "الموظف المحدد غير موجود.";
         Ar["Selected employee not found or is inactive."] = "الموظف المحدد غير موجود أو غير مفعّل.";
-        Ar["Selected group not found."] = "الفريق المحدد غير موجود.";
+        Ar["Selected group not found."] = "المجموعة المحددة غير موجودة.";
         Ar["A closed maintenance order can't be reassigned."] = "لا يمكن إعادة إسناد أمر صيانة مغلق.";
         Ar["A closed inspection order can't be reassigned."] = "لا يمكن إعادة إسناد أمر معاينة مغلق.";
         Ar["Use this if the current assignee's account has been deactivated and the order needs to move to someone else."] = "استخدم هذا إذا تم إلغاء تفعيل حساب المُسنَد إليه الحالي وتحتاج نقل الأمر إلى شخص آخر.";
         Ar["Reassign"] = "إعادة إسناد";
-        Ar["— or select a group —"] = "— أو اختر فريقًا —";
+        Ar["— or select a group —"] = "— أو اختر مجموعة —";
 
         // ── Round-18 fixes: missing translations for validation errors added in rounds 10-17 ──
-        Ar["Selected zone not found."] = "المنطقة المحددة غير موجودة.";
+        Ar["Selected zone not found."] = "الموضع المحدد غير موجود.";
         Ar["Selected location type not found."] = "نوع الموقع المحدد غير موجود.";
         Ar["Selected category not found."] = "الفئة المحددة غير موجودة.";
         Ar["Selected parent category not found."] = "الفئة الرئيسية المحددة غير موجودة.";
-        Ar["A zone with this name already exists in this location category."] = "توجد منطقة بهذا الاسم بالفعل ضمن نوع الموقع هذا.";
-        Ar["Asset location created."] = "تم إنشاء موقع الأصل.";
-        Ar["Asset location updated."] = "تم تحديث موقع الأصل.";
+        Ar["A zone with this name already exists in this location category."] = "يوجد موضع بهذا الاسم بالفعل ضمن فئة الموقع هذه.";
+        Ar["Asset location created."] = "تم إنشاء الموضع.";
+        Ar["Asset location updated."] = "تم تحديث الموضع.";
         Ar["A vendor named '{0}' already exists."] = "يوجد مورد باسم '{0}' بالفعل.";
         Ar["A block reason named '{0}' already exists."] = "يوجد سبب حظر باسم '{0}' بالفعل.";
         Ar["Role '{0}' already exists."] = "الدور '{0}' موجود بالفعل.";
