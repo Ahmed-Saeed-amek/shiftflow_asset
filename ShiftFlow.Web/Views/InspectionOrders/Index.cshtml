@@ -24,11 +24,16 @@
 }
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
-    <div class="btn-group btn-group-sm" role="group">
-        <a class="btn @(status == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index">@Loc.T("All")</a>
-        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Open">@Loc.T("Open")</a>
-        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="InProgress">@Loc.T("In Progress")</a>
-        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Done">@Loc.T("Done")</a>
+    @* Same unwrapping btn-group issue documented on Orders/Create.cshtml — a btn-group doesn't
+       wrap its buttons, so 4 status labels can drag the whole page into horizontal scroll on a
+       narrow phone instead of just this control. *@
+    <div class="overflow-x-auto">
+        <div class="btn-group btn-group-sm text-nowrap" role="group">
+            <a class="btn @(status == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index">@Loc.T("All")</a>
+            <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Open">@Loc.T("Open")</a>
+            <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+            <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="Done">@Loc.T("Done")</a>
+        </div>
     </div>
     <form method="get" class="d-flex gap-2">
         <input type="hidden" name="status" value="@status" />

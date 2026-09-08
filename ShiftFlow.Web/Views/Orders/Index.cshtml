@@ -56,11 +56,17 @@
             }
         </div>
     </div>
-    <div class="btn-group btn-group-sm" role="group">
-        <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId">@Loc.T("All Statuses")</a>
-        <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Open">@Loc.T("Open")</a>
-        <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="InProgress">@Loc.T("In Progress")</a>
-        <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Done">@Loc.T("Done")</a>
+    @* Same unwrapping btn-group issue as the Order Type chips above (see comment on
+       Orders/Create.cshtml) — 4 status labels ("All Statuses"/"In Progress"/etc.) don't fit a
+       narrow phone width and a btn-group doesn't wrap its buttons, so without this it dragged
+       the whole page into horizontal scroll instead of just this control. *@
+    <div class="overflow-x-auto">
+        <div class="btn-group btn-group-sm text-nowrap" role="group">
+            <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId">@Loc.T("All Statuses")</a>
+            <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Open">@Loc.T("Open")</a>
+            <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+            <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Done">@Loc.T("Done")</a>
+        </div>
     </div>
     <form method="get" class="d-flex gap-2">
         <input type="hidden" name="orderTypeId" value="@orderTypeId" />

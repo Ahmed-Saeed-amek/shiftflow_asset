@@ -31,11 +31,16 @@
     </div>
 </div>
 
-<div class="btn-group btn-group-sm mb-3" role="group">
-    <a class="btn @(string.IsNullOrEmpty(category) ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range">@Loc.T("All Categories")</a>
-    <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Inspection">@Loc.T("Inspection")</a>
-    <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
-    <a class="btn @(category == "WorkOrder" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="WorkOrder">@Loc.T("Work Order")</a>
+@* Same unwrapping btn-group issue documented on Orders/Create.cshtml — 4 category labels
+   ("All Categories"/"Maintenance"/etc.) don't fit a narrow phone and a btn-group doesn't wrap
+   its buttons, so without this it drags the whole page into horizontal scroll. *@
+<div class="overflow-x-auto mb-3">
+    <div class="btn-group btn-group-sm text-nowrap" role="group">
+        <a class="btn @(string.IsNullOrEmpty(category) ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range">@Loc.T("All Categories")</a>
+        <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Inspection">@Loc.T("Inspection")</a>
+        <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
+        <a class="btn @(category == "WorkOrder" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="WorkOrder">@Loc.T("Work Order")</a>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">

@@ -19,19 +19,26 @@
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <span class="small text-muted fw-semibold me-1">@Loc.T("Location Category")</span>
-    <div class="btn-group btn-group-sm" role="group">
-        <button type="button" class="btn btn-primary" data-filter-category="">@Loc.T("All")</button>
-        @foreach (var c in categories)
-        {
-            <button type="button" class="btn btn-outline-secondary" data-filter-category="@c.Name">@Loc.LocalizedName(c.Name, c.NameAr)</button>
-        }
+    @* Same unwrapping btn-group issue documented on Orders/Create.cshtml — an unbounded number
+       of location categories (site-dependent) don't fit a narrow phone and a btn-group doesn't
+       wrap its buttons, so without this it drags the whole page into horizontal scroll. *@
+    <div class="overflow-x-auto">
+        <div class="btn-group btn-group-sm text-nowrap" role="group">
+            <button type="button" class="btn btn-primary" data-filter-category="">@Loc.T("All")</button>
+            @foreach (var c in categories)
+            {
+                <button type="button" class="btn btn-outline-secondary" data-filter-category="@c.Name">@Loc.LocalizedName(c.Name, c.NameAr)</button>
+            }
+        </div>
     </div>
     <span class="small text-muted fw-semibold ms-2 me-1">@Loc.T("Status")</span>
-    <div class="btn-group btn-group-sm" role="group">
-        <button type="button" class="btn btn-primary" data-filter-status="">@Loc.T("All")</button>
-        <button type="button" class="btn btn-outline-secondary" data-filter-status="Defective">@Loc.T("Defective")</button>
-        <button type="button" class="btn btn-outline-secondary" data-filter-status="Maintenance">@Loc.T("Maintenance")</button>
-        <button type="button" class="btn btn-outline-secondary" data-filter-status="OK">@Loc.T("OK")</button>
+    <div class="overflow-x-auto">
+        <div class="btn-group btn-group-sm text-nowrap" role="group">
+            <button type="button" class="btn btn-primary" data-filter-status="">@Loc.T("All")</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter-status="Defective">@Loc.T("Defective")</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter-status="Maintenance">@Loc.T("Maintenance")</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter-status="OK">@Loc.T("OK")</button>
+        </div>
     </div>
 </div>
 

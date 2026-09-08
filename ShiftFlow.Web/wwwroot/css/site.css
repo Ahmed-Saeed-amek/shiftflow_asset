@@ -513,6 +513,15 @@ body.sidebar-locked { overflow: hidden; }
 @media (max-width: 991.98px) {
   .btn-sm { min-height: 44px; padding-top: .5rem; padding-bottom: .5rem; }
 }
+/* Buttons/labels inside a .btn-group-sm (role="group") are sized via CSS custom properties the
+   group sets on itself, not by carrying the .btn-sm class individually — so the .btn-sm rule
+   above never applies to them. Found on the icon-only None/Read/Write/Both and None/Allow/Deny
+   toggles in RolePermissions.cshtml/UserPermissions.cshtml (a handful of these per page, each
+   button just an icon glyph), plus every text btn-check/link toggle group (order-type chips,
+   status filters, etc.) — all under the same ~30px mouse-oriented height as .btn-sm was. */
+@media (max-width: 991.98px) {
+  .btn-group-sm > .btn { min-height: 44px; padding-top: .5rem; padding-bottom: .5rem; }
+}
 /* Bootstrap's .form-control/.form-select set background-color: var(--bs-body-bg)
    directly on the class, same issue as .list-group/.table above — the page-bg
    remap otherwise makes inputs disappear against the page wherever they aren't

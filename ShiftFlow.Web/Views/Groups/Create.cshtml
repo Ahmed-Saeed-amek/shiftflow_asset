@@ -61,7 +61,11 @@
         selected.forEach((label, id) => {
             const chip = document.createElement('span');
             chip.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2';
-            chip.innerHTML = `${label}<input type="hidden" name="MemberUserIds" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem"></button>`;
+            // data-chip is what site.css's [data-chip] .btn-close-sm rule targets to pad this glyph-sized
+            // remove button out to a ~44px touch target (same fix already applied to _AssetMultiPicker's
+            // chips) — without it this ~14x14px "x" is well under a reliably tappable size on phones.
+            chip.setAttribute('data-chip', '');
+            chip.innerHTML = `${label}<input type="hidden" name="MemberUserIds" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" aria-label="Remove"></button>`;
             chip.querySelector('button').addEventListener('click', () => { selected.delete(id); renderChips(); });
             chipsEl.appendChild(chip);
         });
