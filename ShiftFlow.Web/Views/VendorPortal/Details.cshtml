@@ -212,7 +212,10 @@
             if (sparePartIds.length === 0) return;
             if (!window.__sparePartsReady || !window.__sparePartsReady['partsList']) return;
             window.__sparePartsReady['partsList'].then(function () {
-                for (let i = 1; i < sparePartIds.length; i++) addSparePartRow('partsList');
+                // The picker no longer auto-adds a first row (using a part is opt-in — see
+                // _SparePartPicker.cshtml), so every row here has to be added, not just the ones
+                // past the first.
+                for (let i = 0; i < sparePartIds.length; i++) addSparePartRow('partsList');
                 const container = document.getElementById('partsList');
                 const selects = container.querySelectorAll('select[name=SparePartIds]');
                 const qtyInputs = container.querySelectorAll('input[name=PartQuantities]');

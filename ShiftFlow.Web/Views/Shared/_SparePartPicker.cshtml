@@ -21,6 +21,7 @@
         window.__sparePartPickerInit = true;
         window.__sparePartCache = {};   // containerId -> [{id, fullName, sku}]
         window.__sparePartsReady = {};  // containerId -> Promise, so a restore-on-failure script can wait for the row(s) to exist
+        window.__sparePartRemoveLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Remove")));
 
         window.initSparePartPicker = function (containerId, assetId) {
             window.__sparePartsReady[containerId] = fetch('/SpareParts/CompatibleForAsset?assetId=' + encodeURIComponent(assetId))
@@ -32,9 +33,10 @@
                         if (emptyMsg) emptyMsg.classList.remove('d-none');
                         var addBtn = document.getElementById(containerId + 'AddBtn');
                         if (addBtn) addBtn.disabled = true;
-                        return parts;
                     }
-                    addSparePartRow(containerId);
+                    // No row added by default — using a part is optional (not every fix consumes
+                    // one), so the form must not force a selection just because the picker loaded.
+                    // The "Add Part" button is how someone who DID use a part opts in.
                     return parts;
                 });
         };
@@ -47,8 +49,10 @@
             row.className = 'row g-2 mb-1';
             var esc = function (s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
             var options = parts.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('');
-            row.innerHTML = '<div class="col-7"><select name="SparePartIds" class="form-select form-select-sm">' + options + '</select></div>'
-                + '<div class="col-5"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>';
+            row.innerHTML = '<div class="col-6"><select name="SparePartIds" class="form-select form-select-sm">' + options + '</select></div>'
+                + '<div class="col-4"><input type="number" name="PartQuantities" class="form-control form-control-sm" value="1" min="1" /></div>'
+                + '<div class="col-2"><button type="button" class="btn btn-sm btn-outline-danger w-100" aria-label="' + esc(window.__sparePartRemoveLabel || 'Remove') + '"><i class="bi bi-x-lg"></i></button></div>';
+            row.querySelector('button').addEventListener('click', function () { row.remove(); });
             container.appendChild(row);
 
             // Default a newly-added row to a part not already picked in an earlier row - clicking
