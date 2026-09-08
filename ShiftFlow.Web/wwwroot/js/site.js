@@ -208,8 +208,18 @@ window.scanAssetQr = function (onResolved) {
     pointCamera: statusEl.textContent,
     resolving: statusEl.dataset.resolving || 'Looking up asset…',
     notAnAsset: statusEl.dataset.notAnAsset || "That QR code isn't an asset label — keep scanning…",
+    // getUserMedia is only exposed in a "secure context" — https, or http on localhost/127.0.0.1
+    // specifically. Opening the app over plain http via its LAN IP (e.g. http://192.168.x.x:port —
+    // exactly how a phone would reach it to scan a physical label) is NOT secure, so
+    // navigator.mediaDevices is simply undefined there and the button would otherwise look broken
+    // with zero explanation. This is the single most likely real-world failure for this feature.
+    insecureContext: statusEl.dataset.insecureContext
+      || 'Camera access needs a secure connection (HTTPS), or http://localhost on this same computer — scanning over a plain http:// LAN address like this one is blocked by the browser.',
     noSupport: statusEl.dataset.noSupport || "This browser can't access the camera.",
-    noCamera: statusEl.dataset.noCamera || 'Camera access was denied or is unavailable — check your browser/device permissions.',
+    denied: statusEl.dataset.denied || 'Camera access was denied — allow camera access for this site in your browser settings and try again.',
+    noCamera: statusEl.dataset.noCamera || 'No camera was found on this device.',
+    inUse: statusEl.dataset.inUse || 'The camera is already in use by another app or browser tab.',
+    otherError: statusEl.dataset.otherError || 'Camera access is unavailable — check your browser/device permissions.',
   };
   var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
   var canvas = document.createElement('canvas');
@@ -263,6 +273,10 @@ window.scanAssetQr = function (onResolved) {
   // broken button with zero feedback.
   statusEl.textContent = messages.pointCamera;
   modal.show();
+  if (window.isSecureContext === false) {
+    statusEl.textContent = messages.insecureContext;
+    return;
+  }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     statusEl.textContent = messages.noSupport;
     return;
@@ -275,7 +289,12 @@ window.scanAssetQr = function (onResolved) {
       video.play();
       rafId = requestAnimationFrame(tick);
     })
-    .catch(function () {
-      if (!settled) statusEl.textContent = messages.noCamera;
+    .catch(function (err) {
+      if (settled) return;
+      var name = err && err.name;
+      statusEl.textContent = name === 'NotAllowedError' || name === 'SecurityError' ? messages.denied
+        : name === 'NotFoundError' || name === 'DevicesNotFoundError' ? messages.noCamera
+        : name === 'NotReadableError' || name === 'TrackStartError' ? messages.inUse
+        : messages.otherError;
     });
 };
