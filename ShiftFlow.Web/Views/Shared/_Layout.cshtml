@@ -73,7 +73,7 @@
         }
         else
         {
-            @if (!User.IsInRole("HR"))
+            @if (!User.IsInRole("HR") && !User.IsInRole("Admin"))
             {
                 <li class="nav-section-label">@Loc.T("My Work")</li>
                 <li><a class="nav-link" asp-controller="MyHome" asp-action="Index"><i class="bi bi-house-door me-2"></i>@Loc.T("My Home")</a></li>
