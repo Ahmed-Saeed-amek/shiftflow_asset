@@ -15,16 +15,28 @@ public class SparePartsController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ISparePartService _service;
+    private readonly IAssetScopeService _scopeService;
     private readonly UserManager<ApplicationUser> _userManager;
-    public SparePartsController(ApplicationDbContext db, ISparePartService service, UserManager<ApplicationUser> userManager)
+    public SparePartsController(ApplicationDbContext db, ISparePartService service, IAssetScopeService scopeService, UserManager<ApplicationUser> userManager)
     {
-        _db = db; _service = service; _userManager = userManager;
+        _db = db; _service = service; _scopeService = scopeService; _userManager = userManager;
+    }
+
+    /// <summary>Every part linked ONLY to assets outside the caller's own asset scope (see
+    /// AssetScopeService) is excluded — same "can't see a part tied to an asset you can't see"
+    /// rule the catalog's whole point (parts fit specific assets) implies. A user with no scope
+    /// (the common case) sees everything, since ApplyScopeAsync is then a no-op.</summary>
+    private async Task<IQueryable<SparePart>> ScopedPartsAsync(IQueryable<SparePart> query, string userId)
+    {
+        var scopedAssetIds = (await _scopeService.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id);
+        return query.Where(p => p.AssetLinks.Any(l => scopedAssetIds.Contains(l.AssetId)));
     }
 
     [Authorize(Policy = PermissionCatalog.SparePartView)]
     public async Task<IActionResult> Index(bool? lowStockOnly)
     {
-        var query = _db.SpareParts.AsQueryable();
+        var userId = _userManager.GetUserId(User)!;
+        var query = await ScopedPartsAsync(_db.SpareParts.AsQueryable(), userId);
         if (lowStockOnly == true)
             query = query.Where(p => p.ReorderThreshold != null && p.StockQuantity <= p.ReorderThreshold);
         var parts = await query.OrderBy(p => p.Name).ToListAsync();
@@ -35,7 +47,9 @@ public class SparePartsController : Controller
     [Authorize(Policy = PermissionCatalog.SparePartView)]
     public async Task<IActionResult> Details(int id)
     {
-        var part = await _db.SpareParts.Include(p => p.AssetLinks).ThenInclude(l => l.Asset)
+        var userId = _userManager.GetUserId(User)!;
+        var part = await (await ScopedPartsAsync(_db.SpareParts.AsQueryable(), userId))
+            .Include(p => p.AssetLinks).ThenInclude(l => l.Asset)
             .FirstOrDefaultAsync(p => p.Id == id);
         if (part == null) return NotFound();
 
