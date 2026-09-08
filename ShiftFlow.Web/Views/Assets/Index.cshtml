@@ -39,32 +39,58 @@
         </select>
     </div>
     <div class="col-auto">
-        <select name="locationCategoryId" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Location Category")</option>
-            @foreach (var cat in (List<LocationCategory>)ViewBag.LocationCategories)
-            {
-                <option value="@cat.Id" selected="@(ViewBag.LocationCategoryId==cat.Id)">@Loc.LocalizedName(cat.Name, cat.NameAr)</option>
-            }
-        </select>
+        @if ((bool)ViewBag.LocationCategoryLocked)
+        {
+            var lockedLocCat = ((List<LocationCategory>)ViewBag.LocationCategories).FirstOrDefault();
+            <input type="hidden" name="locationCategoryId" value="@ViewBag.LocationCategoryId" />
+            <div class="form-control form-control-sm bg-body-secondary text-muted d-flex align-items-center gap-1" title="@Loc.T("Locked to your assigned scope")">
+                <i class="bi bi-lock-fill small"></i>@(lockedLocCat != null ? Loc.LocalizedName(lockedLocCat.Name, lockedLocCat.NameAr) : Loc.T("Location Category"))
+            </div>
+        }
+        else
+        {
+            <select name="locationCategoryId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@Loc.T("Location Category")</option>
+                @foreach (var cat in (List<LocationCategory>)ViewBag.LocationCategories)
+                {
+                    <option value="@cat.Id" selected="@(ViewBag.LocationCategoryId==cat.Id)">@Loc.LocalizedName(cat.Name, cat.NameAr)</option>
+                }
+            </select>
+        }
     </div>
     <div class="col-auto">
-        <select name="zoneId" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Zone")</option>
-            @foreach (var g in ((List<Zone>)ViewBag.Zones).GroupBy(z => z.LocationCategory!.Name))
-            {
-                <optgroup label="@g.Key">
-                    @foreach (var z in g)
-                    {
-                        <option value="@z.Id" selected="@(ViewBag.ZoneId==z.Id)">@z.Name</option>
-                    }
-                </optgroup>
-            }
-        </select>
+        @if ((bool)ViewBag.ZoneLocked)
+        {
+            var lockedZone = ((List<Zone>)ViewBag.Zones).FirstOrDefault();
+            <input type="hidden" name="zoneId" value="@ViewBag.ZoneId" />
+            <div class="form-control form-control-sm bg-body-secondary text-muted d-flex align-items-center gap-1" title="@Loc.T("Locked to your assigned scope")">
+                <i class="bi bi-lock-fill small"></i>@(lockedZone?.Name ?? Loc.T("Zone"))
+            </div>
+        }
+        else
+        {
+            <select name="zoneId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@Loc.T("Zone")</option>
+                @foreach (var g in ((List<Zone>)ViewBag.Zones).GroupBy(z => z.LocationCategory!.Name))
+                {
+                    <optgroup label="@g.Key">
+                        @foreach (var z in g)
+                        {
+                            <option value="@z.Id" selected="@(ViewBag.ZoneId==z.Id)">@z.Name</option>
+                        }
+                    </optgroup>
+                }
+            </select>
+        }
+    </div>
+    <div class="col-auto form-check d-flex align-items-center pt-1">
+        <input type="checkbox" class="form-check-input" id="assignedToMe" name="assignedToMe" value="true" checked="@((bool)ViewBag.AssignedToMe)" onchange="this.form.submit()" />
+        <label class="form-check-label small ms-1" for="assignedToMe">@Loc.T("Assigned to me")</label>
     </div>
     <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
     </div>
-    @if (ViewBag.LocationCategoryId != null || ViewBag.ZoneId != null || ViewBag.CategoryId != null || ViewBag.Status != null || !string.IsNullOrEmpty((string)ViewBag.Q))
+    @if (ViewBag.LocationCategoryId != null || ViewBag.ZoneId != null || ViewBag.CategoryId != null || ViewBag.Status != null || !string.IsNullOrEmpty((string)ViewBag.Q) || (bool)ViewBag.AssignedToMe)
     {
         <div class="col-auto">
             <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")</a>

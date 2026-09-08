@@ -17,18 +17,23 @@ public interface IAssetScopeService
     Task<IQueryable<Asset>> ApplyScopeAsync(IQueryable<Asset> query, string userId);
     Task<bool> IsInScopeAsync(Asset asset, string userId);
     Task<bool> HasScopeAsync(string userId);
+    /// <summary>The resolved scope's own Zone/LocationCategory/Category ids (same resolution as
+    /// ApplyScopeAsync — individual overrides group), or null if unrestricted. Lets a filter UI lock
+    /// itself to what the user is actually allowed to see instead of offering choices ApplyScopeAsync
+    /// would silently return zero rows for.</summary>
+    Task<EffectiveScope?> GetEffectiveScopeAsync(string userId);
 }
 
 /// <summary>Common shape a UserAssetScope or GroupAssetScope row is read into for effective-scope
 /// resolution — the two entities aren't otherwise related.</summary>
-internal readonly record struct EffectiveScope(int? ZoneId, int? LocationCategoryId, int? CategoryId);
+public readonly record struct EffectiveScope(int? ZoneId, int? LocationCategoryId, int? CategoryId);
 
 public class AssetScopeService : IAssetScopeService
 {
     private readonly ApplicationDbContext _db;
     public AssetScopeService(ApplicationDbContext db) { _db = db; }
 
-    private async Task<EffectiveScope?> GetEffectiveScopeAsync(string userId)
+    public async Task<EffectiveScope?> GetEffectiveScopeAsync(string userId)
     {
         var own = await _db.UserAssetScopes.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == userId);
         if (own != null) return new EffectiveScope(own.ZoneId, own.LocationCategoryId, own.CategoryId);

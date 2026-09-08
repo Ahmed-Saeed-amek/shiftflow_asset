@@ -33,11 +33,11 @@ public class AssetsController : Controller
         _scopeService.ApplyScopeAsync(_db.Assets.AsQueryable(), userId);
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
-    public async Task<IActionResult> Index(string? status, int? categoryId, int? zoneId, int? locationCategoryId, string? q)
+    public async Task<IActionResult> Index(string? status, int? categoryId, int? zoneId, int? locationCategoryId, string? q, bool? assignedToMe)
     {
         q = SearchQuery.Cap(q);
         var currentUserId = _userManager.GetUserId(User)!;
-        var scope = await _db.UserAssetScopes.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == currentUserId);
+        var scope = await _scopeService.GetEffectiveScopeAsync(currentUserId);
         IQueryable<Asset> query = (await ScopedAssetsAsync(currentUserId))
             .Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory);
 
@@ -48,16 +48,64 @@ public class AssetsController : Controller
         else if (locationCategoryId.HasValue) query = query.Where(a => a.Zone!.LocationCategoryId == locationCategoryId.Value);
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(a => a.AssetTag.Contains(q) || a.Name.Contains(q) || (a.SerialNumber != null && a.SerialNumber.Contains(q)));
+        if (assignedToMe == true)
+            query = query.Where(a => AssignedToUserAssetIdsQuery(currentUserId).Contains(a.Id));
 
-        ViewBag.Categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
+        var categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
             .OrderBy(c => c.Name).ToListAsync();
-        ViewBag.Zones = await _db.Zones.Include(z => z.LocationCategory)
+        var zones = await _db.Zones.Include(z => z.LocationCategory)
             .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name).ToListAsync();
-        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
+        var locationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
+
+        // Narrow/lock the filter dropdowns themselves to what the caller's own scope actually
+        // allows — before this, a scoped user could still pick a Zone/Category outside their scope
+        // and just silently get zero results, with nothing telling them why. A Zone scope pins the
+        // Zone (and therefore its LocationCategory) to exactly one value; a bare LocationCategory
+        // scope pins that dropdown and narrows Zone to just its own zones; a Category scope narrows
+        // the Category dropdown to that branch (its own subcategories are still a real, meaningful
+        // choice, so that one isn't fully locked to a single option).
+        ViewBag.ZoneLocked = scope?.ZoneId != null;
+        ViewBag.LocationCategoryLocked = scope?.ZoneId != null || scope?.LocationCategoryId != null;
+        if (scope?.ZoneId is int scopedZoneId)
+        {
+            zones = zones.Where(z => z.Id == scopedZoneId).ToList();
+            locationCategories = locationCategories.Where(c => c.Id == zones[0].LocationCategoryId).ToList();
+            zoneId = scopedZoneId;
+            locationCategoryId ??= zones[0].LocationCategoryId;
+        }
+        else if (scope?.LocationCategoryId is int scopedLocationCategoryId)
+        {
+            zones = zones.Where(z => z.LocationCategoryId == scopedLocationCategoryId).ToList();
+            locationCategories = locationCategories.Where(c => c.Id == scopedLocationCategoryId).ToList();
+            locationCategoryId = scopedLocationCategoryId;
+        }
+        if (scope?.CategoryId is int scopedCategoryId)
+            categories = categories.Where(c => c.Id == scopedCategoryId).ToList();
+
+        ViewBag.Categories = categories;
+        ViewBag.Zones = zones;
+        ViewBag.LocationCategories = locationCategories;
         ViewBag.Status = status; ViewBag.CategoryId = categoryId; ViewBag.ZoneId = zoneId; ViewBag.Q = q;
         ViewBag.LocationCategoryId = locationCategoryId;
+        ViewBag.AssignedToMe = assignedToMe == true;
         ViewBag.IsScoped = scope != null;
         return View(await query.OrderBy(a => a.AssetTag).ToListAsync());
+    }
+
+    /// <summary>Every asset tied to an Inspection/Maintenance/Work order assigned to this user —
+    /// individually, or via a group they belong to (Work Orders have no group-assignment concept).
+    /// Backs the Assets list's "Assigned to me" filter.</summary>
+    private IQueryable<int> AssignedToUserAssetIdsQuery(string userId)
+    {
+        var groupIds = _db.GroupMembers.Where(m => m.UserId == userId).Select(m => m.GroupId);
+        var maintenanceOrderAssetIds = _db.MaintenanceOrders
+            .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && groupIds.Contains(o.AssignedToGroupId.Value)))
+            .Select(o => o.AssetId);
+        var workOrderAssetIds = _db.WorkOrders.Where(o => o.AssignedToUserId == userId).Select(o => o.AssetId);
+        var inspectionOrderAssetIds = _db.InspectionOrders
+            .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && groupIds.Contains(o.AssignedToGroupId.Value)))
+            .SelectMany(o => o.InspectionRun!.Items.Select(i => i.AssetId));
+        return maintenanceOrderAssetIds.Concat(workOrderAssetIds).Concat(inspectionOrderAssetIds);
     }
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
