@@ -7,6 +7,9 @@ using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
 using ShiftFlow.Web.ViewModels;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
 
 namespace ShiftFlow.Web.Controllers;
 
@@ -60,6 +63,49 @@ public class DashboardController : Controller
         ViewBag.OverdueOrders = overdueOrders;
 
         return View(kpis);
+    }
+
+    public async Task<IActionResult> ExportPdf()
+    {
+        var user = await _um.GetUserAsync(User);
+        var kpis = await _dash.GetKpisAsync(user?.Id);
+        List<int>? scopedAssetIds = user != null && await _scope.HasScopeAsync(user.Id)
+            ? await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), user.Id)).Select(a => a.Id).ToListAsync()
+            : null;
+        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssetIds);
+
+        using var ms = new MemoryStream();
+        using (var writer = new PdfWriter(ms))
+        using (var pdf = new PdfDocument(writer))
+        {
+            var doc = new Document(pdf);
+            doc.Add(new Paragraph("Executive Dashboard").SetBold().SetFontSize(16));
+            doc.Add(new Paragraph(DateTime.Today.ToString("yyyy-MM-dd")).SetFontSize(10));
+
+            var kpiTable = new Table(2, true).UseAllAvailableWidth();
+            void Kpi(string label, string value) { kpiTable.AddCell(label); kpiTable.AddCell(value); }
+            Kpi("Open Inspection Orders", kpis.OpenInspectionOrders.ToString());
+            Kpi("Overdue Orders", overdueCount.ToString());
+            Kpi("Active Groups", kpis.ActiveGroups.ToString());
+            Kpi("Defective Assets", $"{kpis.DefectiveAssets}/{kpis.TotalAssets}");
+            Kpi("Open Work Orders", kpis.OpenWorkOrders.ToString());
+            Kpi("Low Stock Parts", kpis.LowStockPartsCount.ToString());
+            doc.Add(kpiTable);
+
+            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontSize(13).SetMarginTop(16));
+            var overdueTable = new Table(4, true).UseAllAvailableWidth();
+            foreach (var h in new[] { "Order Number", "Category", "Assigned To", "Due Date" })
+                overdueTable.AddHeaderCell(h);
+            foreach (var o in overdueOrders)
+            {
+                overdueTable.AddCell(o.OrderNumber);
+                overdueTable.AddCell(o.CategoryLabel);
+                overdueTable.AddCell(o.AssignedToLabel ?? "-");
+                overdueTable.AddCell(o.DueDate?.ToString("yyyy-MM-dd") ?? "-");
+            }
+            doc.Add(overdueTable);
+        }
+        return File(ms.ToArray(), "application/pdf", $"Dashboard_{DateTime.Today:yyyyMMdd}.pdf");
     }
 
     /// <summary>Overdue = Inspection or Maintenance order, still open, past its DueDate — combined

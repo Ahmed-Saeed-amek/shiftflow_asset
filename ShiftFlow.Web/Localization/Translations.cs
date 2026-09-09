@@ -1474,6 +1474,7 @@ public static class Translations
         Ar["Reports"] = "التقارير";
         Ar["Create"] = "إنشاء";
         Ar["Export"] = "تصدير";
+        Ar["Export PDF"] = "تصدير PDF";
         Ar["Manage"] = "إدارة";
         Ar["AssignResponsible"] = "تعيين المسؤول";
         Ar["Request"] = "طلب";

@@ -1,6 +1,6 @@
 @model ShiftFlow.Web.ViewModels.PageHeaderModel
 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-2">
-    <div>
+    <div class="text-break" style="min-width:0">
         <h1 class="fs-3 fw-bold font-heading mb-0">@Loc.T(Model.Title)</h1>
         @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
         {

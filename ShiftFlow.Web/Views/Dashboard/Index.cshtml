@@ -18,7 +18,7 @@
         _ => "bg-info-subtle text-info-emphasis",
     };
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait"),ActionsHtml="<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-primary btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("Export PDF") + "</a>"})" />
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=Model.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
