@@ -48,6 +48,7 @@ public class ContractsController : Controller
     {
         var contract = await _db.Contracts.Include(c => c.Vendor)
             .Include(c => c.AssetLinks).ThenInclude(l => l.Asset)
+            .Include(c => c.Attachments)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (contract == null) return NotFound();
         if (contract.ContractType == "Preventive Maintenance")
@@ -132,6 +133,43 @@ public class ContractsController : Controller
             ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds);
             return View(vm);
         }
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.ContractManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadAttachment(int id, List<IFormFile>? files)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        var rejected = await ShiftFlow.Web.Services.ContractAttachmentStorage.SaveAsync(_db, id, files, userId);
+        if (rejected.Count > 0)
+            TempData["Error"] = string.Join(" ", rejected.Select(r => $"{r.FileName}: {r.Reason}"));
+        else if (files is { Count: > 0 })
+            TempData["Success"] = "Attachment(s) uploaded.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    /// <summary>Downloads a contract attachment — anyone with Contract.View, same as Details.</summary>
+    [Authorize(Policy = PermissionCatalog.ContractView)]
+    public async Task<IActionResult> DownloadAttachment(int attachmentId)
+    {
+        var attachment = await _db.ContractAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId);
+        if (attachment == null) return NotFound();
+        var path = ShiftFlow.Web.Services.ContractAttachmentStorage.ResolvePhysicalPath(attachment.FilePath);
+        if (!System.IO.File.Exists(path)) return NotFound();
+        return PhysicalFile(path, attachment.FileType ?? "application/octet-stream", attachment.FileName);
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.ContractManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAttachment(int attachmentId)
+    {
+        var attachment = await _db.ContractAttachments.FindAsync(attachmentId);
+        if (attachment == null) return NotFound();
+        var contractId = attachment.ContractId;
+        var path = ShiftFlow.Web.Services.ContractAttachmentStorage.ResolvePhysicalPath(attachment.FilePath);
+        _db.ContractAttachments.Remove(attachment);
+        await _db.SaveChangesAsync();
+        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+        TempData["Success"] = "Attachment removed.";
+        return RedirectToAction(nameof(Details), new { id = contractId });
     }
 
     private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)

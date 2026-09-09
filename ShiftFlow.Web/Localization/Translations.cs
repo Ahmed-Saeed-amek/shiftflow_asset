@@ -1897,6 +1897,9 @@ public static class Translations
         Ar["All reports"] = "جميع التقارير";
         Ar["Submitted at"] = "تم التقديم في";
         Ar["No attachments yet."] = "لا توجد مرفقات بعد.";
+        Ar["Remove this attachment?"] = "هل تريد إزالة هذا المرفق؟";
+        Ar["Attachment(s) uploaded."] = "تم رفع المرفق (المرفقات).";
+        Ar["Attachment removed."] = "تمت إزالة المرفق.";
         Ar["All shift handover reports."] = "جميع تقارير تسليم المناوبات.";
         Ar["Your shift handover reports."] = "تقارير تسليم المناوبات الخاصة بك.";
         Ar["report(s)"] = "تقرير(تقارير)";

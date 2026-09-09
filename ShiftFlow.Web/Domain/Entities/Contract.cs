@@ -17,6 +17,7 @@ public class Contract
     public string? PmCadence{get;set;}
 
     public virtual ICollection<ContractAsset> AssetLinks{get;set;}=new List<ContractAsset>();
+    public virtual ICollection<ContractAttachment> Attachments{get;set;}=new List<ContractAttachment>();
 
     public static readonly string[] ContractTypes = ["Purchase", "Warranty", "Service", "Insurance", "Preventive Maintenance"];
     public static readonly string[] PmCadences = ["Weekly", "Monthly", "Quarterly", "Semi-Annual", "Annual"];
@@ -35,4 +36,18 @@ public class ContractAsset
     public int Id{get;set;}
     public int ContractId{get;set;} public virtual Contract? Contract{get;set;}
     public int AssetId{get;set;} public virtual Asset? Asset{get;set;}
+}
+
+/// <summary>A file attached to a Contract (signed PDF, scanned insurance certificate, etc.) — same
+/// shape/storage pattern as WorkOrderAttachment, see ContractAttachmentStorage.</summary>
+public class ContractAttachment
+{
+    public int Id{get;set;}
+    public int ContractId{get;set;} public virtual Contract? Contract{get;set;}
+    public string FileName{get;set;}=string.Empty;
+    public string FilePath{get;set;}=string.Empty;
+    public string? FileType{get;set;}
+    public long FileSize{get;set;}
+    public string UploadedByUserId{get;set;}=string.Empty; public virtual ApplicationUser? UploadedByUser{get;set;}
+    public DateTime UploadedAt{get;set;}=DateTime.UtcNow;
 }

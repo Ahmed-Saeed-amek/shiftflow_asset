@@ -43,6 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<WorkOrderPart> WorkOrderParts => Set<WorkOrderPart>();
     public DbSet<WorkOrderBlockReason> WorkOrderBlockReasons => Set<WorkOrderBlockReason>();
     public DbSet<WorkOrderAttachment> WorkOrderAttachments => Set<WorkOrderAttachment>();
+    public DbSet<ContractAttachment> ContractAttachments => Set<ContractAttachment>();
     public DbSet<MaintenanceOrder> MaintenanceOrders => Set<MaintenanceOrder>();
     public DbSet<MaintenanceOrderPart> MaintenanceOrderParts => Set<MaintenanceOrderPart>();
     public DbSet<OrderType> OrderTypes => Set<OrderType>();
@@ -325,6 +326,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.Property(a => a.FileType).HasMaxLength(150);
             e.HasOne(a => a.WorkOrder).WithMany(w => w.Attachments)
                 .HasForeignKey(a => a.WorkOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(a => a.UploadedByUser).WithMany()
+                .HasForeignKey(a => a.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ContractAttachment>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.FileName).HasMaxLength(300).IsRequired();
+            e.Property(a => a.FilePath).HasMaxLength(500).IsRequired();
+            e.Property(a => a.FileType).HasMaxLength(150);
+            e.HasOne(a => a.Contract).WithMany(c => c.Attachments)
+                .HasForeignKey(a => a.ContractId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(a => a.UploadedByUser).WithMany()
                 .HasForeignKey(a => a.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
