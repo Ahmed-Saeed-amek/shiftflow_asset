@@ -1,5 +1,8 @@
+using iText.IO.Font;
+using iText.IO.Font.Constants;
 using iText.Kernel.Colors;
 using iText.Kernel.Events;
+using iText.Kernel.Font;
 using iText.Kernel.Geom;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas;
@@ -31,6 +34,28 @@ public static class PdfReportHelper
     public static readonly DeviceRgb BorderColor = new(226, 232, 240); // --border: 220 13% 91%
     public static readonly DeviceRgb MutedBackground = new(243, 244, 246); // --muted: 220 14% 96%
     public static readonly DeviceRgb MutedText = new(107, 114, 128); // --muted-foreground: 220 9% 46%
+
+    private static byte[]? _arabicFontBytes;
+
+    /// <summary>iText's default Helvetica has no Arabic glyphs — Arabic text through it doesn't
+    /// error, it just silently renders as nothing (confirmed live: a Dashboard export's "Group: "
+    /// prefix vanished entirely under Arabic, leaving a bare ": Field Team A"). Call
+    /// <c>doc.SetFont(GetFont(loc.IsRTL))</c> right after creating the Document so every element
+    /// added afterward inherits a font that can actually draw the language in use.
+    ///
+    /// A PdfFont returned by PdfFontFactory.CreateFont becomes bound to whichever PdfDocument
+    /// first flushes it — reusing the same PdfFont instance across a second, separate
+    /// PdfDocument throws "Pdf indirect object belongs to other PDF document" (confirmed live:
+    /// worked on the first export after app start, 500'd on every export after that). Only the
+    /// font's raw bytes are safe to cache across requests; a fresh PdfFont is created from them
+    /// every call.</summary>
+    public static PdfFont GetFont(bool rtl)
+    {
+        if (!rtl) return PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+        _arabicFontBytes ??= File.ReadAllBytes(
+            System.IO.Path.Combine(AppContext.BaseDirectory, "App_Data", "fonts", "Cairo-Variable.ttf"));
+        return PdfFontFactory.CreateFont(_arabicFontBytes, PdfEncodings.IDENTITY_H);
+    }
 
     /// <summary>Fills every page with the app's own pale canvas color instead of PDF's default
     /// white, so the white "card" sections added below actually read as cards sitting on a

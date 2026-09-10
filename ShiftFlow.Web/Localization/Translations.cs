@@ -1481,6 +1481,17 @@ public static class Translations
         Ar["Next"] = "التالي";
         Ar["of"] = "من";
         Ar["New assets are only created if this contract is saved successfully."] = "لن يتم إنشاء الأصول الجديدة إلا إذا تم حفظ هذا العقد بنجاح.";
+        Ar["Asset Register"] = "سجل الأصول";
+        Ar["Uncategorized"] = "غير مصنف";
+        Ar["Total Assets"] = "إجمالي الأصول";
+        Ar["Expiring in 30 Days"] = "تنتهي خلال 30 يومًا";
+        Ar["Contracts by Type"] = "العقود حسب النوع";
+        Ar["Work Order #"] = "رقم أمر العمل";
+        Ar["Critical Open"] = "حرجة قائمة";
+        Ar["Work Orders by Stage"] = "أوامر العمل حسب المرحلة";
+        Ar["Tag"] = "الرقم التعريفي";
+        Ar["Assets by Category"] = "الأصول حسب الفئة";
+        Ar["Order Number"] = "رقم الأمر";
         Ar["Manage"] = "إدارة";
         Ar["AssignResponsible"] = "تعيين المسؤول";
         Ar["Request"] = "طلب";

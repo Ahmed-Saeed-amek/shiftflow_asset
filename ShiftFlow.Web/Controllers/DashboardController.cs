@@ -87,26 +87,29 @@ public class DashboardController : Controller
         {
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
-            PdfReportHelper.AddHeader(doc, "Executive Dashboard", "Ministry of Electricity, Water & Renewable Energy — Kuwait · " + DateTime.Today.ToString("dddd, dd MMMM yyyy"));
+            doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
+            PdfReportHelper.AddHeader(doc, _loc.T("Executive Dashboard"),
+                _loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait") + " · " + _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
 
             PdfReportHelper.AddKpiRow(doc,
-                ("Open Inspection Orders", kpis.OpenInspectionOrders.ToString(), PdfReportHelper.Primary),
-                ("Overdue Orders", overdueCount.ToString(), PdfReportHelper.Danger),
-                ("Active Groups", kpis.ActiveGroups.ToString(), PdfReportHelper.Violet),
-                ("Defective Assets", $"{kpis.DefectiveAssets}/{kpis.TotalAssets}", PdfReportHelper.Danger),
-                ("Open Work Orders", kpis.OpenWorkOrders.ToString(), PdfReportHelper.Warning),
-                ("Low Stock Parts", kpis.LowStockPartsCount.ToString(), PdfReportHelper.Warning));
+                (_loc.T("Open Inspection Orders"), kpis.OpenInspectionOrders.ToString(), PdfReportHelper.Primary),
+                (_loc.T("Overdue Orders"), overdueCount.ToString(), PdfReportHelper.Danger),
+                (_loc.T("Active Groups"), kpis.ActiveGroups.ToString(), PdfReportHelper.Violet),
+                (_loc.T("Defective Assets"), $"{kpis.DefectiveAssets}/{kpis.TotalAssets}", PdfReportHelper.Danger),
+                (_loc.T("Open Work Orders"), kpis.OpenWorkOrders.ToString(), PdfReportHelper.Warning),
+                (_loc.T("Low Stock Parts"), kpis.LowStockPartsCount.ToString(), PdfReportHelper.Warning));
 
-            var statusData = statusOrder.Select(s => (s == "InProgress" ? "In Progress" : s, statusCounts.GetValueOrDefault(s, 0)));
-            PdfReportHelper.AddBarChart(doc, "Inspection Orders by Status", statusData, PdfReportHelper.Primary);
+            var statusData = statusOrder.Select(s => (_loc.T(s == "InProgress" ? "In Progress" : s), statusCounts.GetValueOrDefault(s, 0)));
+            PdfReportHelper.AddBarChart(doc, _loc.T("Inspection Orders by Status"), statusData, PdfReportHelper.Primary);
 
-            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontColor(PdfReportHelper.Foreground).SetFontSize(13).SetMarginBottom(8));
-            var overdueTable = PdfReportHelper.StyledTable(new float[] { 1.4f, 1.2f, 1.6f, 1f }, new[] { "Order Number", "Category", "Assigned To", "Due Date" });
+            doc.Add(new Paragraph(_loc.T("Overdue Orders")).SetBold().SetFontColor(PdfReportHelper.Foreground).SetFontSize(13).SetMarginBottom(8));
+            var overdueTable = PdfReportHelper.StyledTable(new float[] { 1.4f, 1.2f, 1.6f, 1f },
+                new[] { _loc.T("Order Number"), _loc.T("Category"), _loc.T("Assigned To"), _loc.T("Due Date") });
             var i = 0;
             foreach (var o in overdueOrders)
             {
                 PdfReportHelper.AddRow(overdueTable, i++, 9,
-                    o.OrderNumber, o.CategoryLabel, o.AssignedToLabel ?? "-", o.DueDate?.ToString("yyyy-MM-dd") ?? "-");
+                    o.OrderNumber, _loc.T(o.CategoryLabel), o.AssignedToLabel ?? "-", o.DueDate?.ToString("yyyy-MM-dd") ?? "-");
             }
             doc.Add(overdueTable);
         }

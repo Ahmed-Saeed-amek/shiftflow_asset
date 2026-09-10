@@ -6,6 +6,7 @@ using iText.Layout;
 using iText.Layout.Element;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Localization;
 
 namespace ShiftFlow.Application.Services;
 
@@ -15,8 +16,9 @@ public class AssetService : IAssetService
     private readonly IAuditService _audit;
     private readonly IContractService _contractService;
     private readonly IAssetScopeService _scopeService;
-    public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService, IAssetScopeService scopeService)
-    { _db = db; _audit = audit; _contractService = contractService; _scopeService = scopeService; }
+    private readonly ILanguageService _loc;
+    public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService, IAssetScopeService scopeService, ILanguageService loc)
+    { _db = db; _audit = audit; _contractService = contractService; _scopeService = scopeService; _loc = loc; }
 
     // The Edit/Create form's assignee dropdown already excludes deactivated users, but that's
     // UI-only — a direct POST with a stale/tampered id otherwise saves an Asset "assigned" to
@@ -106,8 +108,20 @@ public class AssetService : IAssetService
         return await query.OrderBy(a => a.AssetTag).ToListAsync();
     }
 
-    private static string ZoneLabel(Asset a) =>
-        a.Zone == null ? "" : $"{a.Zone.Name} ({a.Zone.LocationCategory?.Name})";
+    private string ZoneLabel(Asset a)
+    {
+        if (a.Zone == null) return "";
+        var zoneName = LocalizedName(a.Zone.Name, a.Zone.NameAr);
+        var locCat = a.Zone.LocationCategory;
+        var locCatName = locCat == null ? null : LocalizedName(locCat.Name, locCat.NameAr);
+        return $"{zoneName} ({locCatName})";
+    }
+
+    private string? LocalizedCategoryName(Asset a) =>
+        a.Category == null ? null : LocalizedName(a.Category.Name, a.Category.NameAr);
+
+    private string LocalizedName(string name, string? nameAr) =>
+        _loc.Lang == "ar" && !string.IsNullOrWhiteSpace(nameAr) ? nameAr : name;
 
     public async Task<byte[]> ExportToExcelAsync(string userId)
     {
@@ -147,29 +161,30 @@ public class AssetService : IAssetService
         {
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
-            PdfReportHelper.AddHeader(doc, "Asset Register");
+            doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
+            PdfReportHelper.AddHeader(doc, _loc.T("Asset Register"), _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
 
             var byStatus = assets.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count());
             PdfReportHelper.AddKpiRow(doc,
-                ("Total Assets", assets.Count.ToString(), PdfReportHelper.Primary),
-                ("Working", byStatus.GetValueOrDefault("Working").ToString(), PdfReportHelper.Success),
-                ("Defective", byStatus.GetValueOrDefault("Defective").ToString(), PdfReportHelper.Danger),
-                ("Maintenance", byStatus.GetValueOrDefault("Maintenance").ToString(), PdfReportHelper.Warning),
-                ("Retired", byStatus.GetValueOrDefault("Retired").ToString(), PdfReportHelper.MutedText));
+                (_loc.T("Total Assets"), assets.Count.ToString(), PdfReportHelper.Primary),
+                (_loc.T("Working"), byStatus.GetValueOrDefault("Working").ToString(), PdfReportHelper.Success),
+                (_loc.T("Defective"), byStatus.GetValueOrDefault("Defective").ToString(), PdfReportHelper.Danger),
+                (_loc.T("Maintenance"), byStatus.GetValueOrDefault("Maintenance").ToString(), PdfReportHelper.Warning),
+                (_loc.T("Retired"), byStatus.GetValueOrDefault("Retired").ToString(), PdfReportHelper.MutedText));
 
-            var byCategory = assets.GroupBy(a => a.Category?.Name ?? "Uncategorized")
+            var byCategory = assets.GroupBy(a => LocalizedCategoryName(a) ?? _loc.T("Uncategorized"))
                 .OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
-            PdfReportHelper.AddBarChart(doc, "Assets by Category", byCategory, PdfReportHelper.Primary);
+            PdfReportHelper.AddBarChart(doc, _loc.T("Assets by Category"), byCategory, PdfReportHelper.Primary);
 
             var table = PdfReportHelper.StyledTable(
                 new float[] { 1.4f, 1.8f, 1.3f, 1.6f, 1.3f, 1.1f, 1.3f, 1f },
-                new[] { "Tag", "Name", "Category", "Zone", "Vendor", "Model", "Serial Number", "Status" });
+                new[] { _loc.T("Tag"), _loc.T("Name"), _loc.T("Category"), _loc.T("Zone"), _loc.T("Vendor"), _loc.T("Model"), _loc.T("Serial Number"), _loc.T("Status") });
             var i = 0;
             foreach (var a in assets)
             {
                 PdfReportHelper.AddRow(table, i++, 9,
-                    a.AssetTag, a.Name, a.Category?.Name ?? "", ZoneLabel(a),
-                    vendors.GetValueOrDefault(a.Id)?.Name ?? "", a.Model ?? "", a.SerialNumber ?? "", a.Status);
+                    a.AssetTag, a.Name, LocalizedCategoryName(a) ?? "", ZoneLabel(a),
+                    vendors.GetValueOrDefault(a.Id)?.Name ?? "", a.Model ?? "", a.SerialNumber ?? "", _loc.T(a.Status));
             }
             doc.Add(table);
         }

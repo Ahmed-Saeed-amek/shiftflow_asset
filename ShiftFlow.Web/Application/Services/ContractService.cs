@@ -5,6 +5,7 @@ using iText.Layout;
 using iText.Layout.Element;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Localization;
 
 namespace ShiftFlow.Application.Services;
 
@@ -12,7 +13,8 @@ public class ContractService : IContractService
 {
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
-    public ContractService(ApplicationDbContext db, IAuditService audit) { _db = db; _audit = audit; }
+    private readonly ILanguageService _loc;
+    public ContractService(ApplicationDbContext db, IAuditService audit, ILanguageService loc) { _db = db; _audit = audit; _loc = loc; }
 
     // Cost is stored as decimal(12,2) - a value the client can't represent (e.g. a 27-digit
     // string pasted into the field) used to reach an unhandled DbUpdateException/ArgumentException
@@ -258,28 +260,29 @@ public class ContractService : IContractService
         {
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
-            PdfReportHelper.AddHeader(doc, "Contracts");
+            doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
+            PdfReportHelper.AddHeader(doc, _loc.T("Contracts"), _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
 
             var today = DateTime.UtcNow.Date;
             var expiringSoon = contracts.Count(c => c.EndDate != null && c.EndDate >= today && c.EndDate <= today.AddDays(30));
             var totalCost = contracts.Sum(c => c.Cost ?? 0);
             PdfReportHelper.AddKpiRow(doc,
-                ("Total Contracts", contracts.Count.ToString(), PdfReportHelper.Primary),
-                ("Total Cost", totalCost.ToString("0.00"), PdfReportHelper.Success),
-                ("Expiring in 30 Days", expiringSoon.ToString(), PdfReportHelper.Warning),
-                ("Linked Assets", contracts.Sum(c => c.AssetLinks.Count).ToString(), PdfReportHelper.Info));
+                (_loc.T("Total Contracts"), contracts.Count.ToString(), PdfReportHelper.Primary),
+                (_loc.T("Total Cost"), totalCost.ToString("0.00"), PdfReportHelper.Success),
+                (_loc.T("Expiring in 30 Days"), expiringSoon.ToString(), PdfReportHelper.Warning),
+                (_loc.T("Linked Assets"), contracts.Sum(c => c.AssetLinks.Count).ToString(), PdfReportHelper.Info));
 
-            var byType = contracts.GroupBy(c => c.ContractType).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
-            PdfReportHelper.AddBarChart(doc, "Contracts by Type", byType, PdfReportHelper.Primary);
+            var byType = contracts.GroupBy(c => _loc.T(c.ContractType)).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, _loc.T("Contracts by Type"), byType, PdfReportHelper.Primary);
 
             var table = PdfReportHelper.StyledTable(
                 new float[] { 1.6f, 1.6f, 1.4f, 1.2f, 1.2f, 1f, 0.8f },
-                new[] { "Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets" });
+                new[] { _loc.T("Contract Number"), _loc.T("Vendor"), _loc.T("Contract Type"), _loc.T("Start Date"), _loc.T("End Date"), _loc.T("Cost"), _loc.T("Assets") });
             var i = 0;
             foreach (var c in contracts)
             {
                 PdfReportHelper.AddRow(table, i++, 9,
-                    c.ContractNumber ?? "", c.Vendor?.Name ?? "", c.ContractType,
+                    c.ContractNumber ?? "", c.Vendor?.Name ?? "", _loc.T(c.ContractType),
                     c.StartDate.ToString("yyyy-MM-dd"), c.EndDate?.ToString("yyyy-MM-dd") ?? "",
                     c.Cost?.ToString("0.00") ?? "", c.AssetLinks.Count.ToString());
             }

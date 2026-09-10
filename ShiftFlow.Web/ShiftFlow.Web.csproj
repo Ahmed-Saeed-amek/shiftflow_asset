@@ -21,4 +21,11 @@
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="ZXing.Net.Bindings.SkiaSharp" Version="0.16.22" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Embedded in Arabic-language PDF exports (PdfReportHelper) — Helvetica (iText's default)
+         has no Arabic glyphs, so Arabic text in a PDF silently renders as nothing without this.
+         Same Cairo font the app already loads via Google Fonts for on-screen Arabic text (see
+         site.css), so exports read consistently with the live page. SIL OFL 1.1 licensed. -->
+    <Content Include="App_Data\fonts\Cairo-Variable.ttf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

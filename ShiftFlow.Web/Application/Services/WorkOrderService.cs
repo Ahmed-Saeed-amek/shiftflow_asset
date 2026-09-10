@@ -6,6 +6,7 @@ using iText.Layout;
 using iText.Layout.Element;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
+using ShiftFlow.Web.Localization;
 
 namespace ShiftFlow.Application.Services;
 
@@ -15,7 +16,8 @@ public class WorkOrderService : IWorkOrderService
     private readonly IAuditService _audit;
     private readonly ISparePartService _spareParts;
     private readonly IAssetScopeService _scope;
-    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IAssetScopeService scope) { _db = db; _audit = audit; _spareParts = spareParts; _scope = scope; }
+    private readonly ILanguageService _loc;
+    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IAssetScopeService scope, ILanguageService loc) { _db = db; _audit = audit; _spareParts = spareParts; _scope = scope; _loc = loc; }
 
     // The Assets/Details "New Work Order"/"Report Action" buttons are now hidden for a Retired
     // asset, but that's UI-only — enforce it here too (both CreateAsync and ReportAsync route
@@ -596,20 +598,21 @@ public class WorkOrderService : IWorkOrderService
         {
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
-            PdfReportHelper.AddHeader(doc, "Work Orders");
+            doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
+            PdfReportHelper.AddHeader(doc, _loc.T("Work Orders"), _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
 
             var closed = orders.Count(w => w.ClosedDate != null);
             var critical = orders.Count(w => w.Priority == "Critical" && w.ClosedDate == null);
             PdfReportHelper.AddKpiRow(doc,
-                ("Total", orders.Count.ToString(), PdfReportHelper.Primary),
-                ("Open", (orders.Count - closed).ToString(), PdfReportHelper.Warning),
-                ("Closed", closed.ToString(), PdfReportHelper.Success),
-                ("Critical Open", critical.ToString(), PdfReportHelper.Danger));
+                (_loc.T("Total"), orders.Count.ToString(), PdfReportHelper.Primary),
+                (_loc.T("Open"), (orders.Count - closed).ToString(), PdfReportHelper.Warning),
+                (_loc.T("Closed"), closed.ToString(), PdfReportHelper.Success),
+                (_loc.T("Critical Open"), critical.ToString(), PdfReportHelper.Danger));
 
-            var byStage = orders.GroupBy(w => w.Stage).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
-            PdfReportHelper.AddBarChart(doc, "Work Orders by Stage", byStage, PdfReportHelper.Primary);
-            var byPriority = orders.GroupBy(w => w.Priority).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
-            PdfReportHelper.AddBarChart(doc, "Work Orders by Priority", byPriority, PdfReportHelper.Warning);
+            var byStage = orders.GroupBy(w => _loc.T(w.Stage)).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, _loc.T("Work Orders by Stage"), byStage, PdfReportHelper.Primary);
+            var byPriority = orders.GroupBy(w => _loc.T(w.Priority)).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, _loc.T("Work Orders by Priority"), byPriority, PdfReportHelper.Warning);
 
             // Equal-width columns (the old `new Table(7, true)`) squeezed "Work Order #" values
             // like "WO-2026-0020" into a column too narrow to fit on one line, wrapping mid-string
@@ -618,12 +621,12 @@ public class WorkOrderService : IWorkOrderService
             // the whole table needed a smaller font, not just different column proportions.
             var table = PdfReportHelper.StyledTable(
                 new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f },
-                new[] { "Work Order #", "Asset", "Priority", "Stage", "Vendor", "Created", "Closed" }, 8);
+                new[] { _loc.T("Work Order #"), _loc.T("Asset"), _loc.T("Priority"), _loc.T("Stage"), _loc.T("Vendor"), _loc.T("Created"), _loc.T("Closed") }, 8);
             var i = 0;
             foreach (var w in orders)
             {
                 PdfReportHelper.AddRow(table, i++, 8,
-                    w.WorkOrderNumber, w.Asset?.AssetTag ?? "", w.Priority, w.Stage, w.Vendor?.Name ?? "",
+                    w.WorkOrderNumber, w.Asset?.AssetTag ?? "", _loc.T(w.Priority), _loc.T(w.Stage), w.Vendor?.Name ?? "",
                     w.CreatedDate.ToString("yyyy-MM-dd"), w.ClosedDate?.ToString("yyyy-MM-dd") ?? "");
             }
             doc.Add(table);
