@@ -92,14 +92,20 @@
                                 </div>
                             </div>
                             <div class="row g-2 mt-1">
-                                <div class="col-md-3">
-                                    <select class="form-select form-select-sm" data-name="CategoryId">
+                                <div class="col-md-2">
+                                    <select class="form-select form-select-sm" data-na-cat-parent>
                                         <option value="">@Loc.T("Category")…</option>
-                                        @foreach (var c in (List<(int Id, string Label)>)ViewBag.NewAssetCategoryOptions)
+                                        @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
                                         {
-                                            <option value="@c.Id">@c.Label</option>
+                                            <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>
                                         }
                                     </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <select class="form-select form-select-sm" data-na-cat-sub disabled>
+                                        <option value="">@Loc.T("None")</option>
+                                    </select>
+                                    <input type="hidden" data-name="CategoryId" />
                                 </div>
                                 <div class="col-md-3">
                                     <select class="form-select form-select-sm" data-name="ZoneId">
@@ -110,7 +116,7 @@
                                         }
                                     </select>
                                 </div>
-                                <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Model")" data-name="Model" /></div>
+                                <div class="col-md-2"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Model")" data-name="Model" /></div>
                                 <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Serial Number")" data-name="SerialNumber" /></div>
                             </div>
                         </div>
@@ -147,6 +153,8 @@
         var template = document.getElementById('newAssetRowTemplate');
         var addBtn = document.getElementById('addNewAssetBtn');
         var countBadge = document.getElementById('newAssetCount');
+        var noneLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("None")));
+        var isRTL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.IsRTL));
 
         function renumber() {
             Array.prototype.forEach.call(container.children, function (row, i) {
@@ -168,5 +176,38 @@
             renumber();
         }
         addBtn.addEventListener('click', addRow);
+
+        // Category -> Subcategory cascade per row (subcategory optional — the hidden CategoryId
+        // input falls back to the parent when none is chosen). A single flat select mixing every
+        // category and subcategory together was unusably long as a native mobile dropdown, so this
+        // mirrors the two-level picker the main Asset form already uses, loading each row's
+        // subcategories on demand from the same /AssetCategories/ByParent endpoint.
+        container.addEventListener('change', function (e) {
+            var row = e.target.closest('.new-asset-row');
+            if (!row) return;
+            var hidden = row.querySelector('[data-name="CategoryId"]');
+            if (e.target.matches('[data-na-cat-parent]')) {
+                var subSel = row.querySelector('[data-na-cat-sub]');
+                var parentId = e.target.value;
+                hidden.value = parentId;
+                subSel.innerHTML = '<option value="">' + noneLabel + '</option>';
+                subSel.disabled = true;
+                if (!parentId) return;
+                fetch('/AssetCategories/ByParent?parentId=' + parentId, { headers: { Accept: 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(function (subs) {
+                        subs.forEach(function (s) {
+                            var opt = document.createElement('option');
+                            opt.value = s.id;
+                            opt.textContent = (isRTL && s.nameAr) ? s.nameAr : s.name;
+                            subSel.appendChild(opt);
+                        });
+                        subSel.disabled = subs.length === 0;
+                    });
+            } else if (e.target.matches('[data-na-cat-sub]')) {
+                var parentSel = row.querySelector('[data-na-cat-parent]');
+                hidden.value = e.target.value || parentSel.value;
+            }
+        });
     })();
 </script>

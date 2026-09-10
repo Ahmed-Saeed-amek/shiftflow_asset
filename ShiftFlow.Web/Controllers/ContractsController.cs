@@ -182,20 +182,7 @@ public class ContractsController : Controller
     private async Task PopulateLookupsAsync()
     {
         ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
-        var allCategories = await _db.AssetCategories.OrderBy(c => c.Name).ToListAsync();
-        ViewBag.Categories = allCategories.Where(c => c.ParentCategoryId == null).ToList();
-
-        // Flat (Id, indented label) options for the "create new assets" picker's Category select —
-        // a plain dropdown, unlike the Asset form's cascading parent/subcategory pair, since these
-        // are quick inline rows rather than the full Asset form.
-        var newAssetCategoryOptions = new List<(int Id, string Label)>();
-        foreach (var p in ((List<AssetCategory>)ViewBag.Categories).OrderBy(c => c.Name))
-        {
-            newAssetCategoryOptions.Add((p.Id, p.Name));
-            foreach (var s in allCategories.Where(c => c.ParentCategoryId == p.Id).OrderBy(c => c.Name))
-                newAssetCategoryOptions.Add((s.Id, "— " + s.Name));
-        }
-        ViewBag.NewAssetCategoryOptions = newAssetCategoryOptions;
+        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
         ViewBag.NewAssetZoneOptions = await _db.Zones.Include(z => z.LocationCategory)
             .OrderBy(z => z.LocationCategory!.Id).ThenBy(z => z.Name).ToListAsync();
     }
