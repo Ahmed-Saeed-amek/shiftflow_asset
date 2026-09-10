@@ -1492,6 +1492,7 @@ public static class Translations
         Ar["Tag"] = "الرقم التعريفي";
         Ar["Assets by Category"] = "الأصول حسب الفئة";
         Ar["Order Number"] = "رقم الأمر";
+        Ar["Update Priority"] = "تحديث الأولوية";
         Ar["Manage"] = "إدارة";
         Ar["AssignResponsible"] = "تعيين المسؤول";
         Ar["Request"] = "طلب";

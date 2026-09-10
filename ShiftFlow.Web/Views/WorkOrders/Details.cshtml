@@ -95,7 +95,7 @@
                         <partial name="_EmployeePicker" model='new EmployeePickerModel {
                             Name = "employeeUserId", SelectedId = Model.AssignedToUserId, SelectedLabel = Model.AssignedToUser?.FullName,
                             Placeholder = Loc.T("Search by name or email…"), CssClass = "form-control-sm" }' />
-                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100 mt-2">@assignLabel</button>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100 mt-2"><i class="bi bi-person-check me-1"></i>@assignLabel</button>
                     </form>
                 }
 
@@ -110,7 +110,7 @@
                                 <option value="@p" selected="@(Model.Priority==p)">@Loc.T(p)</option>
                             }
                         </select>
-                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">@Loc.T("Update")</button>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0"><i class="bi bi-flag me-1"></i>@Loc.T("Update Priority")</button>
                     </form>
                 }
             </div>
