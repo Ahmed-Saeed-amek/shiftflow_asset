@@ -11,7 +11,12 @@
             {
                 <input type="hidden" name="OriginalAssetIds" value="@originalAssetId" />
             }
-            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            @* "All" (not "ModelOnly") so a field-scoped ModelState error still shows up here even
+               without a dedicated asp-validation-for span nearby — the NewAssets inline rows are
+               built entirely in JS with no such spans, so a field-level error there (e.g. an
+               implicit-required failure on a nullable DTO property) would otherwise render nowhere
+               at all: no summary text, no field span, just a silently-reset form (confirmed live). *@
+            <div asp-validation-summary="All" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label small">@Loc.T("Vendor")</label>
@@ -40,6 +45,7 @@
                 <div class="col-md-4">
                     <label class="form-label small">@Loc.T("Start Date")</label>
                     <input asp-for="StartDate" type="date" class="form-control" />
+                    <span asp-validation-for="StartDate" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small">@Loc.T("End Date")</label>

@@ -54,7 +54,7 @@ public class ContractService : IContractService
         var rows = newAssets.Where(a => !string.IsNullOrWhiteSpace(a.AssetTag)).ToList();
         if (rows.Count == 0) return [];
 
-        var tags = rows.Select(a => a.AssetTag.Trim()).ToList();
+        var tags = rows.Select(a => a.AssetTag!.Trim()).ToList();
         var dupe = tags.GroupBy(t => t, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
         if (dupe != null)
             throw new InvalidOperationException($"Duplicate new asset tag: {dupe.Key}.");
@@ -81,7 +81,7 @@ public class ContractService : IContractService
                 throw new InvalidOperationException($"New asset \"{r.AssetTag}\": invalid status.");
             assets.Add(new Asset
             {
-                AssetTag = r.AssetTag.Trim(), Name = r.Name.Trim(), CategoryId = r.CategoryId, ZoneId = r.ZoneId,
+                AssetTag = r.AssetTag!.Trim(), Name = r.Name!.Trim(), CategoryId = r.CategoryId, ZoneId = r.ZoneId,
                 Status = status, Model = string.IsNullOrWhiteSpace(r.Model) ? null : r.Model.Trim(),
                 SerialNumber = string.IsNullOrWhiteSpace(r.SerialNumber) ? null : r.SerialNumber.Trim(),
                 CreatedByUserId = userId, CreatedDate = DateTime.UtcNow,

@@ -145,11 +145,20 @@ public class PmScheduleRow
 
 /// <summary>One row of the Contract form's inline asset creator — a new Asset to create and link
 /// to the contract, in the same save as the contract itself. Rows with a blank AssetTag are
-/// ignored (an added-then-untouched row), so nothing needs to be posted at all when unused.</summary>
+/// ignored (an added-then-untouched row), so nothing needs to be posted at all when unused.
+/// AssetTag/Name are deliberately string? (not non-nullable string): with &lt;Nullable&gt;enable&lt;/Nullable&gt;
+/// set project-wide, a non-nullable reference-type property is treated as implicitly [Required] by
+/// MVC's model validation — a blank Name then failed ModelState.IsValid on binding, before the
+/// controller's try block (and BuildNewAssetsAsync's own specific "needs a name" check) ever ran,
+/// and that implicit error was keyed to "NewAssets[0].Name" rather than the empty model-level key
+/// asp-validation-summary="ModelOnly" renders, so it was invisible everywhere: no summary text, no
+/// per-field span (the JS-generated row has none) — the whole contract form just silently reset
+/// with zero feedback (confirmed live). Nullable here lets a blank Name reach the one validation
+/// path that actually reports it.</summary>
 public class NewAssetInput
 {
-    public string AssetTag { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
+    public string? AssetTag { get; set; }
+    public string? Name { get; set; }
     public int CategoryId { get; set; }
     public int ZoneId { get; set; }
     public string? Status { get; set; }

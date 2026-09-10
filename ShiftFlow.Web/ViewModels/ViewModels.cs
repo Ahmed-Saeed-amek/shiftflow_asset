@@ -110,6 +110,13 @@ public class ContractViewModel : IValidatableObject
             // truncating the schedule the admin asked for.
             if (EndDate != null && EndDate > StartDate.AddYears(25))
                 yield return new ValidationResult(T("Preventive Maintenance contracts can't span more than 25 years — check the End Date."), new[] { nameof(EndDate) });
+
+            // Same reasoning as the span cap above, just from the other end — RecurringOrderViewModel
+            // already rejects a StartDate this far in the past for the same schedule-size-explosion
+            // risk, but this ViewModel's copy of the PM checks was missing it: a fat-fingered century
+            // (e.g. 1990 instead of 2090) with a short cadence was still accepted (confirmed live).
+            if (StartDate < DateTime.UtcNow.Date.AddYears(-25))
+                yield return new ValidationResult(T("Start Date can't be more than 25 years in the past."), new[] { nameof(StartDate) });
         }
     }
 }
