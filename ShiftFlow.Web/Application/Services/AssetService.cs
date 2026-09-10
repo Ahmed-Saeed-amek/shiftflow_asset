@@ -145,6 +145,7 @@ public class AssetService : IAssetService
         using (var writer = new PdfWriter(ms))
         using (var pdf = new PdfDocument(writer))
         {
+            PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
             PdfReportHelper.AddHeader(doc, "Asset Register");
 

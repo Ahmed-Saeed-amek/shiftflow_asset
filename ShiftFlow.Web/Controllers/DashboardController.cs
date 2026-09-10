@@ -85,6 +85,7 @@ public class DashboardController : Controller
         using (var writer = new PdfWriter(ms))
         using (var pdf = new PdfDocument(writer))
         {
+            PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
             PdfReportHelper.AddHeader(doc, "Executive Dashboard", "Ministry of Electricity, Water & Renewable Energy — Kuwait · " + DateTime.Today.ToString("dddd, dd MMMM yyyy"));
 
@@ -99,7 +100,7 @@ public class DashboardController : Controller
             var statusData = statusOrder.Select(s => (s == "InProgress" ? "In Progress" : s, statusCounts.GetValueOrDefault(s, 0)));
             PdfReportHelper.AddBarChart(doc, "Inspection Orders by Status", statusData, PdfReportHelper.Primary);
 
-            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontSize(13).SetMarginBottom(8));
+            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontColor(PdfReportHelper.Foreground).SetFontSize(13).SetMarginBottom(8));
             var overdueTable = PdfReportHelper.StyledTable(new float[] { 1.4f, 1.2f, 1.6f, 1f }, new[] { "Order Number", "Category", "Assigned To", "Due Date" });
             var i = 0;
             foreach (var o in overdueOrders)
