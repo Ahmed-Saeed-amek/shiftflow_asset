@@ -152,6 +152,9 @@ public class NewAssetInput
     public string Name { get; set; } = string.Empty;
     public int CategoryId { get; set; }
     public int ZoneId { get; set; }
+    public string? Status { get; set; }
+    public string? Model { get; set; }
+    public string? SerialNumber { get; set; }
 }
 
 public interface ISparePartService

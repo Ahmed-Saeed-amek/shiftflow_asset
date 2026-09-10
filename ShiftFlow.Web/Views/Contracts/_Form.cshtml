@@ -71,34 +71,48 @@
                 </div>
                 <div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label small mb-0">@Loc.T("Create New Assets")</label>
+                        <label class="form-label small mb-0">@Loc.T("Create New Assets") <span id="newAssetCount" class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle rounded-pill ms-1" hidden>0</span></label>
                         <button type="button" id="addNewAssetBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Asset")</button>
                     </div>
                     <div class="form-text mb-2"><i class="bi bi-info-circle me-1"></i>@Loc.T("New assets are only created if this contract is saved successfully.")</div>
                     <div id="newAssetRows"></div>
                     <template id="newAssetRowTemplate">
-                        <div class="row g-2 align-items-center mb-2 new-asset-row">
-                            <div class="col-md-2"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Asset Tag")" data-name="AssetTag" /></div>
-                            <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Name")" data-name="Name" /></div>
-                            <div class="col-md-3">
-                                <select class="form-select form-select-sm" data-name="CategoryId">
-                                    <option value="">@Loc.T("Category")…</option>
-                                    @foreach (var c in (List<(int Id, string Label)>)ViewBag.NewAssetCategoryOptions)
-                                    {
-                                        <option value="@c.Id">@c.Label</option>
-                                    }
-                                </select>
+                        <div class="border rounded p-2 mb-2 new-asset-row position-relative">
+                            <button type="button" class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1" data-na-remove aria-label="@Loc.T("Remove")"><i class="bi bi-x-lg"></i></button>
+                            <div class="row g-2">
+                                <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Asset Tag")" data-name="AssetTag" /></div>
+                                <div class="col-md-4"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Name")" data-name="Name" /></div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" data-name="Status">
+                                        @foreach (var s in Asset.Statuses)
+                                        {
+                                            <option value="@s" selected="@(s == "Working")">@Loc.T(s)</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
-                            <div class="col-md-3">
-                                <select class="form-select form-select-sm" data-name="ZoneId">
-                                    <option value="">@Loc.T("Zone")…</option>
-                                    @foreach (var z in (List<Zone>)ViewBag.NewAssetZoneOptions)
-                                    {
-                                        <option value="@z.Id">@z.Name (@z.LocationCategory?.Name)</option>
-                                    }
-                                </select>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" data-name="CategoryId">
+                                        <option value="">@Loc.T("Category")…</option>
+                                        @foreach (var c in (List<(int Id, string Label)>)ViewBag.NewAssetCategoryOptions)
+                                        {
+                                            <option value="@c.Id">@c.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" data-name="ZoneId">
+                                        <option value="">@Loc.T("Zone")…</option>
+                                        @foreach (var z in (List<Zone>)ViewBag.NewAssetZoneOptions)
+                                        {
+                                            <option value="@z.Id">@z.Name (@z.LocationCategory?.Name)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Model")" data-name="Model" /></div>
+                                <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Serial Number")" data-name="SerialNumber" /></div>
                             </div>
-                            <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" data-na-remove aria-label="@Loc.T("Remove")"><i class="bi bi-x-lg"></i></button></div>
                         </div>
                     </template>
                 </div>
@@ -132,6 +146,7 @@
         var container = document.getElementById('newAssetRows');
         var template = document.getElementById('newAssetRowTemplate');
         var addBtn = document.getElementById('addNewAssetBtn');
+        var countBadge = document.getElementById('newAssetCount');
 
         function renumber() {
             Array.prototype.forEach.call(container.children, function (row, i) {
@@ -139,6 +154,9 @@
                     el.name = 'NewAssets[' + i + '].' + el.dataset.name;
                 });
             });
+            var count = container.children.length;
+            countBadge.textContent = count;
+            countBadge.hidden = count === 0;
         }
         function addRow() {
             var node = template.content.firstElementChild.cloneNode(true);

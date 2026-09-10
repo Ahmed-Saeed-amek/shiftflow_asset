@@ -71,10 +71,15 @@ public class ContractService : IContractService
                 throw new InvalidOperationException($"New asset \"{r.AssetTag}\": selected category not found.");
             if (!validZoneIds.Contains(r.ZoneId))
                 throw new InvalidOperationException($"New asset \"{r.AssetTag}\": selected zone not found.");
+            var status = string.IsNullOrWhiteSpace(r.Status) ? "Working" : r.Status;
+            if (!Asset.Statuses.Contains(status))
+                throw new InvalidOperationException($"New asset \"{r.AssetTag}\": invalid status.");
             assets.Add(new Asset
             {
                 AssetTag = r.AssetTag.Trim(), Name = r.Name.Trim(), CategoryId = r.CategoryId, ZoneId = r.ZoneId,
-                Status = "Working", CreatedByUserId = userId, CreatedDate = DateTime.UtcNow,
+                Status = status, Model = string.IsNullOrWhiteSpace(r.Model) ? null : r.Model.Trim(),
+                SerialNumber = string.IsNullOrWhiteSpace(r.SerialNumber) ? null : r.SerialNumber.Trim(),
+                CreatedByUserId = userId, CreatedDate = DateTime.UtcNow,
             });
         }
         return assets;
