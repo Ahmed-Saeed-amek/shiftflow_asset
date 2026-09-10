@@ -3,6 +3,7 @@
     var role = (ApplicationRole)ViewBag.Role;
     var roleLabel = Loc.LocalizedName(role.Name!, role.NameAr);
     var rolePerms = (HashSet<string>)ViewBag.RolePerms;
+    var isOwnRole = (bool)ViewBag.IsOwnRole;
     // Group permissions by category
     var groups = Model.GroupBy(p => p.Category).OrderBy(g => g.Key);
     var toggleAllLabelJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Toggle all"));
@@ -29,6 +30,23 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 }
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@err
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (isOwnRole)
+{
+    <div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert">
+        <i class="bi bi-shield-exclamation fs-5 flex-shrink-0"></i>
+        <div>
+            <strong>@Loc.T("You're a member of this role.")</strong>
+            @Loc.T("If you uncheck \"Manage Roles & Permissions\" or \"Full Administrator Access\" below, that change will be skipped for this role so you don't lock yourself out.")
+        </div>
+    </div>
+}
 
 <form method="post" asp-action="SaveRolePermissions" asp-route-roleId="@role.Id">
     @Html.AntiForgeryToken()
@@ -48,10 +66,15 @@
 
             var pairsInGroup = PermissionDisplay.Pairs.Where(p => group.Any(x => x.Name == p.ReadPermission)).ToList();
             var standalone = group.Where(p => !PermissionDisplay.PairedPermissionNames.Contains(p.Name)).ToList();
+            var grantedInGroup = pairsInGroup.Count(p => rolePerms.Contains(p.ReadPermission) || rolePerms.Contains(p.WritePermission))
+                                + standalone.Count(p => rolePerms.Contains(p.Name));
+            var totalInGroup = pairsInGroup.Count + standalone.Count;
             <div class="col-md-6 col-xl-4">
                 <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header bg-transparent border-bottom py-2 px-3">
+                    <div class="card-header bg-transparent border-bottom py-2 px-3 d-flex align-items-center gap-2">
+                        <i class="bi @PermissionDisplay.GetCategoryIcon(group.Key) text-primary"></i>
                         <span class="fw-semibold small text-uppercase text-muted">@Loc.T(group.Key)</span>
+                        <span class="badge bg-secondary-subtle text-secondary ms-1">@grantedInGroup/@totalInGroup</span>
                     </div>
                     <div class="card-body py-2 px-3">
                         @foreach (var pair in pairsInGroup)

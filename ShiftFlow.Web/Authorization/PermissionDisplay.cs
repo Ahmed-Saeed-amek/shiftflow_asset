@@ -43,6 +43,23 @@ public static class PermissionDisplay
         [PermissionCatalog.SparePartView]            = "View Spare Parts",
         [PermissionCatalog.SparePartManage]          = "Manage Spare Parts",
         [PermissionCatalog.IsAdmin]                  = "Full Administrator Access",
+        [PermissionCatalog.AssetView]                = "View Assets",
+        [PermissionCatalog.AssetManage]               = "Manage Assets",
+        [PermissionCatalog.AssetCategoryManage]      = "Manage Asset Categories",
+        [PermissionCatalog.AssetReportAction]        = "Report Asset Issues",
+        [PermissionCatalog.AssetScopeManage]         = "Restrict Employee Asset Scope",
+        [PermissionCatalog.VendorView]                = "View Vendors",
+        [PermissionCatalog.VendorManage]              = "Manage Vendors",
+        [PermissionCatalog.WorkOrderView]              = "View Work Orders",
+        [PermissionCatalog.WorkOrderManage]            = "Manage Work Orders",
+        [PermissionCatalog.WorkOrderAssign]            = "Assign Work Order Vendors",
+        [PermissionCatalog.WorkOrderExport]            = "Export Work Orders",
+        [PermissionCatalog.ContractView]               = "View Contracts",
+        [PermissionCatalog.ContractManage]             = "Manage Contracts",
+        [PermissionCatalog.MaintenanceOrderView]       = "View Maintenance Orders",
+        [PermissionCatalog.MaintenanceOrderManage]     = "Manage Maintenance Orders",
+        [PermissionCatalog.MaintenanceOrderReport]     = "Report Maintenance Outcomes",
+        [PermissionCatalog.MaintenanceOrderExport]     = "Export Maintenance Orders",
     };
 
     /// <summary>Friendly title for a permission name. Falls back to a humanized version of the
@@ -50,6 +67,28 @@ public static class PermissionDisplay
     /// never renders as a raw/blank string while its title is still being written.</summary>
     public static string GetTitle(string permissionName) =>
         Titles.TryGetValue(permissionName, out var title) ? title : Humanize(permissionName);
+
+    private static readonly Dictionary<string, string> CategoryIcons = new()
+    {
+        ["Users"]               = "bi-people",
+        ["Inspection Orders"]   = "bi-clipboard-check",
+        ["Groups"]              = "bi-diagram-3",
+        ["My Work"]             = "bi-person-workspace",
+        ["AI Assistant"]        = "bi-robot",
+        ["Administration"]      = "bi-shield-lock",
+        ["Assets"]              = "bi-box-seam",
+        ["Vendors"]             = "bi-truck",
+        ["Work Orders"]         = "bi-tools",
+        ["Contracts"]           = "bi-file-earmark-text",
+        ["Maintenance Orders"]  = "bi-wrench-adjustable",
+        ["Order Types"]         = "bi-tags",
+        ["Spare Parts"]         = "bi-gear",
+    };
+
+    /// <summary>Bootstrap Icons class for a permission category card header. Falls back to a
+    /// generic folder icon for any category not in the table above.</summary>
+    public static string GetCategoryIcon(string category) =>
+        CategoryIcons.TryGetValue(category, out var icon) ? icon : "bi-folder2";
 
     private static string Humanize(string permissionName)
     {

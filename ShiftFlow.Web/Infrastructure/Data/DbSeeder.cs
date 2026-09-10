@@ -500,28 +500,33 @@ public static class DbSeeder
             new Permission { Name = "Rbac.Manage",                  Category = "Administration", Description = "Create roles, assign permissions, and control what each user or role can access" },
             // Super permission
             new Permission { Name = "System.IsAdmin",               Category = "Administration", Description = "Grants every permission in the system, overriding all other settings — use with caution" },
-            // Asset Management
-            new Permission { Name = "Asset.View",                   Category = "Asset Management", Description = "See the asset register — tags, categories, locations, and status" },
-            new Permission { Name = "Asset.Manage",                 Category = "Asset Management", Description = "Add, edit, or retire assets in the register" },
-            new Permission { Name = "AssetCategory.Manage",         Category = "Asset Management", Description = "Create and edit asset categories" },
-            new Permission { Name = "Vendor.View",                  Category = "Asset Management", Description = "See the list of maintenance vendors" },
-            new Permission { Name = "Vendor.Manage",                Category = "Asset Management", Description = "Add, edit, or suspend maintenance vendors" },
-            new Permission { Name = "WorkOrder.View",                Category = "Asset Management", Description = "See maintenance work orders and their status" },
-            new Permission { Name = "WorkOrder.Manage",              Category = "Asset Management", Description = "Create work orders and advance them through their stages" },
-            new Permission { Name = "WorkOrder.Assign",              Category = "Asset Management", Description = "Assign a vendor to a work order" },
-            new Permission { Name = "WorkOrder.Export",              Category = "Asset Management", Description = "Export asset and work order lists to Excel or PDF" },
-            new Permission { Name = "Contract.View",                 Category = "Asset Management", Description = "See vendor contracts and which assets they cover" },
-            new Permission { Name = "Contract.Manage",               Category = "Asset Management", Description = "Create and edit vendor contracts and link them to assets" },
-            new Permission { Name = "Asset.ReportAction",            Category = "Asset Management", Description = "Report a failure or other action on an asset, creating a draft work order for admin review" },
-            new Permission { Name = "Asset.ScopeManage",             Category = "Asset Management", Description = "Restrict which zone, area, or category of assets a specific employee can see" },
+            // Assets
+            new Permission { Name = "Asset.View",                   Category = "Assets", Description = "See the asset register — tags, categories, locations, and status" },
+            new Permission { Name = "Asset.Manage",                 Category = "Assets", Description = "Add, edit, or retire assets in the register" },
+            new Permission { Name = "AssetCategory.Manage",         Category = "Assets", Description = "Create and edit asset categories" },
+            new Permission { Name = "Asset.ReportAction",           Category = "Assets", Description = "Report a failure or other action on an asset, creating a draft work order for admin review" },
+            new Permission { Name = "Asset.ScopeManage",            Category = "Assets", Description = "Restrict which zone, area, or category of assets a specific employee can see" },
+            // Vendors
+            new Permission { Name = "Vendor.View",                  Category = "Vendors", Description = "See the list of maintenance vendors" },
+            new Permission { Name = "Vendor.Manage",                Category = "Vendors", Description = "Add, edit, or suspend maintenance vendors" },
+            // Work Orders
+            new Permission { Name = "WorkOrder.View",                Category = "Work Orders", Description = "See maintenance work orders and their status" },
+            new Permission { Name = "WorkOrder.Manage",              Category = "Work Orders", Description = "Create work orders and advance them through their stages" },
+            new Permission { Name = "WorkOrder.Assign",              Category = "Work Orders", Description = "Assign a vendor to a work order" },
+            new Permission { Name = "WorkOrder.Export",              Category = "Work Orders", Description = "Export asset and work order lists to Excel or PDF" },
+            // Contracts
+            new Permission { Name = "Contract.View",                 Category = "Contracts", Description = "See vendor contracts and which assets they cover" },
+            new Permission { Name = "Contract.Manage",               Category = "Contracts", Description = "Create and edit vendor contracts and link them to assets" },
             // Maintenance Orders
-            new Permission { Name = "MaintenanceOrder.View",         Category = "Asset Management", Description = "See all standalone maintenance orders across the organization" },
-            new Permission { Name = "MaintenanceOrder.Manage",       Category = "Asset Management", Description = "Assign an employee to fix an asset in-house, and cancel maintenance orders" },
-            new Permission { Name = "MaintenanceOrder.Report",       Category = "Asset Management", Description = "Complete a fix on a maintenance order assigned to you" },
-            new Permission { Name = "MaintenanceOrder.Export",       Category = "Asset Management", Description = "Export the maintenance order list to Excel" },
+            new Permission { Name = "MaintenanceOrder.View",         Category = "Maintenance Orders", Description = "See all standalone maintenance orders across the organization" },
+            new Permission { Name = "MaintenanceOrder.Manage",       Category = "Maintenance Orders", Description = "Assign an employee to fix an asset in-house, and cancel maintenance orders" },
+            new Permission { Name = "MaintenanceOrder.Report",       Category = "Maintenance Orders", Description = "Complete a fix on a maintenance order assigned to you" },
+            new Permission { Name = "MaintenanceOrder.Export",       Category = "Maintenance Orders", Description = "Export the maintenance order list to Excel" },
+            // Order Types (shared catalog used by both Inspection Orders and Maintenance Orders)
+            new Permission { Name = "OrderType.Manage",              Category = "Order Types", Description = "Create and edit the order-type catalog used by inspection and maintenance orders" },
             // Spare Parts
-            new Permission { Name = "SparePart.View",                Category = "Asset Management", Description = "See the spare parts catalog, stock levels, and which assets each part fits" },
-            new Permission { Name = "SparePart.Manage",              Category = "Asset Management", Description = "Add or edit spare parts, link them to assets, and adjust stock quantities" },
+            new Permission { Name = "SparePart.View",                Category = "Spare Parts", Description = "See the spare parts catalog, stock levels, and which assets each part fits" },
+            new Permission { Name = "SparePart.Manage",              Category = "Spare Parts", Description = "Add or edit spare parts, link them to assets, and adjust stock quantities" },
         };
 
         var existing = await db.Permissions.ToListAsync();
@@ -561,6 +566,7 @@ public static class DbSeeder
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
                 "MaintenanceOrder.View", "MaintenanceOrder.Manage", "MaintenanceOrder.Report", "MaintenanceOrder.Export",
+                "OrderType.Manage",
                 "SparePart.View", "SparePart.Manage",
             ],
             ["OperationsManager"] =

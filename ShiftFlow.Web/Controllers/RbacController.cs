@@ -231,6 +231,8 @@ public class RbacController : Controller
             .Select(rp => rp.PermissionName)
             .ToHashSet();
 
+        var currentUser = await _userManager.FindByIdAsync(CurrentUserId);
+        ViewBag.IsOwnRole = currentUser != null && role.Name != null && await _userManager.IsInRoleAsync(currentUser, role.Name);
         ViewBag.Role = role;
         ViewBag.RolePerms = rolePerms;
         return View(allPerms);
@@ -260,6 +262,25 @@ public class RbacController : Controller
 
         granted ??= [];
 
+        // Self-lockout protection, same idea as BulkAssignRoles: if the admin submitting this form
+        // is themselves a member of the role being edited, don't let the save strip the two
+        // permissions that control access to RBAC itself — they'd lose the ability to fix it back.
+        var currentUser = await _userManager.FindByIdAsync(CurrentUserId);
+        var selfInRole = currentUser != null && role.Name != null && await _userManager.IsInRoleAsync(currentUser, role.Name);
+        var criticalPerms = new[] { PermissionCatalog.RbacManage, PermissionCatalog.IsAdmin };
+        var selfLockoutBlocked = false;
+        if (selfInRole)
+        {
+            foreach (var perm in criticalPerms)
+            {
+                if (currentlyGranted.Contains(perm) && !granted.Contains(perm))
+                {
+                    granted.Add(perm);
+                    selfLockoutBlocked = true;
+                }
+            }
+        }
+
         // Add newly checked
         var added = granted.Where(p => !currentlyGranted.Contains(p)).ToList();
         foreach (var perm in added)
@@ -275,7 +296,9 @@ public class RbacController : Controller
                 oldValue: removed.Count > 0 ? $"-{string.Join(",", removed)}" : null,
                 newValue: added.Count > 0 ? $"+{string.Join(",", added)}" : null);
 
-        TempData["Success"] = $"Permissions saved for role '{role.Name}'.";
+        TempData["Success"] = selfLockoutBlocked
+            ? $"Permissions saved for role '{role.Name}'. RBAC access permissions were kept for this role to prevent locking yourself out."
+            : $"Permissions saved for role '{role.Name}'.";
         return RedirectToAction(nameof(RolePermissions), new { roleId });
     }
 
@@ -315,6 +338,7 @@ public class RbacController : Controller
         ViewBag.RoleNameArByName = roleNameArByName;
         ViewBag.AllowOverrides = allowOverrides;
         ViewBag.DenyOverrides = denyOverrides;
+        ViewBag.IsSelf = userId == CurrentUserId;
         return View(allPerms);
     }
 
@@ -344,6 +368,26 @@ public class RbacController : Controller
             }
         }
 
+        // Self-lockout protection: if the admin is editing their own overrides, figure out whether
+        // they currently have effective access to RBAC (via a role grant or an Allow override) and
+        // refuse to let this save deny it or drop the Allow override that was the only source of it —
+        // same intent as BulkAssignRoles skipping self role-removal, applied to the override layer.
+        var isSelf = userId == CurrentUserId;
+        HashSet<string> inheritedForSelf = [];
+        if (isSelf)
+        {
+            var selfRoles = await _userManager.GetRolesAsync(user);
+            foreach (var roleName in selfRoles)
+            {
+                var r = await _roleManager.FindByNameAsync(roleName);
+                if (r is null) continue;
+                var perms = (await _permissions.GetRolePermissionsAsync(r.Id)).Select(rp => rp.PermissionName);
+                inheritedForSelf.UnionWith(perms);
+            }
+        }
+
+        var criticalPerms = new[] { PermissionCatalog.RbacManage, PermissionCatalog.IsAdmin };
+        var selfLockoutBlocked = false;
         var changes = new List<string>();
 
         foreach (var perm in allPerms)
@@ -351,6 +395,17 @@ public class RbacController : Controller
             bool wantAllow = allowList.Contains(perm);
             bool wantDeny = denyList.Contains(perm);
             var existing = existingOverrides.FirstOrDefault(o => o.PermissionName == perm);
+
+            if (isSelf && criticalPerms.Contains(perm))
+            {
+                bool currentlyEffective = existing is { IsGranted: true } || (existing is null && inheritedForSelf.Contains(perm));
+                bool newEffective = wantDeny ? false : wantAllow ? true : inheritedForSelf.Contains(perm);
+                if (currentlyEffective && !newEffective)
+                {
+                    selfLockoutBlocked = true;
+                    continue; // leave this permission's override untouched
+                }
+            }
 
             if (wantDeny)
             {
@@ -372,7 +427,9 @@ public class RbacController : Controller
         if (changes.Count > 0)
             await _audit.LogAsync("SavePermissionOverrides", "User", userId, CurrentUserId, newValue: string.Join(",", changes));
 
-        TempData["Success"] = $"Permission overrides saved for '{user.FullName}'.";
+        TempData["Success"] = selfLockoutBlocked
+            ? $"Permission overrides saved for '{user.FullName}'. Your own RBAC access was kept unchanged to prevent locking yourself out."
+            : $"Permission overrides saved for '{user.FullName}'.";
         return RedirectToAction(nameof(UserPermissions), new { userId });
     }
 }
