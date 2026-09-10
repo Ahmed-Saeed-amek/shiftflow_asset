@@ -1475,6 +1475,8 @@ public static class Translations
         Ar["Create"] = "إنشاء";
         Ar["Export"] = "تصدير";
         Ar["Export PDF"] = "تصدير PDF";
+        Ar["Create New Assets"] = "إنشاء أصول جديدة";
+        Ar["New assets are only created if this contract is saved successfully."] = "لن يتم إنشاء الأصول الجديدة إلا إذا تم حفظ هذا العقد بنجاح.";
         Ar["Manage"] = "إدارة";
         Ar["AssignResponsible"] = "تعيين المسؤول";
         Ar["Request"] = "طلب";

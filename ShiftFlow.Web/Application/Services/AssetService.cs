@@ -146,20 +146,29 @@ public class AssetService : IAssetService
         using (var pdf = new PdfDocument(writer))
         {
             var doc = new Document(pdf);
-            doc.Add(new Paragraph("Asset Register").SetBold().SetFontSize(16));
-            var table = new Table(8, true).UseAllAvailableWidth();
-            foreach (var h in new[] { "Tag", "Name", "Category", "Zone", "Vendor", "Model", "Serial Number", "Status" })
-                table.AddHeaderCell(h);
+            PdfReportHelper.AddHeader(doc, "Asset Register");
+
+            var byStatus = assets.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count());
+            PdfReportHelper.AddKpiRow(doc,
+                ("Total Assets", assets.Count.ToString(), PdfReportHelper.Primary),
+                ("Working", byStatus.GetValueOrDefault("Working").ToString(), PdfReportHelper.Success),
+                ("Defective", byStatus.GetValueOrDefault("Defective").ToString(), PdfReportHelper.Danger),
+                ("Maintenance", byStatus.GetValueOrDefault("Maintenance").ToString(), PdfReportHelper.Warning),
+                ("Retired", byStatus.GetValueOrDefault("Retired").ToString(), PdfReportHelper.MutedText));
+
+            var byCategory = assets.GroupBy(a => a.Category?.Name ?? "Uncategorized")
+                .OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, "Assets by Category", byCategory, PdfReportHelper.Primary);
+
+            var table = PdfReportHelper.StyledTable(
+                new float[] { 1.4f, 1.8f, 1.3f, 1.6f, 1.3f, 1.1f, 1.3f, 1f },
+                new[] { "Tag", "Name", "Category", "Zone", "Vendor", "Model", "Serial Number", "Status" });
+            var i = 0;
             foreach (var a in assets)
             {
-                table.AddCell(a.AssetTag);
-                table.AddCell(a.Name);
-                table.AddCell(a.Category?.Name ?? "");
-                table.AddCell(ZoneLabel(a));
-                table.AddCell(vendors.GetValueOrDefault(a.Id)?.Name ?? "");
-                table.AddCell(a.Model ?? "");
-                table.AddCell(a.SerialNumber ?? "");
-                table.AddCell(a.Status);
+                PdfReportHelper.AddRow(table, i++, 9,
+                    a.AssetTag, a.Name, a.Category?.Name ?? "", ZoneLabel(a),
+                    vendors.GetValueOrDefault(a.Id)?.Name ?? "", a.Model ?? "", a.SerialNumber ?? "", a.Status);
             }
             doc.Add(table);
         }

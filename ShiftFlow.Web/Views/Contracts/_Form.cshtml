@@ -69,6 +69,39 @@
                     <label class="form-label small">@Loc.T("Linked Assets")</label>
                     <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
                 </div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label small mb-0">@Loc.T("Create New Assets")</label>
+                        <button type="button" id="addNewAssetBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Asset")</button>
+                    </div>
+                    <div class="form-text mb-2"><i class="bi bi-info-circle me-1"></i>@Loc.T("New assets are only created if this contract is saved successfully.")</div>
+                    <div id="newAssetRows"></div>
+                    <template id="newAssetRowTemplate">
+                        <div class="row g-2 align-items-center mb-2 new-asset-row">
+                            <div class="col-md-2"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Asset Tag")" data-name="AssetTag" /></div>
+                            <div class="col-md-3"><input type="text" class="form-control form-control-sm" placeholder="@Loc.T("Name")" data-name="Name" /></div>
+                            <div class="col-md-3">
+                                <select class="form-select form-select-sm" data-name="CategoryId">
+                                    <option value="">@Loc.T("Category")…</option>
+                                    @foreach (var c in (List<(int Id, string Label)>)ViewBag.NewAssetCategoryOptions)
+                                    {
+                                        <option value="@c.Id">@c.Label</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select form-select-sm" data-name="ZoneId">
+                                    <option value="">@Loc.T("Zone")…</option>
+                                    @foreach (var z in (List<Zone>)ViewBag.NewAssetZoneOptions)
+                                    {
+                                        <option value="@z.Id">@z.Name (@z.LocationCategory?.Name)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" data-na-remove aria-label="@Loc.T("Remove")"><i class="bi bi-x-lg"></i></button></div>
+                        </div>
+                    </template>
+                </div>
             </div>
             <div class="mt-4 d-flex gap-2">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
@@ -89,5 +122,33 @@
         }
         typeSelect.addEventListener('change', togglePm);
         togglePm();
+    })();
+
+    // Inline "create new assets" row picker — rows are cloned from the <template> and their
+    // inputs renamed to NewAssets[i].* on every add/remove so indices stay contiguous from 0
+    // (ASP.NET Core's collection model binder stops at the first missing index, so a gap left
+    // behind by removing a middle row would silently drop every row after it).
+    (function () {
+        var container = document.getElementById('newAssetRows');
+        var template = document.getElementById('newAssetRowTemplate');
+        var addBtn = document.getElementById('addNewAssetBtn');
+
+        function renumber() {
+            Array.prototype.forEach.call(container.children, function (row, i) {
+                row.querySelectorAll('[data-name]').forEach(function (el) {
+                    el.name = 'NewAssets[' + i + '].' + el.dataset.name;
+                });
+            });
+        }
+        function addRow() {
+            var node = template.content.firstElementChild.cloneNode(true);
+            node.querySelector('[data-na-remove]').addEventListener('click', function () {
+                node.remove();
+                renumber();
+            });
+            container.appendChild(node);
+            renumber();
+        }
+        addBtn.addEventListener('click', addRow);
     })();
 </script>

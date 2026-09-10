@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Web.Localization;
 namespace ShiftFlow.Web.ViewModels;
@@ -77,6 +78,9 @@ public class ContractViewModel : IValidatableObject
     /// detect a concurrent edit (someone else changed the linked assets since this page loaded)
     /// instead of silently discarding their change. Null/unused on Create.</summary>
     public List<int>? OriginalAssetIds { get; set; }
+    /// <summary>Rows from the inline "create new assets" picker — created and linked only if the
+    /// contract save itself succeeds. Rows with a blank AssetTag (added-then-untouched) are ignored.</summary>
+    public List<NewAssetInput>? NewAssets { get; set; }
     /// <summary>Recurrence cadence, required only when ContractType == "Preventive Maintenance".</summary>
     public string? PmCadence { get; set; }
 

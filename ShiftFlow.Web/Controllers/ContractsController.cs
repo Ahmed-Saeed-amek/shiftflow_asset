@@ -77,7 +77,7 @@ public class ContractsController : Controller
                 VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
                 StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
                 PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
-            }, vm.AssetIds ?? [], userId);
+            }, vm.AssetIds ?? [], vm.NewAssets ?? [], userId);
             TempData["Success"] = "Contract created.";
             return RedirectToAction(nameof(Index));
         }
@@ -122,7 +122,7 @@ public class ContractsController : Controller
                 Id = vm.Id, VendorId = vm.VendorId, ContractType = vm.ContractType, ContractNumber = vm.ContractNumber,
                 StartDate = vm.StartDate, EndDate = vm.EndDate, Cost = vm.Cost, Notes = vm.Notes,
                 PmCadence = vm.ContractType == "Preventive Maintenance" ? vm.PmCadence : null,
-            }, vm.AssetIds ?? [], vm.OriginalAssetIds ?? [], userId);
+            }, vm.AssetIds ?? [], vm.OriginalAssetIds ?? [], vm.NewAssets ?? [], userId);
             TempData["Success"] = "Contract updated.";
             return RedirectToAction(nameof(Index));
         }
@@ -182,6 +182,21 @@ public class ContractsController : Controller
     private async Task PopulateLookupsAsync()
     {
         ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        var allCategories = await _db.AssetCategories.OrderBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = allCategories.Where(c => c.ParentCategoryId == null).ToList();
+
+        // Flat (Id, indented label) options for the "create new assets" picker's Category select —
+        // a plain dropdown, unlike the Asset form's cascading parent/subcategory pair, since these
+        // are quick inline rows rather than the full Asset form.
+        var newAssetCategoryOptions = new List<(int Id, string Label)>();
+        foreach (var p in ((List<AssetCategory>)ViewBag.Categories).OrderBy(c => c.Name))
+        {
+            newAssetCategoryOptions.Add((p.Id, p.Name));
+            foreach (var s in allCategories.Where(c => c.ParentCategoryId == p.Id).OrderBy(c => c.Name))
+                newAssetCategoryOptions.Add((s.Id, "— " + s.Name));
+        }
+        ViewBag.NewAssetCategoryOptions = newAssetCategoryOptions;
+        ViewBag.NewAssetZoneOptions = await _db.Zones.Include(z => z.LocationCategory)
+            .OrderBy(z => z.LocationCategory!.Id).ThenBy(z => z.Name).ToListAsync();
     }
 }

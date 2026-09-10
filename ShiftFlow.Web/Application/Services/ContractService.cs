@@ -40,18 +40,66 @@ public class ContractService : IContractService
             throw new InvalidOperationException("One or more selected assets are retired and can't be linked to a contract.");
     }
 
-    public async Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId)
+    /// <summary>Validates and builds the new Asset entities for the Contract form's inline
+    /// creator — not yet added to the DbContext, so nothing is persisted until the caller adds
+    /// them alongside the Contract and calls SaveChangesAsync once. Rows with a blank AssetTag
+    /// (an added-then-untouched row) are silently skipped rather than rejected.</summary>
+    private async Task<List<Asset>> BuildNewAssetsAsync(List<NewAssetInput> newAssets, string userId)
+    {
+        var rows = newAssets.Where(a => !string.IsNullOrWhiteSpace(a.AssetTag)).ToList();
+        if (rows.Count == 0) return [];
+
+        var tags = rows.Select(a => a.AssetTag.Trim()).ToList();
+        var dupe = tags.GroupBy(t => t, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+        if (dupe != null)
+            throw new InvalidOperationException($"Duplicate new asset tag: {dupe.Key}.");
+        var existingTags = await _db.Assets.Where(a => tags.Contains(a.AssetTag)).Select(a => a.AssetTag).ToListAsync();
+        if (existingTags.Count > 0)
+            throw new InvalidOperationException($"Asset tag already in use: {string.Join(", ", existingTags)}.");
+
+        var categoryIds = rows.Select(a => a.CategoryId).Distinct().ToList();
+        var zoneIds = rows.Select(a => a.ZoneId).Distinct().ToList();
+        var validCategoryIds = (await _db.AssetCategories.Where(c => categoryIds.Contains(c.Id)).Select(c => c.Id).ToListAsync()).ToHashSet();
+        var validZoneIds = (await _db.Zones.Where(z => zoneIds.Contains(z.Id)).Select(z => z.Id).ToListAsync()).ToHashSet();
+
+        var assets = new List<Asset>();
+        foreach (var r in rows)
+        {
+            if (string.IsNullOrWhiteSpace(r.Name))
+                throw new InvalidOperationException($"New asset \"{r.AssetTag}\" needs a name.");
+            if (!validCategoryIds.Contains(r.CategoryId))
+                throw new InvalidOperationException($"New asset \"{r.AssetTag}\": selected category not found.");
+            if (!validZoneIds.Contains(r.ZoneId))
+                throw new InvalidOperationException($"New asset \"{r.AssetTag}\": selected zone not found.");
+            assets.Add(new Asset
+            {
+                AssetTag = r.AssetTag.Trim(), Name = r.Name.Trim(), CategoryId = r.CategoryId, ZoneId = r.ZoneId,
+                Status = "Working", CreatedByUserId = userId, CreatedDate = DateTime.UtcNow,
+            });
+        }
+        return assets;
+    }
+
+    public async Task<Contract> CreateAsync(Contract contract, List<int> assetIds, List<NewAssetInput> newAssets, string userId)
     {
         await ValidateAsync(contract, assetIds);
+        var newAssetEntities = await BuildNewAssetsAsync(newAssets, userId);
         contract.CreatedDate = DateTime.UtcNow;
         contract.AssetLinks = assetIds.Select(id => new ContractAsset { AssetId = id }).ToList();
+        foreach (var asset in newAssetEntities)
+            contract.AssetLinks.Add(new ContractAsset { Asset = asset });
         _db.Contracts.Add(contract);
+        // Single SaveChangesAsync for the contract, its asset links, AND the brand-new assets —
+        // if this throws (bad FK, DB constraint), nothing here is persisted; a new asset is never
+        // created unless the contract it's being linked to is created too.
         await _db.SaveChangesAsync();
         await _audit.LogAsync("Create", "Contract", contract.Id.ToString(), userId, newValue: contract.ContractNumber);
+        foreach (var asset in newAssetEntities)
+            await _audit.LogAsync("Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {contract.ContractNumber})");
         return contract;
     }
 
-    public async Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, string userId)
+    public async Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, List<NewAssetInput> newAssets, string userId)
     {
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
@@ -69,6 +117,7 @@ public class ContractService : IContractService
         // Cost) blocked until someone remembers to unlink it.
         var newlyAddedIds = assetIds.Where(id => !existing.AssetLinks.Any(l => l.AssetId == id)).ToList();
         await ValidateAsync(contract, newlyAddedIds);
+        var newAssetEntities = await BuildNewAssetsAsync(newAssets, userId);
         existing.VendorId = contract.VendorId; existing.ContractType = contract.ContractType; existing.ContractNumber = contract.ContractNumber;
         existing.StartDate = contract.StartDate; existing.EndDate = contract.EndDate; existing.Cost = contract.Cost; existing.Notes = contract.Notes;
         existing.PmCadence = contract.PmCadence;
@@ -77,9 +126,15 @@ public class ContractService : IContractService
         var toAdd = newlyAddedIds.Select(id => new ContractAsset { ContractId = existing.Id, AssetId = id });
         _db.ContractAssets.RemoveRange(toRemove);
         _db.ContractAssets.AddRange(toAdd);
+        foreach (var asset in newAssetEntities)
+            existing.AssetLinks.Add(new ContractAsset { Asset = asset });
 
+        // Single SaveChangesAsync — a new asset is never created unless this contract update
+        // itself succeeds, same guarantee as CreateAsync above.
         await _db.SaveChangesAsync();
         await _audit.LogAsync("Update", "Contract", existing.Id.ToString(), userId, newValue: existing.ContractNumber);
+        foreach (var asset in newAssetEntities)
+            await _audit.LogAsync("Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {existing.ContractNumber})");
     }
 
     public async Task<Vendor?> GetDerivedVendorAsync(int assetId)
@@ -197,19 +252,30 @@ public class ContractService : IContractService
         using (var pdf = new PdfDocument(writer))
         {
             var doc = new Document(pdf);
-            doc.Add(new Paragraph("Contracts").SetBold().SetFontSize(16));
-            var table = new Table(7, true).UseAllAvailableWidth();
-            foreach (var h in new[] { "Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets" })
-                table.AddHeaderCell(h);
+            PdfReportHelper.AddHeader(doc, "Contracts");
+
+            var today = DateTime.UtcNow.Date;
+            var expiringSoon = contracts.Count(c => c.EndDate != null && c.EndDate >= today && c.EndDate <= today.AddDays(30));
+            var totalCost = contracts.Sum(c => c.Cost ?? 0);
+            PdfReportHelper.AddKpiRow(doc,
+                ("Total Contracts", contracts.Count.ToString(), PdfReportHelper.Primary),
+                ("Total Cost", totalCost.ToString("0.00"), PdfReportHelper.Success),
+                ("Expiring in 30 Days", expiringSoon.ToString(), PdfReportHelper.Warning),
+                ("Linked Assets", contracts.Sum(c => c.AssetLinks.Count).ToString(), PdfReportHelper.Info));
+
+            var byType = contracts.GroupBy(c => c.ContractType).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, "Contracts by Type", byType, PdfReportHelper.Primary);
+
+            var table = PdfReportHelper.StyledTable(
+                new float[] { 1.6f, 1.6f, 1.4f, 1.2f, 1.2f, 1f, 0.8f },
+                new[] { "Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets" });
+            var i = 0;
             foreach (var c in contracts)
             {
-                table.AddCell(c.ContractNumber ?? "");
-                table.AddCell(c.Vendor?.Name ?? "");
-                table.AddCell(c.ContractType);
-                table.AddCell(c.StartDate.ToString("yyyy-MM-dd"));
-                table.AddCell(c.EndDate?.ToString("yyyy-MM-dd") ?? "");
-                table.AddCell(c.Cost?.ToString("0.00") ?? "");
-                table.AddCell(c.AssetLinks.Count.ToString());
+                PdfReportHelper.AddRow(table, i++, 9,
+                    c.ContractNumber ?? "", c.Vendor?.Name ?? "", c.ContractType,
+                    c.StartDate.ToString("yyyy-MM-dd"), c.EndDate?.ToString("yyyy-MM-dd") ?? "",
+                    c.Cost?.ToString("0.00") ?? "", c.AssetLinks.Count.ToString());
             }
             doc.Add(table);
         }

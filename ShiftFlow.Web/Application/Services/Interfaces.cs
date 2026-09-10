@@ -105,11 +105,14 @@ public interface IRecurringOrderService
 
 public interface IContractService
 {
-    Task<Contract> CreateAsync(Contract contract, List<int> assetIds, string userId);
+    /// <summary>newAssets are created and linked in the same SaveChangesAsync call as the contract
+    /// itself — if the contract save fails (bad vendor, invalid cost, etc.) none of the new assets
+    /// are persisted either, since nothing about them is ever saved standalone.</summary>
+    Task<Contract> CreateAsync(Contract contract, List<int> assetIds, List<NewAssetInput> newAssets, string userId);
     /// <summary>originalAssetIds is the linked-asset snapshot the edit form was loaded with; the
     /// call is rejected if the contract's actual linked assets no longer match it (someone else
     /// changed them concurrently), instead of silently discarding their change.</summary>
-    Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, string userId);
+    Task UpdateAsync(Contract contract, List<int> assetIds, List<int> originalAssetIds, List<NewAssetInput> newAssets, string userId);
     /// <summary>Picks the vendor from the asset's most recently-started contract that's currently active (EndDate null or in the future); falls back to the most recent contract overall; null if the asset has no contracts.</summary>
     Task<Vendor?> GetDerivedVendorAsync(int assetId);
     Task<Dictionary<int, Vendor?>> GetDerivedVendorsAsync(IEnumerable<int> assetIds);
@@ -138,6 +141,17 @@ public class PmScheduleRow
     public DateTime DueDate { get; set; }
     public int? WorkOrderId { get; set; }
     public string? WorkOrderNumber { get; set; }
+}
+
+/// <summary>One row of the Contract form's inline asset creator — a new Asset to create and link
+/// to the contract, in the same save as the contract itself. Rows with a blank AssetTag are
+/// ignored (an added-then-untouched row), so nothing needs to be posted at all when unused.</summary>
+public class NewAssetInput
+{
+    public string AssetTag { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int CategoryId { get; set; }
+    public int ZoneId { get; set; }
 }
 
 public interface ISparePartService

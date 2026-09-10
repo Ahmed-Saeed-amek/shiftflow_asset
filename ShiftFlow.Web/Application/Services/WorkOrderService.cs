@@ -595,24 +595,35 @@ public class WorkOrderService : IWorkOrderService
         using (var pdf = new PdfDocument(writer))
         {
             var doc = new Document(pdf);
-            doc.Add(new Paragraph("Work Orders").SetBold().SetFontSize(16));
+            PdfReportHelper.AddHeader(doc, "Work Orders");
+
+            var closed = orders.Count(w => w.ClosedDate != null);
+            var critical = orders.Count(w => w.Priority == "Critical" && w.ClosedDate == null);
+            PdfReportHelper.AddKpiRow(doc,
+                ("Total", orders.Count.ToString(), PdfReportHelper.Primary),
+                ("Open", (orders.Count - closed).ToString(), PdfReportHelper.Warning),
+                ("Closed", closed.ToString(), PdfReportHelper.Success),
+                ("Critical Open", critical.ToString(), PdfReportHelper.Danger));
+
+            var byStage = orders.GroupBy(w => w.Stage).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, "Work Orders by Stage", byStage, PdfReportHelper.Primary);
+            var byPriority = orders.GroupBy(w => w.Priority).OrderByDescending(g => g.Count()).Select(g => (g.Key, g.Count()));
+            PdfReportHelper.AddBarChart(doc, "Work Orders by Priority", byPriority, PdfReportHelper.Warning);
+
             // Equal-width columns (the old `new Table(7, true)`) squeezed "Work Order #" values
             // like "WO-2026-0020" into a column too narrow to fit on one line, wrapping mid-string
             // at the hyphen. Widening that column alone wasn't enough — Document's default 12pt
             // body font left even "AST-0001" (8 chars) wrapping in an 8-char-wide Asset column, so
             // the whole table needed a smaller font, not just different column proportions.
-            var table = new Table(new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f }).UseAllAvailableWidth().SetFontSize(8);
-            foreach (var h in new[] { "Work Order #", "Asset", "Priority", "Stage", "Vendor", "Created", "Closed" })
-                table.AddHeaderCell(h);
+            var table = PdfReportHelper.StyledTable(
+                new float[] { 2.2f, 1.4f, 1f, 1.3f, 1.6f, 1.1f, 1.1f },
+                new[] { "Work Order #", "Asset", "Priority", "Stage", "Vendor", "Created", "Closed" }, 8);
+            var i = 0;
             foreach (var w in orders)
             {
-                table.AddCell(w.WorkOrderNumber);
-                table.AddCell(w.Asset?.AssetTag ?? "");
-                table.AddCell(w.Priority);
-                table.AddCell(w.Stage);
-                table.AddCell(w.Vendor?.Name ?? "");
-                table.AddCell(w.CreatedDate.ToString("yyyy-MM-dd"));
-                table.AddCell(w.ClosedDate?.ToString("yyyy-MM-dd") ?? "");
+                PdfReportHelper.AddRow(table, i++, 8,
+                    w.WorkOrderNumber, w.Asset?.AssetTag ?? "", w.Priority, w.Stage, w.Vendor?.Name ?? "",
+                    w.CreatedDate.ToString("yyyy-MM-dd"), w.ClosedDate?.ToString("yyyy-MM-dd") ?? "");
             }
             doc.Add(table);
         }

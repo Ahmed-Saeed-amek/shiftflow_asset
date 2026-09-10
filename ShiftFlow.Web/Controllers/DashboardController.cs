@@ -74,34 +74,38 @@ public class DashboardController : Controller
             : null;
         var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssetIds);
 
+        string[] statusOrder = ["Open", "InProgress", "Done"];
+        var statusChartQuery = _db.InspectionOrders.AsNoTracking();
+        if (scopedAssetIds != null) statusChartQuery = statusChartQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        var statusCounts = (await statusChartQuery
+                .GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync())
+            .ToDictionary(x => x.Key, x => x.Count);
+
         using var ms = new MemoryStream();
         using (var writer = new PdfWriter(ms))
         using (var pdf = new PdfDocument(writer))
         {
             var doc = new Document(pdf);
-            doc.Add(new Paragraph("Executive Dashboard").SetBold().SetFontSize(16));
-            doc.Add(new Paragraph(DateTime.Today.ToString("yyyy-MM-dd")).SetFontSize(10));
+            PdfReportHelper.AddHeader(doc, "Executive Dashboard", "Ministry of Electricity, Water & Renewable Energy — Kuwait · " + DateTime.Today.ToString("dddd, dd MMMM yyyy"));
 
-            var kpiTable = new Table(2, true).UseAllAvailableWidth();
-            void Kpi(string label, string value) { kpiTable.AddCell(label); kpiTable.AddCell(value); }
-            Kpi("Open Inspection Orders", kpis.OpenInspectionOrders.ToString());
-            Kpi("Overdue Orders", overdueCount.ToString());
-            Kpi("Active Groups", kpis.ActiveGroups.ToString());
-            Kpi("Defective Assets", $"{kpis.DefectiveAssets}/{kpis.TotalAssets}");
-            Kpi("Open Work Orders", kpis.OpenWorkOrders.ToString());
-            Kpi("Low Stock Parts", kpis.LowStockPartsCount.ToString());
-            doc.Add(kpiTable);
+            PdfReportHelper.AddKpiRow(doc,
+                ("Open Inspection Orders", kpis.OpenInspectionOrders.ToString(), PdfReportHelper.Primary),
+                ("Overdue Orders", overdueCount.ToString(), PdfReportHelper.Danger),
+                ("Active Groups", kpis.ActiveGroups.ToString(), PdfReportHelper.Violet),
+                ("Defective Assets", $"{kpis.DefectiveAssets}/{kpis.TotalAssets}", PdfReportHelper.Danger),
+                ("Open Work Orders", kpis.OpenWorkOrders.ToString(), PdfReportHelper.Warning),
+                ("Low Stock Parts", kpis.LowStockPartsCount.ToString(), PdfReportHelper.Warning));
 
-            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontSize(13).SetMarginTop(16));
-            var overdueTable = new Table(4, true).UseAllAvailableWidth();
-            foreach (var h in new[] { "Order Number", "Category", "Assigned To", "Due Date" })
-                overdueTable.AddHeaderCell(h);
+            var statusData = statusOrder.Select(s => (s == "InProgress" ? "In Progress" : s, statusCounts.GetValueOrDefault(s, 0)));
+            PdfReportHelper.AddBarChart(doc, "Inspection Orders by Status", statusData, PdfReportHelper.Primary);
+
+            doc.Add(new Paragraph("Overdue Orders").SetBold().SetFontSize(13).SetMarginBottom(8));
+            var overdueTable = PdfReportHelper.StyledTable(new float[] { 1.4f, 1.2f, 1.6f, 1f }, new[] { "Order Number", "Category", "Assigned To", "Due Date" });
+            var i = 0;
             foreach (var o in overdueOrders)
             {
-                overdueTable.AddCell(o.OrderNumber);
-                overdueTable.AddCell(o.CategoryLabel);
-                overdueTable.AddCell(o.AssignedToLabel ?? "-");
-                overdueTable.AddCell(o.DueDate?.ToString("yyyy-MM-dd") ?? "-");
+                PdfReportHelper.AddRow(overdueTable, i++, 9,
+                    o.OrderNumber, o.CategoryLabel, o.AssignedToLabel ?? "-", o.DueDate?.ToString("yyyy-MM-dd") ?? "-");
             }
             doc.Add(overdueTable);
         }
