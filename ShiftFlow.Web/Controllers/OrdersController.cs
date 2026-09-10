@@ -170,9 +170,15 @@ public class OrdersController : Controller
                 await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
                 return View(vm);
             }
-            if (await _db.Assets.AnyAsync(a => assetIds.Contains(a.Id) && a.Status == "Retired"))
+            var retiredTags = await _db.Assets.Where(a => assetIds.Contains(a.Id) && a.Status == "Retired")
+                .Select(a => a.AssetTag).ToListAsync();
+            if (retiredTags.Count > 0)
             {
-                ModelState.AddModelError("", "One or more selected assets are retired and can't have new orders opened against them.");
+                // Naming the offending asset(s) instead of a generic "one or more" message — with the
+                // multi-asset picker's chips showing only labels, not status, a manager had no way to
+                // tell which of several selected assets was the retired one without removing them
+                // one at a time to re-submit and see which removal made the error go away.
+                ModelState.AddModelError("", "These assets are retired and can't have new orders opened against them: " + string.Join(", ", retiredTags));
                 await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
                 return View(vm);
             }

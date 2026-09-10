@@ -75,8 +75,14 @@ public class InspectionOrderService : IInspectionOrderService
         // the AI assistant tool) keeps generating new orders against an asset retired after the
         // schedule was created, since OrdersController's own retired-asset check only covers its
         // own manual-create path, not every caller of this method.
-        if (await _db.Assets.AnyAsync(a => resolvedAssetIds.Contains(a.Id) && a.Status == "Retired"))
-            throw new InvalidOperationException("One or more selected assets are retired and can't have new orders opened against them.");
+        var retiredTags = await _db.Assets.Where(a => resolvedAssetIds.Contains(a.Id) && a.Status == "Retired")
+            .Select(a => a.AssetTag).ToListAsync();
+        if (retiredTags.Count > 0)
+            // Names the offending asset(s) — with a multi-asset picker, "one or more" left the
+            // caller no way to tell which of several selected assets to remove without trial and
+            // error (confirmed live: submitting AST-0006 + AST-0007 together gave no indication
+            // AST-0006 was the retired one).
+            throw new InvalidOperationException("These assets are retired and can't have new orders opened against them: " + string.Join(", ", retiredTags));
         // AssetsController routes every single-asset read through ScopedAssetsAsync so a
         // UserAssetScope-restricted user can't view an out-of-scope asset — but this method (reached
         // directly by OrdersController.Create, the AI assistant, and the recurring scheduler) had no

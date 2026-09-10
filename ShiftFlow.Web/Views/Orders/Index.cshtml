@@ -12,9 +12,19 @@
     var overdue = ViewBag.Overdue is true;
     var canManageInspection = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     var canManageMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
+    var canExportInspection = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderExport)).Succeeded;
+    var canExportMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderExport)).Succeeded;
     string actionsHtml = "";
+    // InspectionOrders/MaintenanceOrders each still have a working ExportExcel action, but their
+    // own Index pages are no longer linked from the sidebar (superseded by this unified Orders
+    // page) — without a link here, InspectionOrder.Export/MaintenanceOrder.Export had no reachable
+    // UI entry point at all despite being grantable permissions.
+    if (canExportInspection)
+        actionsHtml += "<a href='" + Url.Action("ExportExcel", "InspectionOrders") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Inspection Orders") + "</a> ";
+    if (canExportMaintenance)
+        actionsHtml += "<a href='" + Url.Action("ExportExcel", "MaintenanceOrders") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Maintenance Orders") + "</a> ";
     if (canManageInspection || canManageMaintenance)
-        actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
+        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
 
     // Picks readable text (near-black or white) for an arbitrary hex badge background — the
     // 20-color auto-assigned palette (OrderTypeColors) spans both light and dark hues, so a

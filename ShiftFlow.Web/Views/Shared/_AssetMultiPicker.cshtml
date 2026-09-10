@@ -122,6 +122,14 @@
 
     const jsNoMatches = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("No matching assets")));
 
+    // Selecting a result re-focuses the search box (so the user can immediately type the next
+    // asset) — but focus's own listener re-runs search() on the now-empty term, and the backend
+    // treats an empty q as "browse everything" (top 20, unfiltered) rather than "no results", so
+    // without this guard every selection reopened a full unfiltered dropdown right over the
+    // Create Order button below, and a stray click there added a random extra asset instead of
+    // submitting (confirmed live: AST-0007 got auto-added this way on two separate attempts).
+    let suppressNextFocusSearch = false;
+
     async function search(term) {
         const res = await fetch(`/Assets/Search?q=${encodeURIComponent(term)}`);
         const items = await res.json();
@@ -148,6 +156,7 @@
                 addChip(i.id, `${i.assetTag} — ${i.name}`);
                 searchEl.value = '';
                 resultsEl.classList.add('d-none');
+                suppressNextFocusSearch = true;
                 searchEl.focus();
             });
             resultsEl.appendChild(item);
@@ -159,7 +168,10 @@
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => search(searchEl.value.trim()), 220);
     });
-    searchEl.addEventListener('focus', () => search(searchEl.value.trim()));
+    searchEl.addEventListener('focus', () => {
+        if (suppressNextFocusSearch) { suppressNextFocusSearch = false; return; }
+        search(searchEl.value.trim());
+    });
     document.addEventListener('click', e => { if (!root.contains(e.target)) resultsEl.classList.add('d-none'); });
 
     const scanBtn = root.querySelector('[data-scan]');
