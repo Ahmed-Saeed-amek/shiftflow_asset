@@ -95,8 +95,38 @@ public static class PdfReportHelper
     /// string into presentation-form glyphs in visual order before iText ever sees it — safe to
     /// call unconditionally, it's documented as a no-op on non-Arabic/already-shaped text, so
     /// every string flowing through this class is routed through it rather than threading an
-    /// `rtl` flag through every method and call site.</summary>
-    public static string Shape(string? text) => string.IsNullOrEmpty(text) ? text ?? "" : Arabic.Fix(text);
+    /// `rtl` flag through every method and call site.
+    ///
+    /// One gap: Arabic.Fix maps every letter to its positional presentation-form codepoint,
+    /// including the six "non-joining" letters (alef, dal, thal, reh, zain, waw) that never
+    /// connect to the letter after them — their isolated/final presentation forms are, by
+    /// definition, visually identical to the plain base letter, so most Arabic fonts (including
+    /// this app's embedded Cairo-Variable.ttf) don't bother mapping those presentation-form
+    /// codepoints in their cmap at all. The result was a missing-glyph tofu box wherever one of
+    /// those letters started a word in isolated position — alef most visibly, since it starts
+    /// "ال" (the definite article prefixed onto most nouns): "الأصول" rendered as a box in place
+    /// of its leading alef (confirmed live, reported by the user). Remapping those codepoints back
+    /// to the base letter is always safe (same glyph shape) and sidesteps the coverage gap
+    /// entirely instead of depending on whichever presentation forms happen to be in the font.</summary>
+    private static readonly Dictionary<char, char> NonJoiningPresentationForms = new()
+    {
+        ['ﺍ'] = 'ا', ['ﺎ'] = 'ا', // Alef, isolated/final
+        ['ﺩ'] = 'د', ['ﺪ'] = 'د', // Dal, isolated/final
+        ['ﺫ'] = 'ذ', ['ﺬ'] = 'ذ', // Thal, isolated/final
+        ['ﺭ'] = 'ر', ['ﺮ'] = 'ر', // Reh, isolated/final
+        ['ﺯ'] = 'ز', ['ﺰ'] = 'ز', // Zain, isolated/final
+        ['ﻭ'] = 'و', ['ﻮ'] = 'و', // Waw, isolated/final
+    };
+
+    public static string Shape(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        var shaped = Arabic.Fix(text);
+        Span<char> buffer = shaped.Length <= 256 ? stackalloc char[shaped.Length] : new char[shaped.Length];
+        for (var i = 0; i < shaped.Length; i++)
+            buffer[i] = NonJoiningPresentationForms.TryGetValue(shaped[i], out var baseLetter) ? baseLetter : shaped[i];
+        return new string(buffer);
+    }
 
     public static void AddHeader(Document doc, string title, string? subtitle = null)
     {
@@ -109,13 +139,12 @@ public static class PdfReportHelper
     }
 
     /// <summary>A row of KPI cards matching the live app's KPI cards: white card, small
-    /// muted-uppercase label, big bold colored value, and a small color-tinted square standing in
-    /// for the page's icon chip — an actual Bootstrap Icons glyph isn't available inside a PDF
-    /// font, and the chip previously had nothing drawn inside it at all, so every export showed a
-    /// row of blank pastel squares that read as broken/missing icons rather than a deliberate
-    /// design choice (reported live). A bold single-letter monogram in the same font as the rest
-    /// of the document (so it still shapes correctly for an Arabic label) needs no icon font and
-    /// reads as an intentional icon stand-in instead of a missing asset.</summary>
+    /// muted-uppercase label, big bold colored value. The live page's icon chip is dropped
+    /// entirely here rather than stood in for — neither an actual Bootstrap Icons glyph nor a
+    /// plain color square nor a single-letter monogram render reliably inside a PDF (confirmed
+    /// live: the color-square version showed as empty boxes, and the embedded Arabic font has no
+    /// glyph for some shaped single-letter monogram codepoints either) — so just the label/value
+    /// text, with no placeholder standing in for a missing icon.</summary>
     public static void AddKpiRow(Document doc, params (string Label, string Value, DeviceRgb Color)[] kpis)
     {
         if (kpis.Length == 0) return;
@@ -123,17 +152,8 @@ public static class PdfReportHelper
         foreach (var (label, value, color) in kpis)
         {
             var card = Card().SetPadding(10).SetMarginBottom(0);
-            var header = new Table(new float[] { 5f, 1f }).UseAllAvailableWidth();
-            var textCell = new Cell().SetBorder(Border.NO_BORDER).SetPadding(0);
-            textCell.Add(new Paragraph(Shape(label.ToUpperInvariant())).SetFontSize(7).SetFontColor(MutedText).SetBold().SetMargin(0));
-            textCell.Add(new Paragraph(Shape(value)).SetFontSize(17).SetBold().SetFontColor(color).SetMarginTop(2).SetMarginBottom(0));
-            header.AddCell(textCell);
-            var chip = new Div().SetBackgroundColor(color).SetOpacity(0.12f).SetWidth(UnitValue.CreatePointValue(22)).SetHeight(UnitValue.CreatePointValue(22)).SetBorderRadius(new BorderRadius(6));
-            var monogram = Shape(label.Trim().Length > 0 ? label.Trim().Substring(0, 1).ToUpperInvariant() : "•");
-            chip.Add(new Paragraph(monogram).SetFontSize(11).SetBold().SetFontColor(color).SetMargin(0)
-                .SetTextAlignment(TextAlignment.CENTER).SetMultipliedLeading(1f).SetPaddingTop(3));
-            header.AddCell(new Cell().Add(chip).SetBorder(Border.NO_BORDER).SetPadding(0).SetVerticalAlignment(VerticalAlignment.TOP).SetTextAlignment(TextAlignment.RIGHT));
-            card.Add(header);
+            card.Add(new Paragraph(Shape(label.ToUpperInvariant())).SetFontSize(7).SetFontColor(MutedText).SetBold().SetMargin(0));
+            card.Add(new Paragraph(Shape(value)).SetFontSize(17).SetBold().SetFontColor(color).SetMarginTop(2).SetMarginBottom(0));
             table.AddCell(new Cell().Add(card).SetBorder(Border.NO_BORDER).SetPadding(0).SetPaddingRight(6).SetPaddingBottom(6));
         }
         doc.Add(table);
