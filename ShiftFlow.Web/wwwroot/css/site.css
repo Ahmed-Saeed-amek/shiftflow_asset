@@ -403,6 +403,26 @@ body.sidebar-locked { overflow: hidden; }
   overflow: visible;
 }
 
+/* Horizontal-scroll affordance: most tables rely on .table-responsive's plain overflow-x
+   scroll (see comment above) with nothing telling a mobile user there's more to the right —
+   confirmed live on the Assets list, where the row action button sits past the fold with no
+   hint to swipe. A right-edge shadow appears only while there's still unscrolled content
+   (toggled by initTableScrollHints() in site.js) and fades out once scrolled to the end, so a
+   table that already fits its viewport never shows a hint at all. */
+.table-responsive { position: relative; }
+.table-responsive.has-scroll-hint::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 28px;
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, .14));
+  pointer-events: none;
+}
+[dir="rtl"] .table-responsive.has-scroll-hint::after {
+  right: auto; left: 0;
+  background: linear-gradient(to left, transparent, rgba(0, 0, 0, .14));
+}
+
 /* Opt-in table→card stacking for data-dense tables on phones. Most tables
    default to horizontal scroll via the existing .table-responsive wrapper
    (acceptable and cheaper); reserve .table-card-stack for a table where

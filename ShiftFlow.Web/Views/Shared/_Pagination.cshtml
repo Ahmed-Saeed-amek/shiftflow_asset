@@ -1,0 +1,31 @@
+@model ShiftFlow.Web.ViewModels.PaginationModel
+@{
+    // Rebuilds the current URL's own query string with only "page" swapped, so every existing
+    // filter (search text, status, category…) survives Prev/Next without the caller having to
+    // repeat them here.
+    string PageUrl(int p)
+    {
+        var pairs = Context.Request.Query
+            .Where(kv => !string.Equals(kv.Key, "page", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(kv => kv.Value.Select(v => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(v ?? "")))
+            .ToList();
+        pairs.Add("page=" + p);
+        return "?" + string.Join("&", pairs);
+    }
+}
+@if (Model.TotalPages > 1)
+{
+    <nav aria-label="@Loc.T("Pagination")" class="d-flex justify-content-between align-items-center mt-3 gap-2">
+        <a class="btn btn-outline-secondary btn-sm @(Model.Page <= 1 ? "disabled" : "")"
+           aria-disabled="@(Model.Page <= 1 ? "true" : "false")"
+           href="@(Model.Page <= 1 ? "#" : PageUrl(Model.Page - 1))">
+            <i class="bi bi-chevron-left me-1"></i>@Loc.T("Previous")
+        </a>
+        <span class="small text-muted">@Loc.T("Page") @Model.Page @Loc.T("of") @Model.TotalPages</span>
+        <a class="btn btn-outline-secondary btn-sm @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+           aria-disabled="@(Model.Page >= Model.TotalPages ? "true" : "false")"
+           href="@(Model.Page >= Model.TotalPages ? "#" : PageUrl(Model.Page + 1))">
+            @Loc.T("Next")<i class="bi bi-chevron-right ms-1"></i>
+        </a>
+    </nav>
+}

@@ -24,9 +24,12 @@ public class WorkOrdersController : Controller
         _db = db; _workOrderService = workOrderService; _contractService = contractService; _userManager = userManager; _scope = scope;
     }
 
+    private const int PageSize = 25;
+
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
-    public async Task<IActionResult> Index(string? stage, string? priority, string? q)
+    public async Task<IActionResult> Index(string? stage, string? priority, string? q, int page = 1)
     {
+        if (page < 1) page = 1;
         q = SearchQuery.Cap(q);
         var userId = _userManager.GetUserId(User)!;
         var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
@@ -43,7 +46,15 @@ public class WorkOrdersController : Controller
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(w => w.WorkOrderNumber.Contains(q) || (w.Asset != null && w.Asset.AssetTag.Contains(q)));
         ViewBag.Stage = stage; ViewBag.Priority = priority; ViewBag.Q = q;
-        return View(await query.OrderByDescending(w => w.CreatedDate).ToListAsync());
+
+        var orderedQuery = query.OrderByDescending(w => w.CreatedDate);
+        var totalCount = await orderedQuery.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
+        ViewBag.TotalCount = totalCount;
+
+        return View(await orderedQuery.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync());
     }
 
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]

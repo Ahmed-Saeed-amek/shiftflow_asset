@@ -1,4 +1,21 @@
-document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.alert-dismissible').forEach(a=>setTimeout(()=>{a.style.opacity='0';setTimeout(()=>a.remove(),300)},5000));document.querySelectorAll('[data-confirm]').forEach(btn=>btn.addEventListener('click',e=>{if(!confirm(btn.dataset.confirm||'Are you sure?'))e.preventDefault();}));document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t=>new bootstrap.Tooltip(t));initEmployeePickers();initAssetPickers();initZonePickers();initSidebar();initSidebarScrollMemory();});
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.alert-dismissible').forEach(a=>setTimeout(()=>{a.style.opacity='0';setTimeout(()=>a.remove(),300)},5000));document.querySelectorAll('[data-confirm]').forEach(btn=>btn.addEventListener('click',e=>{if(!confirm(btn.dataset.confirm||'Are you sure?'))e.preventDefault();}));document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(t=>new bootstrap.Tooltip(t));initEmployeePickers();initAssetPickers();initZonePickers();initSidebar();initSidebarScrollMemory();initTableScrollHints();});
+
+// Toggles .has-scroll-hint on every .table-responsive that currently has unscrolled content to
+// the right (see site.css) — a right-edge shadow that appears only while swiping would reveal
+// more and disappears once you've scrolled to the end, instead of a hint that's either always
+// on (looks like a bug on tables that already fit) or never on (no clue there's more to see).
+function initTableScrollHints(){
+  document.querySelectorAll('.table-responsive').forEach(function(el){
+    function update(){
+      var hasOverflow=el.scrollWidth>el.clientWidth+1;
+      var atEnd=Math.abs(el.scrollLeft)+el.clientWidth>=el.scrollWidth-2;
+      el.classList.toggle('has-scroll-hint',hasOverflow&&!atEnd);
+    }
+    el.addEventListener('scroll',update,{passive:true});
+    window.addEventListener('resize',update,{passive:true});
+    update();
+  });
+}
 
 // Shared HTML-escaping helper for the typeahead pickers below — every field they render
 // (employee FullName/Email/EmployeeNumber, asset Name, zone Name/NameAr) comes from other

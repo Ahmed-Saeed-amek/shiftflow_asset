@@ -21,11 +21,21 @@ public class ContractsController : Controller
         _db = db; _contractService = contractService; _userManager = userManager;
     }
 
+    private const int PageSize = 25;
+
     [Authorize(Policy = PermissionCatalog.ContractView)]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
-        var contracts = await _db.Contracts.Include(c => c.Vendor).Include(c => c.AssetLinks)
-            .OrderByDescending(c => c.StartDate).ToListAsync();
+        if (page < 1) page = 1;
+        var query = _db.Contracts.Include(c => c.Vendor).Include(c => c.AssetLinks)
+            .OrderByDescending(c => c.StartDate);
+        var totalCount = await query.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
+        ViewBag.TotalCount = totalCount;
+
+        var contracts = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
         return View(contracts);
     }
 

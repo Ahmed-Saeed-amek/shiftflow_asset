@@ -24,7 +24,12 @@
         clearTimeout(hideTimer);
         hideTimer = setTimeout(function () { el.classList.remove('scroll-hide'); }, delayMs);
     }
-    window.addEventListener('scroll', function () { hideThenSettle(500); }, { passive: true });
+    // Capture phase, on document rather than window — a plain window-scroll listener never
+    // fires for scrolling *inside* a nested container (e.g. a .table-responsive scrolled
+    // horizontally on a narrow screen), so the bubble stayed fully visible and kept covering
+    // whatever row action had scrolled out from under it. Scroll events don't bubble, but they
+    // do dispatch through the capture phase on ancestors, which document-level capture catches.
+    document.addEventListener('scroll', function () { hideThenSettle(500); }, { passive: true, capture: true });
     // Whatever row/button happens to land under the bubble's fixed corner on a freshly loaded
     // page (no scroll needed to reproduce it — e.g. a short list on /Rbac or /Users) is just as
     // covered as it would be mid-scroll. Give the page a beat to be seen and tapped before the

@@ -32,9 +32,12 @@ public class AssetsController : Controller
     private Task<IQueryable<Asset>> ScopedAssetsAsync(string userId) =>
         _scopeService.ApplyScopeAsync(_db.Assets.AsQueryable(), userId);
 
+    private const int PageSize = 25;
+
     [Authorize(Policy = PermissionCatalog.AssetView)]
-    public async Task<IActionResult> Index(string? status, int? categoryId, int? zoneId, int? locationCategoryId, string? q, bool? assignedToMe)
+    public async Task<IActionResult> Index(string? status, int? categoryId, int? zoneId, int? locationCategoryId, string? q, bool? assignedToMe, int page = 1)
     {
+        if (page < 1) page = 1;
         q = SearchQuery.Cap(q);
         var currentUserId = _userManager.GetUserId(User)!;
         var scope = await _scopeService.GetEffectiveScopeAsync(currentUserId);
@@ -89,7 +92,15 @@ public class AssetsController : Controller
         ViewBag.LocationCategoryId = locationCategoryId;
         ViewBag.AssignedToMe = assignedToMe == true;
         ViewBag.IsScoped = scope != null;
-        return View(await query.OrderBy(a => a.AssetTag).ToListAsync());
+
+        var orderedQuery = query.OrderBy(a => a.AssetTag);
+        var totalCount = await orderedQuery.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
+        ViewBag.TotalCount = totalCount;
+
+        return View(await orderedQuery.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync());
     }
 
     /// <summary>Every asset tied to an Inspection/Maintenance/Work order assigned to this user —

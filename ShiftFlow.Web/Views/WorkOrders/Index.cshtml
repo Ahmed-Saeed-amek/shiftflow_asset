@@ -43,7 +43,7 @@
     {
         <div class="col-auto"><a asp-action="Index" class="btn btn-sm btn-outline-secondary">@Loc.T("Clear")</a></div>
     }
-    <div class="col-auto ms-auto text-muted small">@Model.Count @Loc.T("records")</div>
+    <div class="col-auto ms-auto text-muted small">@ViewBag.TotalCount @Loc.T("records")</div>
 </form>
 
 <div class="card border-0 shadow-sm">
@@ -82,3 +82,4 @@
         </table>
     </div>
 </div>
+<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />

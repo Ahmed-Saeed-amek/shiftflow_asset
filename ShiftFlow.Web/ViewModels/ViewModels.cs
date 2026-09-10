@@ -120,6 +120,16 @@ public class AssetChip
     public string Label { get; set; } = string.Empty;
 }
 
+/// <summary>Drives the shared _Pagination partial — Page is 1-based. The partial rebuilds each
+/// prev/next link from the current request's own query string (swapping only "page"), so it
+/// carries whatever filters the list page already applied without the controller needing to
+/// hand them back explicitly.</summary>
+public class PaginationModel
+{
+    public int Page { get; set; } = 1;
+    public int TotalPages { get; set; }
+}
+
 public class AssetMultiPickerModel
 {
     /// <summary>Hidden input name, repeated once per selected asset — binds straight to a List&lt;int&gt; on the target view model.</summary>

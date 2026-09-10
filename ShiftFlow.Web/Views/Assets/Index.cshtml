@@ -96,7 +96,7 @@
             <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")</a>
         </div>
     }
-    <div class="col-auto ms-auto text-muted small">@Model.Count @Loc.T("records")</div>
+    <div class="col-auto ms-auto text-muted small">@ViewBag.TotalCount @Loc.T("records")</div>
 </form>
 
 <div class="card border-0 shadow-sm">
@@ -128,3 +128,4 @@
         </table>
     </div>
 </div>
+<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
