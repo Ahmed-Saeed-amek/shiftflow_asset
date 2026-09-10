@@ -47,6 +47,14 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
             return RedirectToAction(nameof(Index));
         }
+        // Name has the same unique index as Prefix (IX_OrderTypes_Name) but was never checked up
+        // front — a duplicate name hit an unhandled SqlException at SaveChangesAsync instead of
+        // this clean message (confirmed live).
+        if (await _db.OrderTypes.AnyAsync(t => t.Name == vm.Name))
+        {
+            TempData["Error"] = $"An order type named '{vm.Name}' already exists.";
+            return RedirectToAction(nameof(Index));
+        }
         var usedColors = await _db.OrderTypes.Select(t => t.Color).ToListAsync();
         _db.OrderTypes.Add(new OrderType
         {
@@ -80,6 +88,15 @@ public class OrderTypesController : Controller
         if (await _db.OrderTypes.AnyAsync(t => t.Id != vm.Id && t.Prefix == vm.Prefix))
         {
             TempData["Error"] = $"Prefix '{vm.Prefix}' is already used by another order type.";
+            return RedirectToAction(nameof(Index));
+        }
+        // Name has the same unique index as Prefix (IX_OrderTypes_Name) but was never checked up
+        // front — a duplicate name hit an unhandled SqlException at SaveChangesAsync instead of
+        // this clean message (confirmed live: editing a type's name to an existing type's name
+        // 500'd with a raw SqlException stack trace).
+        if (await _db.OrderTypes.AnyAsync(t => t.Id != vm.Id && t.Name == vm.Name))
+        {
+            TempData["Error"] = $"An order type named '{vm.Name}' already exists.";
             return RedirectToAction(nameof(Index));
         }
         // IsDirectFix decides which table (InspectionOrders vs MaintenanceOrders) every order or
