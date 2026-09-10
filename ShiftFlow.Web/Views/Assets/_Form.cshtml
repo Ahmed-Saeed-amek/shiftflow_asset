@@ -132,7 +132,17 @@
         updateCategoryHidden();
     }
 
-    catParentSel.addEventListener('change', async () => { await loadSubcategories(catParentSel.value ? Number(catParentSel.value) : null, null); });
+    catParentSel.addEventListener('change', async () => {
+        // Set the hidden CategoryId to the parent immediately, synchronously — updateCategoryHidden()
+        // otherwise only runs once loadSubcategories' async fetch resolves, so picking a parent
+        // category that HAS subcategories and saving before that fetch finishes (a fast click, or a
+        // slow network) posted an empty CategoryId and a misleading "Please select a Category" error
+        // even though a category was, in fact, selected (confirmed live). Stale subcategory options
+        // are about to be replaced by loadSubcategories below, so don't let the old catSubSel.value
+        // win here — go straight to the parent, then let the subcategory fetch override it if needed.
+        catIdHidden.value = catParentSel.value || '';
+        await loadSubcategories(catParentSel.value ? Number(catParentSel.value) : null, null);
+    });
     catSubSel.addEventListener('change', updateCategoryHidden);
 
     if (catParentSel.value) loadSubcategories(Number(catParentSel.value), selectedSubcategoryId);
