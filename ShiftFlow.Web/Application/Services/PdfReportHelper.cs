@@ -1,3 +1,4 @@
+using ArabicRt;
 using iText.IO.Font;
 using iText.IO.Font.Constants;
 using iText.Kernel.Colors;
@@ -86,11 +87,22 @@ public static class PdfReportHelper
         new Div().SetBackgroundColor(CardBackground).SetBorder(new SolidBorder(BorderColor, 0.75f))
             .SetBorderRadius(new BorderRadius(8)).SetPadding(14).SetMarginBottom(14);
 
+    /// <summary>iText7's free/core engine draws each Unicode codepoint's isolated glyph form and
+    /// never reorders for RTL bidi — real Arabic contextual shaping (letters joining into their
+    /// initial/medial/final forms) and bidi reordering are gated behind iText's paid pdfCalligraph
+    /// add-on, which this app doesn't have. Without it, Arabic text renders as visibly broken
+    /// disconnected letters (confirmed live). ArabicRt.Arabic.Fix pre-shapes and reorders the
+    /// string into presentation-form glyphs in visual order before iText ever sees it — safe to
+    /// call unconditionally, it's documented as a no-op on non-Arabic/already-shaped text, so
+    /// every string flowing through this class is routed through it rather than threading an
+    /// `rtl` flag through every method and call site.</summary>
+    public static string Shape(string? text) => string.IsNullOrEmpty(text) ? text ?? "" : Arabic.Fix(text);
+
     public static void AddHeader(Document doc, string title, string? subtitle = null)
     {
-        doc.Add(new Paragraph(title).SetFontColor(Foreground).SetBold().SetFontSize(22).SetMarginBottom(2));
+        doc.Add(new Paragraph(Shape(title)).SetFontColor(Foreground).SetBold().SetFontSize(22).SetMarginBottom(2));
         var sub = subtitle ?? DateTime.Today.ToString("dddd, dd MMMM yyyy");
-        doc.Add(new Paragraph(sub).SetFontColor(MutedText).SetFontSize(10).SetMarginBottom(6));
+        doc.Add(new Paragraph(Shape(sub)).SetFontColor(MutedText).SetFontSize(10).SetMarginBottom(6));
         // Thin primary-blue rule under the title — the same accent color used for links, active
         // nav items and icons throughout the app, standing in for a literal logo/branding mark.
         doc.Add(new Div().SetHeight(3).SetWidth(UnitValue.CreatePointValue(64)).SetBackgroundColor(Primary).SetMarginBottom(16));
@@ -108,8 +120,8 @@ public static class PdfReportHelper
             var card = Card().SetPadding(10).SetMarginBottom(0);
             var header = new Table(new float[] { 5f, 1f }).UseAllAvailableWidth();
             var textCell = new Cell().SetBorder(Border.NO_BORDER).SetPadding(0);
-            textCell.Add(new Paragraph(label.ToUpperInvariant()).SetFontSize(7).SetFontColor(MutedText).SetBold().SetMargin(0));
-            textCell.Add(new Paragraph(value).SetFontSize(17).SetBold().SetFontColor(color).SetMarginTop(2).SetMarginBottom(0));
+            textCell.Add(new Paragraph(Shape(label.ToUpperInvariant())).SetFontSize(7).SetFontColor(MutedText).SetBold().SetMargin(0));
+            textCell.Add(new Paragraph(Shape(value)).SetFontSize(17).SetBold().SetFontColor(color).SetMarginTop(2).SetMarginBottom(0));
             header.AddCell(textCell);
             var chip = new Div().SetBackgroundColor(color).SetOpacity(0.12f).SetWidth(UnitValue.CreatePointValue(22)).SetHeight(UnitValue.CreatePointValue(22)).SetBorderRadius(new BorderRadius(6));
             header.AddCell(new Cell().Add(chip).SetBorder(Border.NO_BORDER).SetPadding(0).SetVerticalAlignment(VerticalAlignment.TOP).SetTextAlignment(TextAlignment.RIGHT));
@@ -129,7 +141,7 @@ public static class PdfReportHelper
         var rows = data.ToList();
         if (rows.Count == 0) return;
         var card = Card();
-        card.Add(new Paragraph(title).SetBold().SetFontColor(Foreground).SetFontSize(12).SetMarginBottom(8));
+        card.Add(new Paragraph(Shape(title)).SetBold().SetFontColor(Foreground).SetFontSize(12).SetMarginBottom(8));
         var max = Math.Max(1, rows.Max(r => r.Value));
         // A percent-width Div nested inside another Div inside a table cell doesn't reliably
         // resolve against its immediate parent in iText7's layout pass — it renders as a sliver
@@ -140,7 +152,7 @@ public static class PdfReportHelper
         var table = new Table(new float[] { 2f, 6f, 1f }).UseAllAvailableWidth();
         foreach (var (label, value) in rows)
         {
-            table.AddCell(new Cell().Add(new Paragraph(label).SetFontSize(9).SetFontColor(Foreground))
+            table.AddCell(new Cell().Add(new Paragraph(Shape(label)).SetFontSize(9).SetFontColor(Foreground))
                 .SetBorder(Border.NO_BORDER).SetVerticalAlignment(VerticalAlignment.MIDDLE));
 
             var barWidthPt = Math.Max(value * trackWidthPt / max, value > 0 ? 6f : 0f);
@@ -167,7 +179,7 @@ public static class PdfReportHelper
         var table = new Table(columnWidths).UseAllAvailableWidth().SetFixedLayout().SetFontSize(fontSize)
             .SetBackgroundColor(CardBackground).SetBorder(new SolidBorder(BorderColor, 0.75f)).SetBorderRadius(new BorderRadius(8));
         foreach (var h in headers)
-            table.AddHeaderCell(new Cell().Add(new Paragraph(h.ToUpperInvariant()).SetBold().SetFontColor(MutedText).SetFontSize(fontSize - 1))
+            table.AddHeaderCell(new Cell().Add(new Paragraph(Shape(h.ToUpperInvariant())).SetBold().SetFontColor(MutedText).SetFontSize(fontSize - 1))
                 .SetBackgroundColor(MutedBackground).SetPadding(6).SetBorder(Border.NO_BORDER));
         return table;
     }
@@ -177,7 +189,7 @@ public static class PdfReportHelper
     {
         foreach (var c in cells)
         {
-            var cell = new Cell().Add(new Paragraph(c ?? "").SetFontSize(fontSize).SetFontColor(Foreground)).SetPadding(5).SetBorder(Border.NO_BORDER);
+            var cell = new Cell().Add(new Paragraph(Shape(c)).SetFontSize(fontSize).SetFontColor(Foreground)).SetPadding(5).SetBorder(Border.NO_BORDER);
             if (rowIndex % 2 == 1) cell.SetBackgroundColor(MutedBackground);
             table.AddCell(cell);
         }

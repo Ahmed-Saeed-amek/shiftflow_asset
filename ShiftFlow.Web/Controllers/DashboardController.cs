@@ -102,7 +102,7 @@ public class DashboardController : Controller
             var statusData = statusOrder.Select(s => (_loc.T(s == "InProgress" ? "In Progress" : s), statusCounts.GetValueOrDefault(s, 0)));
             PdfReportHelper.AddBarChart(doc, _loc.T("Inspection Orders by Status"), statusData, PdfReportHelper.Primary);
 
-            doc.Add(new Paragraph(_loc.T("Overdue Orders")).SetBold().SetFontColor(PdfReportHelper.Foreground).SetFontSize(13).SetMarginBottom(8));
+            doc.Add(new Paragraph(PdfReportHelper.Shape(_loc.T("Overdue Orders"))).SetBold().SetFontColor(PdfReportHelper.Foreground).SetFontSize(13).SetMarginBottom(8));
             var overdueTable = PdfReportHelper.StyledTable(new float[] { 1.4f, 1.2f, 1.6f, 1f },
                 new[] { _loc.T("Order Number"), _loc.T("Category"), _loc.T("Assigned To"), _loc.T("Due Date") });
             var i = 0;
