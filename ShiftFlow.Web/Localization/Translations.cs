@@ -1985,6 +1985,31 @@ public static class Translations
         Ar["View Audit Log"] = "عرض سجل التدقيق";
         Ar["Manage Roles & Permissions"] = "إدارة الأدوار والصلاحيات";
         Ar["Full Administrator Access"] = "صلاحية المسؤول الكاملة";
+        Ar["View Groups"] = "عرض المجموعات";
+        Ar["See My Home / My Orders"] = "عرض صفحة الرئيسية وأوامري";
+        Ar["View Inspection Orders"] = "عرض أوامر المعاينة";
+        Ar["Manage Inspection Orders"] = "إدارة أوامر المعاينة";
+        Ar["Report Inspection Outcomes"] = "تسجيل نتائج المعاينة";
+        Ar["Export Inspection Orders"] = "تصدير أوامر المعاينة";
+        Ar["Manage Order Types"] = "إدارة أنواع الأوامر";
+        Ar["View Spare Parts"] = "عرض قطع الغيار";
+        Ar["Manage Spare Parts"] = "إدارة قطع الغيار";
+        Ar["View Assets"] = "عرض الأصول";
+        Ar["Manage Assets"] = "إدارة الأصول";
+        Ar["Manage Asset Categories"] = "إدارة فئات الأصول";
+        Ar["Report Asset Issues"] = "الإبلاغ عن أعطال الأصول";
+        Ar["Restrict Employee Asset Scope"] = "تقييد نطاق أصول الموظف";
+        Ar["View Vendors"] = "عرض الموردين";
+        Ar["Manage Vendors"] = "إدارة الموردين";
+        Ar["View Work Orders"] = "عرض أوامر العمل";
+        Ar["Manage Work Orders"] = "إدارة أوامر العمل";
+        Ar["Assign Work Order Vendors"] = "تعيين مورد لأمر العمل";
+        Ar["Export Work Orders"] = "تصدير أوامر العمل";
+        Ar["View Contracts"] = "عرض العقود";
+        Ar["View Maintenance Orders"] = "عرض أوامر الصيانة";
+        Ar["Manage Maintenance Orders"] = "إدارة أوامر الصيانة";
+        Ar["Report Maintenance Outcomes"] = "تسجيل نتائج الصيانة";
+        Ar["Export Maintenance Orders"] = "تصدير أوامر الصيانة";
 
         // Permission descriptions (DbSeeder.cs seed data)
         Ar["Access the AI assistant for shift-related questions and actions"] = "الوصول إلى المساعد الذكي للأسئلة والإجراءات المتعلقة بالمناوبات";
@@ -2018,6 +2043,40 @@ public static class Translations
         Ar["See the task-completion and performance analytics dashboard"] = "عرض لوحة تحليلات إنجاز المهام والأداء";
         Ar["Start a new shift schedule for a work area"] = "بدء جدول مناوبات جديد لمنطقة عمل";
         Ar["Start a shift, marking it as in progress"] = "بدء مناوبة وتحديدها كقيد التنفيذ";
+        Ar["See all inspection orders across the organization"] = "عرض جميع أوامر المعاينة عبر المؤسسة";
+        Ar["Create and cancel inspection orders"] = "إنشاء وإلغاء أوامر المعاينة";
+        Ar["Report an asset's inspection outcome on an order assigned to you or your group"] = "تسجيل نتيجة معاينة أصل ضمن أمر مسند إليك أو لمجموعتك";
+        Ar["Export the inspection order list to Excel"] = "تصدير قائمة أوامر المعاينة إلى إكسل";
+        Ar["See the list of groups and their members"] = "عرض قائمة المجموعات وأعضائها";
+        Ar["Create groups and manage their membership"] = "إنشاء المجموعات وإدارة عضويتها";
+        Ar["See the 'My Home' and 'My Orders' personal-work section in the sidebar — note: an Admin (System.IsAdmin) always sees it regardless of this setting"] = "عرض قسم \"الرئيسية\" و\"أوامري\" الشخصي في القائمة الجانبية — ملاحظة: يرى المسؤول (System.IsAdmin) هذا القسم دائماً بغض النظر عن هذا الإعداد";
+        Ar["Access the AI assistant for inspection-order-related questions and actions"] = "الوصول إلى المساعد الذكي للأسئلة والإجراءات المتعلقة بأوامر المعاينة";
+        Ar["See the asset register — tags, categories, locations, and status"] = "عرض سجل الأصول — الرموز والفئات والمواقع والحالة";
+        Ar["Add, edit, or retire assets in the register"] = "إضافة أصول في السجل أو تعديلها أو إخراجها من الخدمة";
+        Ar["Create and edit asset categories"] = "إنشاء وتعديل فئات الأصول";
+        Ar["Report a failure or other action on an asset, creating a draft work order for admin review"] = "الإبلاغ عن عطل أو إجراء آخر على أصل، مما ينشئ مسودة أمر عمل لمراجعة المسؤول";
+        Ar["Restrict which zone, area, or category of assets a specific employee can see"] = "تقييد المنطقة أو الموقع أو فئة الأصول التي يمكن لموظف معين رؤيتها";
+        Ar["See the list of maintenance vendors"] = "عرض قائمة موردي الصيانة";
+        Ar["Add, edit, or suspend maintenance vendors"] = "إضافة موردي الصيانة أو تعديلهم أو إيقافهم";
+        Ar["See maintenance work orders and their status"] = "عرض أوامر عمل الصيانة وحالتها";
+        Ar["Create work orders and advance them through their stages"] = "إنشاء أوامر العمل وتقديمها عبر مراحلها";
+        Ar["Assign a vendor to a work order"] = "تعيين مورد لأمر عمل";
+        Ar["Export asset and work order lists to Excel or PDF"] = "تصدير قوائم الأصول وأوامر العمل إلى إكسل أو PDF";
+        Ar["See vendor contracts and which assets they cover"] = "عرض عقود الموردين والأصول التي تشملها";
+        Ar["Create and edit vendor contracts and link them to assets"] = "إنشاء وتعديل عقود الموردين وربطها بالأصول";
+        Ar["See all standalone maintenance orders across the organization"] = "عرض جميع أوامر الصيانة المستقلة عبر المؤسسة";
+        Ar["Assign an employee to fix an asset in-house, and cancel maintenance orders"] = "تعيين موظف لإصلاح أصل داخلياً، وإلغاء أوامر الصيانة";
+        Ar["Complete a fix on a maintenance order assigned to you"] = "إتمام إصلاح ضمن أمر صيانة مسند إليك";
+        Ar["Export the maintenance order list to Excel"] = "تصدير قائمة أوامر الصيانة إلى إكسل";
+        Ar["Create and edit the order-type catalog used by inspection and maintenance orders"] = "إنشاء وتعديل كتالوج أنواع الأوامر المستخدم في أوامر المعاينة والصيانة";
+        Ar["See the spare parts catalog, stock levels, and which assets each part fits"] = "عرض كتالوج قطع الغيار ومستويات المخزون والأصول التي تناسبها كل قطعة";
+        Ar["Add or edit spare parts, link them to assets, and adjust stock quantities"] = "إضافة أو تعديل قطع الغيار، وربطها بالأصول، وتعديل كميات المخزون";
+
+        // RBAC self-lockout warning banners (RolePermissions.cshtml / UserPermissions.cshtml)
+        Ar["You're a member of this role."] = "أنت عضو في هذا الدور.";
+        Ar["If you uncheck \"Manage Roles & Permissions\" or \"Full Administrator Access\" below, that change will be skipped for this role so you don't lock yourself out."] = "إذا ألغيت تحديد \"إدارة الأدوار والصلاحيات\" أو \"صلاحية المسؤول الكاملة\" أدناه، سيتم تجاهل هذا التغيير لهذا الدور حتى لا تفقد وصولك.";
+        Ar["This is your own account."] = "هذا حسابك الخاص.";
+        Ar["If a change here would deny or remove your effective access to \"Manage Roles & Permissions\" or \"Full Administrator Access\", it will be skipped so you don't lock yourself out."] = "إذا كان أي تغيير هنا سيمنع أو يزيل وصولك الفعلي إلى \"إدارة الأدوار والصلاحيات\" أو \"صلاحية المسؤول الكاملة\"، سيتم تجاهله حتى لا تفقد وصولك.";
 
         // Permission categories
         Ar["Rotation Templates"] = "قوالب التناوب";
