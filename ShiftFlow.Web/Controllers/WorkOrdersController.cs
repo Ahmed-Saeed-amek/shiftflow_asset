@@ -280,6 +280,15 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> ForceClose(int id, string? reason)
     {
+        // Force-closing bypasses the vendor/employee reply this work order was waiting on — the
+        // reason field was marked "(optional)" despite that, leaving no accountability trail for
+        // why a manager short-circuited the normal flow (flagged in a UX review: irreversible,
+        // audit-relevant actions shouldn't accept a blank justification).
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["Error"] = "A reason is required to force-close a work order.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
         var userId = _userManager.GetUserId(User)!;
         try { await _workOrderService.ForceCloseAsync(id, reason, userId); TempData["Success"] = "Work order force-closed."; }
         catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
@@ -292,6 +301,13 @@ public class WorkOrdersController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.WorkOrderManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Reject(int id, string? reason)
     {
+        // Same reasoning as ForceClose above — rejecting a submitted fix report sends it back with
+        // no record of what was wrong with it unless a reason was typed, and it wasn't required to.
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["Error"] = "A reason is required to reject a fix report.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
         var userId = _userManager.GetUserId(User)!;
         try { await _workOrderService.RejectAsync(id, reason, userId); TempData["Success"] = "Report rejected."; }
         catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }

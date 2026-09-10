@@ -45,6 +45,7 @@ public static class PermissionDisplay
         [PermissionCatalog.IsAdmin]                  = "Full Administrator Access",
         [PermissionCatalog.AssetView]                = "View Assets",
         [PermissionCatalog.AssetManage]               = "Manage Assets",
+        [PermissionCatalog.AssetExport]               = "Export Assets",
         [PermissionCatalog.AssetCategoryManage]      = "Manage Asset Categories",
         [PermissionCatalog.AssetReportAction]        = "Report Asset Issues",
         [PermissionCatalog.AssetScopeManage]         = "Restrict Employee Asset Scope",

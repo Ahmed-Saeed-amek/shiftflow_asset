@@ -35,6 +35,7 @@ public static class PermissionCatalog
     // ── Asset Management ────────────────────────────────────────────────────────
     public const string AssetView                   = "Asset.View";
     public const string AssetManage                 = "Asset.Manage";
+    public const string AssetExport                 = "Asset.Export";
     public const string AssetCategoryManage         = "AssetCategory.Manage";
     public const string VendorView                  = "Vendor.View";
     public const string VendorManage                = "Vendor.Manage";
@@ -74,7 +75,7 @@ public static class PermissionCatalog
         AiAssistantUse,
         AuditLogView,
         RbacManage,
-        AssetView, AssetManage, AssetCategoryManage,
+        AssetView, AssetManage, AssetExport, AssetCategoryManage,
         VendorView, VendorManage,
         WorkOrderView, WorkOrderManage, WorkOrderAssign, WorkOrderExport,
         ContractView, ContractManage, AssetReportAction, AssetScopeManage,

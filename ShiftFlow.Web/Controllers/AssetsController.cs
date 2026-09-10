@@ -352,14 +352,14 @@ public class AssetsController : Controller
         return Json(results);
     }
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
+    [Authorize(Policy = PermissionCatalog.AssetExport)]
     public async Task<IActionResult> ExportExcel()
     {
         var bytes = await _assetService.ExportToExcelAsync(_userManager.GetUserId(User)!);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Assets_{DateTime.Today:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Policy = PermissionCatalog.WorkOrderExport)]
+    [Authorize(Policy = PermissionCatalog.AssetExport)]
     public async Task<IActionResult> ExportPdf()
     {
         var bytes = await _assetService.ExportToPdfAsync(_userManager.GetUserId(User)!);

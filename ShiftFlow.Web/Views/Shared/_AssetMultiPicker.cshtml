@@ -179,9 +179,15 @@
         scanBtn.addEventListener('click', () => {
             window.scanAssetQr(asset => {
                 if (!asset) return;
-                searchEl.value = asset.name;
+                // Mirrors clicking a normal search result — scanning previously only filled the
+                // visible search text and re-ran the query, leaving the scanned asset unselected
+                // (a chip was never added), so the user still had to manually find and click their
+                // own just-scanned asset in the resulting list.
+                addChip(asset.id, `${asset.assetTag} — ${asset.name}`);
+                searchEl.value = '';
+                resultsEl.classList.add('d-none');
+                suppressNextFocusSearch = true;
                 searchEl.focus();
-                search(asset.name);
             });
         });
     }

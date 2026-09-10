@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = Loc.T("Assets");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
-    var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderExport)).Succeeded;
+    var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetExport)).Succeeded;
     string actionsHtml = "";
     if (canExport)
         actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "

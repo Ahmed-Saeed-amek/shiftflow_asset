@@ -154,9 +154,15 @@ function initAssetPickers(){
       scanBtn.addEventListener('click',function(){
         window.scanAssetQr(function(asset){
           if(!asset) return;
-          search.value=asset.name;
-          search.focus();
-          query();
+          // Mirrors clicking a normal search result (line ~138) — scanning previously only filled
+          // the visible search text and re-ran the query, leaving the actual hidden AssetId empty,
+          // so the user still had to manually pick their own just-scanned asset from the resulting
+          // list. Set the real selection directly instead (confirmed live: pre-fix, hidden.value
+          // stayed "" after a scan).
+          hidden.value=asset.id;
+          search.value=asset.assetTag+' — '+(asset.name||'');
+          hide();
+          hidden.dispatchEvent(new Event('change',{bubbles:true}));
         });
       });
     }

@@ -212,7 +212,7 @@
                     </form>
                     <form method="post" asp-action="Reject" asp-route-id="@Model.Id" class="d-flex gap-2 mt-2 pt-2 border-top">
                         @Html.AntiForgeryToken()
-                        <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Rejection reason (optional)")" />
+                        <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Rejection reason")" required />
                         <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Reject")</button>
                     </form>
                 </div>
@@ -440,7 +440,7 @@
                                   onsubmit="return confirm('@Loc.T("Close this work order immediately without waiting for a vendor or employee reply?")')"
                                   class="d-flex gap-2">
                                 @Html.AntiForgeryToken()
-                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Force-close reason (optional)")" />
+                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Force-close reason")" required />
                                 <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Force Close")</button>
                             </form>
                         </div>

@@ -75,7 +75,14 @@
             <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId">@Loc.T("All Statuses")</a>
             <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Open">@Loc.T("Open")</a>
             <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="InProgress">@Loc.T("In Progress")</a>
+            @* PendingApproval and Cancelled are both real, reachable statuses (InspectionOrder/
+               MaintenanceOrder.Statuses) with no filter chip here — status was still a working
+               query-string filter server-side (OrdersController.Index passes it straight through),
+               just with no way to reach it from this UI, making e.g. every cancelled order
+               invisible to a manager reviewing cancellations. *@
+            <a class="btn @(status == "PendingApproval" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="PendingApproval">@Loc.T("PendingApproval")</a>
             <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Done">@Loc.T("Done")</a>
+            <a class="btn @(status == "Cancelled" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Cancelled">@Loc.T("Cancelled")</a>
         </div>
     </div>
     <form method="get" class="d-flex gap-2">

@@ -503,6 +503,7 @@ public static class DbSeeder
             // Assets
             new Permission { Name = "Asset.View",                   Category = "Assets", Description = "See the asset register — tags, categories, locations, and status" },
             new Permission { Name = "Asset.Manage",                 Category = "Assets", Description = "Add, edit, or retire assets in the register" },
+            new Permission { Name = "Asset.Export",                 Category = "Assets", Description = "Export the asset register to Excel or PDF" },
             new Permission { Name = "AssetCategory.Manage",         Category = "Assets", Description = "Create and edit asset categories" },
             new Permission { Name = "Asset.ReportAction",           Category = "Assets", Description = "Report a failure or other action on an asset, creating a draft work order for admin review" },
             new Permission { Name = "Asset.ScopeManage",            Category = "Assets", Description = "Restrict which zone, area, or category of assets a specific employee can see" },
@@ -561,7 +562,7 @@ public static class DbSeeder
                 "Group.View", "Group.Manage",
                 "AiAssistant.Use",
                 "AuditLog.View", "Rbac.Manage",
-                "Asset.View", "Asset.Manage", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
+                "Asset.View", "Asset.Manage", "Asset.Export", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
@@ -582,7 +583,7 @@ public static class DbSeeder
                 // way to touch the category taxonomy or order-type catalog those depend on (flat
                 // Access Denied on /OrderTypes, and a totally read-only Asset Categories page with
                 // no Add/Edit controls despite its own subtitle telling the manager to use them).
-                "Asset.View", "Asset.Manage", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
+                "Asset.View", "Asset.Manage", "Asset.Export", "AssetCategory.Manage", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View", "Vendor.Manage",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View", "Contract.Manage",
@@ -595,7 +596,7 @@ public static class DbSeeder
                 "InspectionOrder.View", "InspectionOrder.Manage", "InspectionOrder.Report",
                 "Group.View",
                 "MyWork.View",
-                "Asset.View", "Asset.Manage", "Asset.ScopeManage", "Asset.ReportAction",
+                "Asset.View", "Asset.Manage", "Asset.Export", "Asset.ScopeManage", "Asset.ReportAction",
                 "Vendor.View",
                 "WorkOrder.View", "WorkOrder.Manage", "WorkOrder.Assign", "WorkOrder.Export",
                 "Contract.View",

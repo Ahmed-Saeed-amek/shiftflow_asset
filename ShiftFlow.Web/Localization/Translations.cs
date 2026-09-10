@@ -395,6 +395,8 @@ public static class Translations
         ["This just logs maintenance work performed — the asset still needs OK or Defective recorded separately."] = "هذا يسجل فقط أعمال الصيانة المنفذة — لا يزال يجب تسجيل حالة الأصل كـ \"جيد\" أو \"معطل\" بشكل منفصل.",
         ["Force Close"] = "إغلاق إجباري",
         ["Force-close reason (optional)"] = "سبب الإغلاق الإجباري (اختياري)",
+        ["Force-close reason"] = "سبب الإغلاق الإجباري",
+        ["A reason is required to force-close a work order."] = "السبب مطلوب لإغلاق أمر العمل إجباريًا.",
         ["Defect Report"] = "تقرير العطل",
         ["Back to Work Orders"] = "العودة إلى أوامر العمل",
         ["Review this report"] = "مراجعة هذا البلاغ",
@@ -554,6 +556,8 @@ public static class Translations
         ["Awaiting admin review — not yet a published work order."] = "بانتظار مراجعة المسؤول — لم يتم نشره كأمر عمل بعد.",
         ["This report was rejected and will not become a work order."] = "تم رفض هذا التقرير ولن يتحول إلى أمر عمل.",
         ["Rejection reason (optional)"] = "سبب الرفض (اختياري)",
+        ["Rejection reason"] = "سبب الرفض",
+        ["A reason is required to reject a fix report."] = "السبب مطلوب لرفض تقرير الإصلاح.",
         ["Scope Type"] = "نوع النطاق",
         ["Are you sure?"] = "هل أنت متأكد؟",
         ["Restrict which assets a specific employee can see"] = "قصر الأصول التي يمكن لموظف معين رؤيتها",
@@ -1996,6 +2000,8 @@ public static class Translations
         Ar["Manage Spare Parts"] = "إدارة قطع الغيار";
         Ar["View Assets"] = "عرض الأصول";
         Ar["Manage Assets"] = "إدارة الأصول";
+        Ar["Export Assets"] = "تصدير الأصول";
+        Ar["Export the asset register to Excel or PDF"] = "تصدير سجل الأصول إلى إكسل أو PDF";
         Ar["Manage Asset Categories"] = "إدارة فئات الأصول";
         Ar["Report Asset Issues"] = "الإبلاغ عن أعطال الأصول";
         Ar["Restrict Employee Asset Scope"] = "تقييد نطاق أصول الموظف";
