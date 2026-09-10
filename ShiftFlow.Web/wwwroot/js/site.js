@@ -96,7 +96,7 @@ function initEmployeePickers(){
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
-        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();});
+        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
       });
     }
     function query(){
@@ -135,7 +135,7 @@ function initAssetPickers(){
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
-        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();});
+        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
       });
     }
     function query(){
@@ -184,7 +184,7 @@ function initZonePickers(){
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
-        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();});
+        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
       });
     }
     function filterAndRender(){
