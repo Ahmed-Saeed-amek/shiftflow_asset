@@ -108,9 +108,14 @@ public static class PdfReportHelper
         doc.Add(new Div().SetHeight(3).SetWidth(UnitValue.CreatePointValue(64)).SetBackgroundColor(Primary).SetMarginBottom(16));
     }
 
-    /// <summary>A row of KPI cards matching _KpiCard.cshtml: white card, small muted-uppercase
-    /// label, big bold colored value, and a small color-tinted square standing in for the
-    /// page's icon chip (an actual Bootstrap Icons glyph isn't available inside a PDF font).</summary>
+    /// <summary>A row of KPI cards matching the live app's KPI cards: white card, small
+    /// muted-uppercase label, big bold colored value, and a small color-tinted square standing in
+    /// for the page's icon chip — an actual Bootstrap Icons glyph isn't available inside a PDF
+    /// font, and the chip previously had nothing drawn inside it at all, so every export showed a
+    /// row of blank pastel squares that read as broken/missing icons rather than a deliberate
+    /// design choice (reported live). A bold single-letter monogram in the same font as the rest
+    /// of the document (so it still shapes correctly for an Arabic label) needs no icon font and
+    /// reads as an intentional icon stand-in instead of a missing asset.</summary>
     public static void AddKpiRow(Document doc, params (string Label, string Value, DeviceRgb Color)[] kpis)
     {
         if (kpis.Length == 0) return;
@@ -124,6 +129,9 @@ public static class PdfReportHelper
             textCell.Add(new Paragraph(Shape(value)).SetFontSize(17).SetBold().SetFontColor(color).SetMarginTop(2).SetMarginBottom(0));
             header.AddCell(textCell);
             var chip = new Div().SetBackgroundColor(color).SetOpacity(0.12f).SetWidth(UnitValue.CreatePointValue(22)).SetHeight(UnitValue.CreatePointValue(22)).SetBorderRadius(new BorderRadius(6));
+            var monogram = Shape(label.Trim().Length > 0 ? label.Trim().Substring(0, 1).ToUpperInvariant() : "•");
+            chip.Add(new Paragraph(monogram).SetFontSize(11).SetBold().SetFontColor(color).SetMargin(0)
+                .SetTextAlignment(TextAlignment.CENTER).SetMultipliedLeading(1f).SetPaddingTop(3));
             header.AddCell(new Cell().Add(chip).SetBorder(Border.NO_BORDER).SetPadding(0).SetVerticalAlignment(VerticalAlignment.TOP).SetTextAlignment(TextAlignment.RIGHT));
             card.Add(header);
             table.AddCell(new Cell().Add(card).SetBorder(Border.NO_BORDER).SetPadding(0).SetPaddingRight(6).SetPaddingBottom(6));
