@@ -38,8 +38,11 @@ public class ContractService : IContractService
         // against a Retired asset — a Contract linking one is a dangling, misleading association
         // (it can still surface via GetDerivedVendorAsync/GetActiveServiceVendorsAsync) since no
         // order can ever actually be opened against that asset.
-        if (assetIds.Count > 0 && await _db.Assets.AnyAsync(a => assetIds.Contains(a.Id) && a.Status == "Retired"))
-            throw new InvalidOperationException("One or more selected assets are retired and can't be linked to a contract.");
+        var retiredTags = assetIds.Count > 0
+            ? await _db.Assets.Where(a => assetIds.Contains(a.Id) && a.Status == "Retired").Select(a => a.AssetTag).ToListAsync()
+            : [];
+        if (retiredTags.Count > 0)
+            throw new InvalidOperationException("These assets are retired and can't be linked to a contract: " + string.Join(", ", retiredTags));
     }
 
     /// <summary>Validates and builds the new Asset entities for the Contract form's inline
