@@ -1,0 +1,37 @@
+@model List<ShiftFlow.Web.ViewModels.HeaderMenuItem>
+@*
+    Header overflow menu. Everything past one primary + two outline-secondary actions goes in
+    here, including destructive actions (which render text-danger below a divider).
+    Labels/ConfirmText arrive already translated — this partial never calls Loc.T.
+
+    Usage:
+      <partial name="_HeaderMoreMenu" model='new List<HeaderMenuItem>{
+          new(){ Label = Loc.T("Print"), Url = Url.Action("Print", new { id }), Icon = "bi-printer" },
+          new(){ Label = Loc.T("Delete"), FormAction = Url.Action("Delete", new { id }),
+                 Icon = "bi-trash", IsDanger = true, ConfirmText = Loc.T("Are you sure?") } }' />
+*@
+@if (Model is { Count: > 0 })
+{
+    var normal = Model.Where(i => !i.IsDanger).ToList();
+    var danger = Model.Where(i => i.IsDanger).ToList();
+    <div class="dropdown d-inline-block">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("More actions")">
+            <i class="bi bi-three-dots" aria-hidden="true"></i><span class="ms-1">@Loc.T("More")</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            @foreach (var item in normal)
+            {
+                <li>@await Html.PartialAsync("_HeaderMoreMenuItem", item)</li>
+            }
+            @if (danger.Count > 0 && normal.Count > 0)
+            {
+                <li><hr class="dropdown-divider"></li>
+            }
+            @foreach (var item in danger)
+            {
+                <li>@await Html.PartialAsync("_HeaderMoreMenuItem", item)</li>
+            }
+        </ul>
+    </div>
+}

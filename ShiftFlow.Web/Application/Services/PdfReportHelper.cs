@@ -65,6 +65,37 @@ public static class PdfReportHelper
     public static void ApplyPageBackground(PdfDocument pdf)
     {
         pdf.AddEventHandler(PdfDocumentEvent.START_PAGE, new PageBackgroundHandler(PageBackground));
+        // Every export already calls this once per document, so the brand footer rides along
+        // with it rather than needing a second call added to each of the four export services.
+        pdf.AddEventHandler(PdfDocumentEvent.END_PAGE, new BrandFooterHandler());
+    }
+
+    /// <summary>The product name shown to users, on screen and in every export.</summary>
+    public const string BrandName = "STEP";
+
+    /// <summary>The one date format the whole app uses, exports included.</summary>
+    public const string DateFormat = "dd/MM/yyyy";
+
+    /// <summary>Muted "STEP · page N" line at the foot of every page, drawn directly on the page
+    /// canvas (a Document-level footer would be re-laid-out with the content flow and can't know
+    /// the page number). Sits inside the bottom margin, so it never collides with content.</summary>
+    private class BrandFooterHandler : IEventHandler
+    {
+        public void HandleEvent(Event @event)
+        {
+            var docEvent = (PdfDocumentEvent)@event;
+            var pdf = docEvent.GetDocument();
+            var page = docEvent.GetPage();
+            var size = page.GetPageSize();
+            var pageNumber = pdf.GetPageNumber(page);
+            var canvas = new iText.Layout.Canvas(
+                new PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdf),
+                new Rectangle(size.GetLeft() + 36, size.GetBottom() + 12, size.GetWidth() - 72, 20));
+            canvas.SetFont(PdfFontFactory.CreateFont(StandardFonts.HELVETICA)).SetFontSize(8);
+            canvas.Add(new Paragraph($"{BrandName}  ·  {pageNumber}")
+                .SetFontColor(MutedText).SetTextAlignment(TextAlignment.CENTER).SetMargin(0));
+            canvas.Close();
+        }
     }
 
     private class PageBackgroundHandler(DeviceRgb color) : IEventHandler
@@ -130,10 +161,15 @@ public static class PdfReportHelper
 
     public static void AddHeader(Document doc, string title, string? subtitle = null)
     {
-        doc.Add(new Paragraph(Shape(title)).SetFontColor(Foreground).SetBold().SetFontSize(22).SetMarginBottom(2));
+        // Brand line above the title — the product is STEP everywhere it is shown to a user,
+        // and an exported PDF leaves the app, so it needs to say so on its own.
+        doc.Add(new Paragraph(BrandName).SetFontColor(Primary).SetBold().SetFontSize(9)
+            .SetCharacterSpacing(1.2f).SetMarginBottom(0));
+        doc.Add(new Paragraph(Shape(title)).SetFontColor(Foreground).SetBold().SetFontSize(22).SetMarginTop(2).SetMarginBottom(2));
         // UtcNow, matching the data every report renders — DateTime.Today could print a
-        // different day than the rows beneath it near midnight UTC.
-        var sub = subtitle ?? DateTime.UtcNow.ToString("dddd, dd MMMM yyyy");
+        // different day than the rows beneath it near midnight UTC. dd/MM/yyyy is the app's
+        // one date format (site-wide), so an export reads the same as the screen it came from.
+        var sub = subtitle ?? DateTime.UtcNow.ToString(DateFormat);
         doc.Add(new Paragraph(Shape(sub)).SetFontColor(MutedText).SetFontSize(10).SetMarginBottom(6));
         // Thin primary-blue rule under the title — the same accent color used for links, active
         // nav items and icons throughout the app, standing in for a literal logo/branding mark.

@@ -33,7 +33,48 @@ document.addEventListener('DOMContentLoaded',function(){
   initTableScrollHints();
   initFloatingAvatar();
   initLocalDates();
+  initRowLinks();
 });
+
+// ---------------------------------------------------------------------------
+// Clickable table rows. Mark a row `<tr class="row-link" data-href="/Assets/Details/5">`
+// and this handles the rest — one delegated listener for the whole document instead of an
+// inline onclick="location.href=…" repeated on every row of every list view (which also
+// meant no keyboard access and no way to click a button inside the row without navigating).
+//
+// The primary column of the row still carries a real <a> — that is the accessible path, and
+// why no aria-label is added here. The row is a mouse/touch convenience on top of it.
+// ---------------------------------------------------------------------------
+var ROW_LINK_IGNORE = 'a, button, input, select, textarea, label, .dropdown, [data-no-row-link]';
+
+function rowLinkTarget(e){
+  var row = e.target.closest ? e.target.closest('tr[data-href]') : null;
+  if (!row) return null;
+  // Anything genuinely interactive inside the row wins — its own link, a kebab menu, a
+  // checkbox, an inline form control.
+  var interactive = e.target.closest(ROW_LINK_IGNORE);
+  if (interactive && row.contains(interactive)) return null;
+  return row.getAttribute('data-href') || null;
+}
+
+function initRowLinks(){
+  document.addEventListener('click', function(e){
+    // Let text selection inside a row stay a selection rather than a navigation.
+    var sel = window.getSelection && window.getSelection();
+    if (sel && String(sel).length > 0) return;
+    var href = rowLinkTarget(e);
+    if (href) window.location.href = href;
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter') return;
+    var href = rowLinkTarget(e);
+    if (href) { e.preventDefault(); window.location.href = href; }
+  });
+  // tabindex is applied here rather than in every view's markup.
+  document.querySelectorAll('tr[data-href]').forEach(function(row){
+    if (!row.hasAttribute('tabindex')) row.setAttribute('tabindex','0');
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Fetch helpers — every call must check r.ok and land somewhere visible on

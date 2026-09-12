@@ -44,6 +44,53 @@ public class PageHeaderModel
     public string? Subtitle { get; set; }
     /// <summary>Pre-rendered HTML for right-aligned action buttons (caller builds this with a small inline string or a child partial).</summary>
     public string? ActionsHtml { get; set; }
+
+    /// <summary>
+    /// Trail rendered above the title on detail/create/edit pages — the app has no separate
+    /// "Back" buttons, the breadcrumb is the way up. Labels are passed in ALREADY TRANSLATED
+    /// (the partial never calls Loc.T: half of these are live values such as an order number).
+    /// The last item should have a null Url — it renders as plain aria-current="page" text.
+    /// Usage: Breadcrumbs = new(){ (Loc.T("Work Orders"), Url.Action("Index")), ("WO-2026-0002", null) }
+    /// </summary>
+    public List<(string Label, string? Url)>? Breadcrumbs { get; set; }
+}
+
+/// <summary>
+/// One entry in the header "More" dropdown (_HeaderMoreMenu). Exactly one of Url / FormAction is
+/// used: Url renders an &lt;a class="dropdown-item"&gt;, FormAction renders a POST mini-form with an
+/// antiforgery token (for state-changing actions such as Delete/Cancel/Close). Label is passed in
+/// already translated, same rule as PageHeaderModel.Breadcrumbs.
+/// </summary>
+public class HeaderMenuItem
+{
+    public string Label { get; set; } = string.Empty;
+    /// <summary>GET link target. Ignored when FormAction is set.</summary>
+    public string? Url { get; set; }
+    /// <summary>POST target — renders a mini-form with @Html.AntiForgeryToken() instead of a link.</summary>
+    public string? FormAction { get; set; }
+    /// <summary>Bootstrap Icons class, e.g. "bi-pencil". Optional.</summary>
+    public string? Icon { get; set; }
+    /// <summary>Renders text-danger and is placed after a divider by the partial.</summary>
+    public bool IsDanger { get; set; }
+    /// <summary>When set, site.js's [data-confirm] handler asks this before the action runs.</summary>
+    public string? ConfirmText { get; set; }
+    /// <summary>Extra hidden inputs posted with a FormAction item (name → value).</summary>
+    public Dictionary<string, string>? FormFields { get; set; }
+}
+
+/// <summary>
+/// The shared "nothing here yet" block (_EmptyState) — one look for every empty list/table/panel
+/// instead of each page inventing its own centered muted paragraph. Title/Text/ActionLabel are
+/// passed in already translated.
+/// </summary>
+public class EmptyStateModel
+{
+    /// <summary>Bootstrap Icons class, e.g. "bi-inbox".</summary>
+    public string Icon { get; set; } = "bi-inbox";
+    public string Title { get; set; } = string.Empty;
+    public string? Text { get; set; }
+    public string? ActionUrl { get; set; }
+    public string? ActionLabel { get; set; }
 }
 
 public class ZoneViewModel : IValidatableObject

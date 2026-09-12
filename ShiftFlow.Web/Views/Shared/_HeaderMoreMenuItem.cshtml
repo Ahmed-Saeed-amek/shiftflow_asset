@@ -1,0 +1,38 @@
+@model ShiftFlow.Web.ViewModels.HeaderMenuItem
+@{
+    var cls = "dropdown-item" + (Model.IsDanger ? " text-danger" : "");
+}
+@if (!string.IsNullOrWhiteSpace(Model.FormAction))
+{
+    @* State-changing action — a POST mini-form with an antiforgery token, never a GET link.
+       data-confirm is picked up by the shared handler in site.js. *@
+    <form method="post" action="@Model.FormAction" class="m-0">
+        @Html.AntiForgeryToken()
+        @if (Model.FormFields != null)
+        {
+            foreach (var (name, value) in Model.FormFields)
+            {
+                <input type="hidden" name="@name" value="@value" />
+            }
+        }
+        @* Razor omits the attribute entirely when the expression is null — no empty
+           data-confirm="" that site.js would treat as "confirm with the default message". *@
+        <button type="submit" class="@cls w-100 text-start" data-confirm="@Model.ConfirmText">
+            @if (!string.IsNullOrWhiteSpace(Model.Icon))
+            {
+                <i class="bi @Model.Icon me-2" aria-hidden="true"></i>
+            }
+            @Model.Label
+        </button>
+    </form>
+}
+else
+{
+    <a class="@cls" href="@(Model.Url ?? "#")" data-confirm="@Model.ConfirmText">
+        @if (!string.IsNullOrWhiteSpace(Model.Icon))
+        {
+            <i class="bi @Model.Icon me-2" aria-hidden="true"></i>
+        }
+        @Model.Label
+    </a>
+}

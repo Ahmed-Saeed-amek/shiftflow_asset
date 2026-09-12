@@ -2,4 +2,7 @@
 @model string
 @* Status -> colour map lives in StatusStyle (Services/StatusStyle.cs) so it is built once
    at type-init instead of per render. Output is unchanged. *@
-<span class="badge border @StatusStyle.For(Model)">@Loc.T(Model ?? "")</span>
+@* StatusStyle.Label normalizes the raw enum-ish spelling ("PendingApproval") to the spaced
+   English form the translation table is keyed on, so both forms render — and translate — the
+   same. Every view that renders a status outside a badge should call StatusStyle.Label too. *@
+<span class="badge border @StatusStyle.For(Model)">@Loc.T(StatusStyle.Label(Model))</span>

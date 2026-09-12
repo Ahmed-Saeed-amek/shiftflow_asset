@@ -1,0 +1,24 @@
+@model ShiftFlow.Web.ViewModels.EmptyStateModel
+@*
+    One empty-state look for the whole app. Drop it inside a card body, a tbody's full-width
+    <td colspan="N">, or straight into a panel. Strings arrive already translated.
+
+    Usage:
+      <partial name="_EmptyState" model='new EmptyStateModel{
+          Icon = "bi-clipboard-x",
+          Title = Loc.T("No work orders yet"),
+          Text = Loc.T("Work orders raised against your assets will appear here."),
+          ActionUrl = Url.Action("Create"), ActionLabel = Loc.T("New Work Order") }' />
+*@
+<div class="empty-state text-center py-4">
+    <i class="bi @Model.Icon empty-state__icon" aria-hidden="true"></i>
+    <div class="fw-semibold mt-2">@Model.Title</div>
+    @if (!string.IsNullOrWhiteSpace(Model.Text))
+    {
+        <p class="text-muted small mt-1 mb-0">@Model.Text</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.ActionUrl) && !string.IsNullOrWhiteSpace(Model.ActionLabel))
+    {
+        <a href="@Model.ActionUrl" class="btn btn-primary btn-sm mt-3">@Model.ActionLabel</a>
+    }
+</div>
