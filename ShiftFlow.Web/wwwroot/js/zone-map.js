@@ -11,8 +11,10 @@ const PIN_ZOOM = 15;
 // so the popups are translated by the same dictionary as the rest of the app instead of the
 // small hardcoded Arabic lookup this file used to carry. window.esc (site.js) escapes every
 // interpolated value — zone/asset/work-order names are other users' data going into
-// bindPopup's HTML, which is exactly the stored-XSS path.
-const esc = window.esc || function (v) {
+// bindPopup's HTML, which is exactly the stored-XSS path. Named escHtml, not esc:
+// site.js already declares a global function esc, and a top-level `const esc` here would
+// be a SyntaxError on every page that loads both files.
+const escHtml = window.esc || function (v) {
     return String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -100,7 +102,7 @@ function initZoneReadonlyMap(mapElId, lat, lng, popupText) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
-    L.marker([lat, lng]).addTo(map).bindPopup(esc(popupText)).openPopup();
+    L.marker([lat, lng]).addTo(map).bindPopup(escHtml(popupText)).openPopup();
 }
 
 /** Overview map for the Zones Index "Map View" — plots every zone that has coordinates. */
@@ -116,9 +118,9 @@ async function initZoneOverviewMap(mapElId, dataUrl, detailsUrlTemplate) {
     zones.forEach(z => {
         const marker = L.marker([z.latitude, z.longitude]).addTo(map);
         marker.bindPopup(
-            `<strong>${esc(z.name)}</strong><br>${esc(z.categoryName)}<br>` +
-            `${esc(z.assetCount)} ${esc(tr('assetsCount', 'asset(s)'))}<br>` +
-            `<a href="${esc(detailsUrlTemplate.replace('__ID__', z.id))}">${esc(mapViewLinkText())}</a>`
+            `<strong>${escHtml(z.name)}</strong><br>${escHtml(z.categoryName)}<br>` +
+            `${escHtml(z.assetCount)} ${escHtml(tr('assetsCount', 'asset(s)'))}<br>` +
+            `<a href="${escHtml(detailsUrlTemplate.replace('__ID__', z.id))}">${escHtml(mapViewLinkText())}</a>`
         );
         markers.push(marker);
     });
@@ -202,9 +204,9 @@ async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplat
             const { icon, zIndexOffset } = assetStatusIcon(a.status);
             const marker = L.marker([a.lat, a.lng], { icon, zIndexOffset });
             marker.bindPopup(
-                `<strong>${esc(a.assetTag)}</strong> — ${esc(a.name)}<br>${esc(mapAssetStatusLabel(a.status))}<br>` +
-                `${esc(a.zoneName)}, ${esc(a.categoryName)}<br>` +
-                `<a href="${esc(assetDetailsUrlTemplate.replace('__ID__', a.id))}">${esc(mapViewLinkText())}</a>`
+                `<strong>${escHtml(a.assetTag)}</strong> — ${escHtml(a.name)}<br>${escHtml(mapAssetStatusLabel(a.status))}<br>` +
+                `${escHtml(a.zoneName)}, ${escHtml(a.categoryName)}<br>` +
+                `<a href="${escHtml(assetDetailsUrlTemplate.replace('__ID__', a.id))}">${escHtml(mapViewLinkText())}</a>`
             );
             marker.addTo(layer);
             return marker;
@@ -253,9 +255,9 @@ async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
     placed.forEach(({ item: w, lat, lng }) => {
         const marker = L.marker([lat, lng], { icon: workOrderStageIcon(w.stage) }).addTo(map);
         marker.bindPopup(
-            `<strong>${esc(w.workOrderNumber)}</strong> — ${esc(mapLabel(w.stage))}<br>` +
-            `${esc(w.assetTag)} — ${esc(w.assetName)}<br>${esc(w.zoneName)}, ${esc(w.categoryName)}<br>` +
-            `<a href="${esc(detailsUrlTemplate.replace('__ID__', w.id))}">${esc(mapViewLinkText())}</a>`
+            `<strong>${escHtml(w.workOrderNumber)}</strong> — ${escHtml(mapLabel(w.stage))}<br>` +
+            `${escHtml(w.assetTag)} — ${escHtml(w.assetName)}<br>${escHtml(w.zoneName)}, ${escHtml(w.categoryName)}<br>` +
+            `<a href="${escHtml(detailsUrlTemplate.replace('__ID__', w.id))}">${escHtml(mapViewLinkText())}</a>`
         );
         markers.push(marker);
     });
