@@ -1,3 +1,5 @@
+@* Markup only — the open/close toggle and the scroll-hide behaviour live in site.js
+   (initFloatingAvatar), so nothing here carries an inline onclick= handler. *@
 <div id="floatingAvatar">
     <div class="avatar-card">
         <div class="small fw-semibold text-primary mb-1">@Loc.T("AI Assistant")</div>
@@ -6,34 +8,7 @@
             <i class="bi bi-chat-dots me-1"></i>@Loc.T("Open Chat")
         </a>
     </div>
-    <div class="avatar-bubble" onclick="document.getElementById('floatingAvatar').classList.toggle('open')">
-        <i class="bi bi-robot fs-4"></i>
-    </div>
+    <button type="button" class="avatar-bubble" data-avatar-toggle aria-label="@Loc.T("AI Assistant")">
+        <i class="bi bi-robot fs-4" aria-hidden="true"></i>
+    </button>
 </div>
-<script>
-(function () {
-    // Applies at any viewport/zoom — originally mobile-only on the assumption that desktop's
-    // wider layout always leaves the bubble in empty margin, but at 200% browser zoom it was
-    // confirmed overlapping real content (a Dashboard stat value, an Assets row's Edit button)
-    // on a plain desktop-width page too, since zoom shrinks the effective content area without
-    // the fixed-position bubble moving.
-    var el = document.getElementById('floatingAvatar');
-    var hideTimer;
-    function hideThenSettle(delayMs) {
-        el.classList.add('scroll-hide');
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(function () { el.classList.remove('scroll-hide'); }, delayMs);
-    }
-    // Capture phase, on document rather than window — a plain window-scroll listener never
-    // fires for scrolling *inside* a nested container (e.g. a .table-responsive scrolled
-    // horizontally on a narrow screen), so the bubble stayed fully visible and kept covering
-    // whatever row action had scrolled out from under it. Scroll events don't bubble, but they
-    // do dispatch through the capture phase on ancestors, which document-level capture catches.
-    document.addEventListener('scroll', function () { hideThenSettle(500); }, { passive: true, capture: true });
-    // Whatever row/button happens to land under the bubble's fixed corner on a freshly loaded
-    // page (no scroll needed to reproduce it — e.g. a short list on /Rbac or /Users) is just as
-    // covered as it would be mid-scroll. Give the page a beat to be seen and tapped before the
-    // bubble fades in.
-    hideThenSettle(1200);
-})();
-</script>

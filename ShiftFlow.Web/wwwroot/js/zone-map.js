@@ -7,15 +7,52 @@ const KUWAIT_ZOOM = 9;
 const GOVERNORATE_ZOOM = 12;
 const PIN_ZOOM = 15;
 
-// This file has no access to the Razor Loc.T() dictionary, so the map popups' one recurring
-// static string ("View →") and the raw asset-status enum get a small hardcoded lookup here,
-// keyed off the same document.documentElement.dir the rest of the app's RTL logic reads.
+// Localized strings come from window.i18n (emitted by _Layout.cshtml, read through window.t)
+// so the popups are translated by the same dictionary as the rest of the app instead of the
+// small hardcoded Arabic lookup this file used to carry. window.esc (site.js) escapes every
+// interpolated value — zone/asset/work-order names are other users' data going into
+// bindPopup's HTML, which is exactly the stored-XSS path.
+const esc = window.esc || function (v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+const tr = window.t || function (key, fallback) { return fallback !== undefined ? fallback : key; };
+
 function mapViewLinkText() {
-    return document.documentElement.dir === 'rtl' ? 'عرض ←' : 'View →';
+    return tr('viewLink', 'View →');
 }
-const ASSET_STATUS_LABELS_AR = { Working: 'يعمل', Maintenance: 'صيانة', Defective: 'معطل' };
+/** Translates an enum-ish label (asset status, work order stage) via window.i18n.status. */
+function mapLabel(value) {
+    const dict = (window.i18n && window.i18n.status) || {};
+    return dict[value] || value;
+}
 function mapAssetStatusLabel(status) {
-    return document.documentElement.dir === 'rtl' ? (ASSET_STATUS_LABELS_AR[status] || status) : status;
+    return mapLabel(status);
+}
+
+/** Visible, localized failure state for a map whose data fetch didn't come back. */
+function showMapLoadError(mapElId) {
+    const el = typeof mapElId === 'string' ? document.getElementById(mapElId) : mapElId;
+    if (!el || !el.parentNode || el.parentNode.querySelector('[data-map-error]')) return;
+    const box = document.createElement('div');
+    box.className = 'alert alert-danger small mb-2';
+    box.setAttribute('role', 'alert');
+    box.setAttribute('data-map-error', '');
+    box.textContent = tr('loadFailed', "Couldn't load — please try again.");
+    el.parentNode.insertBefore(box, el);
+}
+
+/** fetch + r.ok check + JSON, shared by the three data-driven maps below. */
+async function fetchMapData(url, mapElId) {
+    try {
+        const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return await r.json();
+    } catch (e) {
+        showMapLoadError(mapElId);
+        return null;
+    }
 }
 
 /** Editable single-marker map for Zone Create/Edit — two-way synced with the Lat/Lng inputs. */
@@ -63,7 +100,7 @@ function initZoneReadonlyMap(mapElId, lat, lng, popupText) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
-    L.marker([lat, lng]).addTo(map).bindPopup(popupText).openPopup();
+    L.marker([lat, lng]).addTo(map).bindPopup(esc(popupText)).openPopup();
 }
 
 /** Overview map for the Zones Index "Map View" — plots every zone that has coordinates. */
@@ -73,13 +110,15 @@ async function initZoneOverviewMap(mapElId, dataUrl, detailsUrlTemplate) {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
 
-    const zones = await (await fetch(dataUrl)).json();
+    const zones = await fetchMapData(dataUrl, mapElId);
+    if (!zones) return;
     const markers = [];
     zones.forEach(z => {
         const marker = L.marker([z.latitude, z.longitude]).addTo(map);
         marker.bindPopup(
-            `<strong>${z.name}</strong><br>${z.categoryName}<br>` +
-            `${z.assetCount} asset(s)<br><a href="${detailsUrlTemplate.replace('__ID__', z.id)}">${mapViewLinkText()}</a>`
+            `<strong>${esc(z.name)}</strong><br>${esc(z.categoryName)}<br>` +
+            `${esc(z.assetCount)} ${esc(tr('assetsCount', 'asset(s)'))}<br>` +
+            `<a href="${esc(detailsUrlTemplate.replace('__ID__', z.id))}">${esc(mapViewLinkText())}</a>`
         );
         markers.push(marker);
     });
@@ -147,7 +186,9 @@ async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplat
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
 
-    const assets = await (await fetch(dataUrl)).json();
+    const assets = await fetchMapData(dataUrl, mapElId);
+    // Returns an inert handle rather than null so a caller's setFilter() never throws.
+    if (!assets) return { setFilter: function () {} };
     const layer = L.layerGroup().addTo(map);
     let hasFitBounds = false;
 
@@ -161,8 +202,9 @@ async function initZoneOverviewAssetMap(mapElId, dataUrl, assetDetailsUrlTemplat
             const { icon, zIndexOffset } = assetStatusIcon(a.status);
             const marker = L.marker([a.lat, a.lng], { icon, zIndexOffset });
             marker.bindPopup(
-                `<strong>${a.assetTag}</strong> — ${a.name}<br>${mapAssetStatusLabel(a.status)}<br>${a.zoneName}, ${a.categoryName}<br>` +
-                `<a href="${assetDetailsUrlTemplate.replace('__ID__', a.id)}">${mapViewLinkText()}</a>`
+                `<strong>${esc(a.assetTag)}</strong> — ${esc(a.name)}<br>${esc(mapAssetStatusLabel(a.status))}<br>` +
+                `${esc(a.zoneName)}, ${esc(a.categoryName)}<br>` +
+                `<a href="${esc(assetDetailsUrlTemplate.replace('__ID__', a.id))}">${esc(mapViewLinkText())}</a>`
             );
             marker.addTo(layer);
             return marker;
@@ -204,15 +246,16 @@ async function initVendorWorkOrderMap(mapElId, dataUrl, detailsUrlTemplate) {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
     }).addTo(map);
 
-    const workOrders = await (await fetch(dataUrl)).json();
+    const workOrders = await fetchMapData(dataUrl, mapElId);
+    if (!workOrders) return;
     const placed = spreadCoincidentPoints(workOrders, w => w.latitude, w => w.longitude);
     const markers = [];
     placed.forEach(({ item: w, lat, lng }) => {
         const marker = L.marker([lat, lng], { icon: workOrderStageIcon(w.stage) }).addTo(map);
         marker.bindPopup(
-            `<strong>${w.workOrderNumber}</strong> — ${w.stage}<br>` +
-            `${w.assetTag} — ${w.assetName}<br>${w.zoneName}, ${w.categoryName}<br>` +
-            `<a href="${detailsUrlTemplate.replace('__ID__', w.id)}">${mapViewLinkText()}</a>`
+            `<strong>${esc(w.workOrderNumber)}</strong> — ${esc(mapLabel(w.stage))}<br>` +
+            `${esc(w.assetTag)} — ${esc(w.assetName)}<br>${esc(w.zoneName)}, ${esc(w.categoryName)}<br>` +
+            `<a href="${esc(detailsUrlTemplate.replace('__ID__', w.id))}">${esc(mapViewLinkText())}</a>`
         );
         markers.push(marker);
     });

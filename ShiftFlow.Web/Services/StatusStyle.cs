@@ -71,6 +71,18 @@ public static class StatusStyle
         ["Inspection"] = "bg-primary-subtle text-primary-emphasis border-primary-subtle",
     };
 
+    /// <summary>
+    /// Statuses/stages that JS needs translated copies of (zone-map.js popups). Emitted into
+    /// window.i18n.status by _Layout — keep it to what the client actually renders rather than
+    /// shipping the whole map on every page.
+    /// </summary>
+    public static readonly string[] JsLabelNames =
+    [
+        "Working", "Maintenance", "Defective",
+        "New", "Assigned", "In Progress", "Open", "Dispatched", "Resolved", "Closed",
+        "Sent to Vendor", "Blocked", "Fixed - Pending Confirmation",
+    ];
+
     /// <summary>Badge classes for a status name; <see cref="Default"/> when unmapped or null.</summary>
     public static string For(string? status) =>
         status is not null && Map.TryGetValue(status, out var cls) ? cls : Default;
