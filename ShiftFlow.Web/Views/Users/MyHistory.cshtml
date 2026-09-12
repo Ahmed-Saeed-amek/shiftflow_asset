@@ -4,7 +4,7 @@
     ViewData["Title"] = Loc.T("History");
     var culture = new System.Globalization.CultureInfo(Loc.IsRTL ? "ar" : "en-US");
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{
     Title = Loc.T("History"),
     Subtitle = Loc.T("Your past orders, grouped by month"),
     Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("My Orders"), Url.Action("MyOrders")), (Loc.T("History"), null) } })" />

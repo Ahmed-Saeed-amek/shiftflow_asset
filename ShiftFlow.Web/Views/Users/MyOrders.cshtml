@@ -22,7 +22,7 @@
         _ => "bg-info-subtle text-info-emphasis border-info-subtle",
     };
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{
     Title = Loc.T("My Orders"),
     Subtitle = Loc.T("Every inspection, maintenance, and work order assigned to you or your groups, in one place"),
     Actions = headerActions(null) })" />

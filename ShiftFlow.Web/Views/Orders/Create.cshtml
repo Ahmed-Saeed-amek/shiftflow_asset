@@ -10,7 +10,7 @@
     var orderTypes = options.OrderTypes;
     var orderTypeMetaJson = options.OrderTypeMetaJson;
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{
     Title = Loc.T("New Order"),
     Subtitle = Loc.T("Create an inspection survey or a direct-fix maintenance order"),
     Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Orders"), Url.Action("Index")), (Loc.T("New Order"), null) } })" />

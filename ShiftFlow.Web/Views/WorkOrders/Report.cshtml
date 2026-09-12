@@ -3,7 +3,7 @@
     var asset = (Asset)ViewBag.Asset;
     ViewData["Title"] = Loc.T("Report Action");
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{
     Title = Loc.T("Report Action"),
     Subtitle = $"{asset.AssetTag} — {asset.Name}",
     Breadcrumbs = new List<(string Label, string? Url)>{ (asset.AssetTag, Url.Action("Details", "Assets", new { id = asset.Id })), (Loc.T("Report Action"), null) } })" />

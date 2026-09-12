@@ -24,7 +24,7 @@
         }
     </text>;
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{Title=Loc.T("Work Orders"),Subtitle=Loc.T("Vendor and in-house repair jobs, from report to close"),Actions=headerActions(null)})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{Title=Loc.T("Work Orders"),Subtitle=Loc.T("Vendor and in-house repair jobs, from report to close"),Actions=headerActions(null)})" />
 
 <form method="get" class="filter-bar d-flex flex-wrap align-items-center gap-2 mb-3">
     <label for="woSearch" class="visually-hidden">@Loc.T("Search")</label>

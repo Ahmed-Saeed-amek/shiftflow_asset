@@ -58,7 +58,7 @@
         ? "bg-primary-subtle text-primary-emphasis border-primary-subtle"
         : "bg-info-subtle text-info-emphasis border-info-subtle";
 }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),Actions=headerActions(null)})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),Actions=headerActions(null)})" />
 
 @if (overdue)
 {

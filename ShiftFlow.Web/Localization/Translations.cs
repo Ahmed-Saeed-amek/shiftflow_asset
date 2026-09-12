@@ -37,6 +37,7 @@ public static class Translations
         AddErrors();
         AddJs();
         AddOther();
+        AddUiPass();
     }
 
     // ─── Navigation, page titles and section headers ───────────────────────────────
@@ -1614,6 +1615,113 @@ public static class Translations
         Ar["— No delivery / pick up —"] = "— بدون تسليم / استلام —";
         Ar["— No delivery —"] = "— بدون تسليم —";
         Ar["— None —"] = "— لا شيء —";
+    }
+
+    // ── UI consistency pass (Sept 2026): filter bars, empty states, breadcrumbs, More menus ──
+    private static void AddUiPass()
+    {
+        Ar["Add a part to start tracking its stock level."] = "أضف قطعة لبدء تتبّع مستوى مخزونها.";
+        Ar["Add a part to the stock catalog."] = "أضف قطعة إلى كتالوج المخزون.";
+        Ar["Add a zone and, optionally, pin it on the map."] = "أضف منطقة، ويمكنك اختياريًا تحديدها على الخريطة.";
+        Ar["Add by category with the picker below, or search for individual assets."] = "أضف حسب الفئة من الأداة أدناه، أو ابحث عن أصول بشكل فردي.";
+        Ar["Add categories and subcategories, then edit or manage their actions below."] = "أضف الفئات والفئات الفرعية، ثم عدّلها أو أدر إجراءاتها أدناه.";
+        Ar["Add the first account to get started."] = "أضف أول حساب للبدء.";
+        Ar["Add the first vendor to start assigning work orders."] = "أضف أول مورد لتتمكن من إسناد أوامر العمل.";
+        Ar["Add your first asset to start tracking it."] = "أضف أول أصل لبدء تتبّعه.";
+        Ar["All Priorities"] = "كل الأولويات";
+        Ar["All Stages"] = "كل المراحل";
+        Ar["Anything assigned to you or your groups shows up here."] = "يظهر هنا كل ما يُسند إليك أو إلى مجموعاتك.";
+        Ar["Ask STEP about inspection orders, groups, and more — by voice or text."] = "اسأل STEP عن أوامر الفحص والمجموعات والمزيد — صوتًا أو نصًا.";
+        Ar["Asset scope"] = "نطاق الأصول";
+        Ar["Assistant"] = "المساعد";
+        Ar["Breadcrumb"] = "مسار التنقل";
+        Ar["Browse the asset category and subcategory taxonomy."] = "تصفّح تصنيف فئات الأصول وفئاتها الفرعية.";
+        Ar["Colour"] = "اللون";
+        Ar["Create a reusable group of employees so you can assign a whole team to an inspection order at once."] = "أنشئ مجموعة موظفين قابلة لإعادة الاستخدام لإسناد فريق كامل إلى أمر فحص دفعة واحدة.";
+        Ar["Create a zone so assets have somewhere to live."] = "أنشئ منطقة ليكون للأصول مكان تُسجَّل فيه.";
+        Ar["Delete this scope? Members of {0} will see every asset they are otherwise permitted to see."] = "حذف هذا النطاق؟ سيرى أعضاء {0} كل الأصول المسموح لهم بها.";
+        Ar["Delete this scope? {0} will see every asset they are otherwise permitted to see."] = "حذف هذا النطاق؟ سيرى {0} كل الأصول المسموح له بها.";
+        Ar["Direct fix"] = "إصلاح مباشر";
+        Ar["Edit Spare Part"] = "تعديل قطعة الغيار";
+        Ar["Edit Zone"] = "تعديل المنطقة";
+        Ar["Edit group scope"] = "تعديل نطاق المجموعة";
+        Ar["Edit user scope"] = "تعديل نطاق المستخدم";
+        Ar["Every tracked asset, its zone and its current status."] = "كل أصل متتبَّع ومنطقته وحالته الحالية.";
+        Ar["Every work order assigned to your company"] = "كل أوامر العمل المسندة إلى شركتك";
+        Ar["Every zone assets can be placed in, grouped by zone category."] = "كل منطقة يمكن وضع الأصول فيها، مجمّعة حسب فئة المنطقة.";
+        Ar["Excel: inspection orders"] = "إكسل: أوامر المعاينة";
+        Ar["Excel: maintenance orders"] = "إكسل: أوامر الصيانة";
+        Ar["For corrections and deliveries — this does not count as usage in Recent Usage or Analytics."] = "للتصحيحات والتوريدات — لا يُحتسب ذلك استهلاكًا في \"الاستخدام الأخير\" أو التحليلات.";
+        Ar["Generate orders automatically on a repeating cadence."] = "توليد الأوامر تلقائيًا وفق تكرار دوري.";
+        Ar["Import from directory"] = "استيراد من الدليل";
+        Ar["Inspection surveys and direct-fix maintenance orders will show up here."] = "ستظهر هنا عمليات المعاينة وأوامر الصيانة المباشرة.";
+        Ar["Low stock only"] = "المخزون المنخفض فقط";
+        Ar["Months you had orders in show up here."] = "تظهر هنا الأشهر التي لديك فيها أوامر.";
+        Ar["More"] = "المزيد";
+        Ar["More actions"] = "إجراءات أخرى";
+        Ar["Multiple assets"] = "عدة أصول";
+        Ar["No assets in this zone yet"] = "لا توجد أصول في هذه المنطقة بعد";
+        Ar["No assets match these filters"] = "لا توجد أصول مطابقة لعوامل التصفية";
+        Ar["No assets yet"] = "لا توجد أصول بعد";
+        Ar["No causes yet"] = "لا توجد أسباب بعد";
+        Ar["No contracts match these filters"] = "لا توجد عقود مطابقة لعوامل التصفية";
+        Ar["No contracts yet"] = "لا توجد عقود بعد";
+        Ar["No employee scopes yet"] = "لا توجد نطاقات موظفين بعد";
+        Ar["No entries match these filters"] = "لا توجد سجلات مطابقة لعوامل التصفية";
+        Ar["No group scopes yet"] = "لا توجد نطاقات مجموعات بعد";
+        Ar["No linked contracts yet"] = "لا توجد عقود مرتبطة بعد";
+        Ar["No orders match these filters"] = "لا توجد أوامر مطابقة لهذه الفلاتر";
+        Ar["No recorded actions yet"] = "لا توجد إجراءات مسجّلة بعد";
+        Ar["No recurring schedules yet"] = "لا توجد جداول متكررة بعد";
+        Ar["No scheduled visits yet."] = "لا توجد زيارات مجدولة بعد.";
+        Ar["No schedules match these filters"] = "لا توجد جداول مطابقة لعوامل التصفية";
+        Ar["No spare parts match these filters"] = "لا توجد قطع غيار مطابقة لعوامل التصفية";
+        Ar["No spare parts yet"] = "لا توجد قطع غيار بعد";
+        Ar["No subcategories yet"] = "لا توجد فئات فرعية بعد";
+        Ar["No users match these filters"] = "لا يوجد مستخدمون مطابقون لهذه الفلاتر";
+        Ar["No users yet"] = "لا يوجد مستخدمون بعد";
+        Ar["No vendors match these filters"] = "لا يوجد موردون مطابقون لهذه الفلاتر";
+        Ar["No vendors yet"] = "لا يوجد موردون بعد";
+        Ar["No work orders match these filters"] = "لا توجد أوامر عمل مطابقة لهذه الفلاتر";
+        Ar["No work orders yet"] = "لا توجد أوامر عمل بعد";
+        Ar["No zones match these filters"] = "لا توجد مناطق مطابقة لعوامل التصفية";
+        Ar["No zones yet"] = "لا توجد مناطق بعد";
+        Ar["Optional — leave empty to file the asset under the category itself."] = "اختياري — اتركه فارغًا لتصنيف الأصل تحت الفئة نفسها.";
+        Ar["Optionally scope an action to a category or subcategory — unscoped actions apply everywhere."] = "يمكن اختياريًا تخصيص الإجراء لفئة أو فئة فرعية — الإجراءات غير المخصّصة تنطبق في كل مكان.";
+        Ar["Parts consumed on work orders appear here once they are recorded."] = "تظهر هنا القطع المستهلكة في أوامر العمل بمجرد تسجيلها.";
+        Ar["Photos or documents — a rejected file is named back to you with the reason."] = "صور أو مستندات — يُعرض اسم أي ملف مرفوض مع سبب الرفض.";
+        Ar["Pick a category first to narrow the zone search."] = "اختر فئة أولًا لتضييق نطاق البحث عن المنطقة.";
+        Ar["Raise a repair job against one asset"] = "إنشاء عمل إصلاح لأصل واحد";
+        Ar["Record a contract to link it to the assets it covers."] = "سجّل عقدًا لربطه بالأصول التي يغطيها.";
+        Ar["Record an agreement and link the assets it covers."] = "سجّل اتفاقية واربطها بالأصول التي تغطيها.";
+        Ar["Record outcome"] = "تسجيل النتيجة";
+        Ar["Register a new tracked asset."] = "تسجيل أصل جديد للتتبّع.";
+        Ar["Scope a whole group at once instead of repeating the same rule per employee."] = "حدّد نطاق مجموعة كاملة دفعة واحدة بدلاً من تكرار القاعدة لكل موظف.";
+        Ar["Search by name, contact, or email…"] = "ابحث بالاسم أو جهة الاتصال أو البريد الإلكتروني…";
+        Ar["Send this order back to the assignee to redo?"] = "إعادة هذا الأمر إلى المكلَّف لإعادة التنفيذ؟";
+        Ar["Set up a schedule to generate orders automatically."] = "أنشئ جدولًا لتوليد الأوامر تلقائيًا.";
+        Ar["Shared by Inspection Orders and Maintenance Orders."] = "مشترك بين أوامر الفحص وأوامر الصيانة.";
+        Ar["Single asset"] = "أصل واحد";
+        Ar["Stock levels and reorder thresholds for every part."] = "مستويات المخزون وحدود إعادة الطلب لكل قطعة.";
+        Ar["Stops this order — recorded outcomes are kept, nothing further can be reported."] = "يوقف هذا الأمر — تُحفظ النتائج المسجّلة ولا يمكن تسجيل المزيد.";
+        Ar["Survey"] = "معاينة";
+        Ar["The vendor signs in to the portal with this address and a temporary password."] = "يسجّل المورد الدخول إلى البوابة بهذا البريد الإلكتروني وكلمة مرور مؤقتة.";
+        Ar["Try a different search or clear the filters."] = "جرّب بحثًا آخر أو امسح الفلاتر.";
+        Ar["Try a different search term or status."] = "جرّب كلمة بحث أو حالة مختلفة.";
+        Ar["Try a different search term, role, or status."] = "جرّب كلمة بحث أو دورًا أو حالة مختلفة.";
+        Ar["Try a wider period or a different category."] = "جرّب فترة أوسع أو فئة أخرى.";
+        Ar["Try clearing a filter or widening your search."] = "جرّب إزالة أحد عوامل التصفية أو توسيع نطاق البحث.";
+        Ar["Type a name or email above, then pick a match to import that account from the Microsoft directory instead of creating a password login."] = "اكتب الاسم أو البريد الإلكتروني بالأعلى ثم اختر نتيجة مطابقة لاستيراد الحساب من دليل مايكروسوفت بدلاً من إنشاء حساب بكلمة مرور.";
+        Ar["Vendor and in-house repair jobs, from report to close"] = "أعمال الإصلاح لدى الموردين وداخليًا، من البلاغ حتى الإغلاق";
+        Ar["Warranty, service and maintenance agreements and the assets they cover."] = "اتفاقيات الضمان والخدمة والصيانة والأصول التي تغطيها.";
+        Ar["Where spare parts are going, and what they cost."] = "أين تُصرف قطع الغيار، وكم تكلّف.";
+        Ar["Who changed what, and when."] = "من غيّر ماذا، ومتى.";
+        Ar["Why a work order can be put on hold."] = "أسباب تعليق أمر العمل.";
+        Ar["Without a scope an employee sees every asset they are otherwise permitted to see."] = "بدون نطاق، يرى الموظف كل الأصول المسموح له بها.";
+        Ar["Work orders raised against your assets will appear here."] = "ستظهر هنا أوامر العمل المرفوعة على أصولك.";
+        Ar["Work orders raised from a defect or a vendor job will show up here."] = "ستظهر هنا أوامر العمل الناتجة عن عطل أو عمل لدى مورد.";
+        Ar["Zone Category"] = "فئة المنطقة";
+        Ar["Reference Data"] = "البيانات المرجعية";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>

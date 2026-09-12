@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 <script src="~/js/zone-map.js" asp-append-version="true"></script>
 
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{Title=Loc.T("My Work Orders"),Subtitle=Loc.T("Every work order assigned to your company"),Actions=headerActions(null)})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{Title=Loc.T("My Work Orders"),Subtitle=Loc.T("Every work order assigned to your company"),Actions=headerActions(null)})" />
 
 <form method="get" class="filter-bar d-flex flex-wrap align-items-center gap-2 mb-3">
     <label for="vendorSearch" class="visually-hidden">@Loc.T("Search")</label>

@@ -1,6 +1,6 @@
 @model WorkOrderViewModel
 @{ ViewData["Title"] = Loc.T("New Work Order"); }
-<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{
     Title = Loc.T("New Work Order"),
     Subtitle = Loc.T("Raise a repair job against one asset"),
     Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Work Orders"), Url.Action("Index")), (Loc.T("New Work Order"), null) } })" />
