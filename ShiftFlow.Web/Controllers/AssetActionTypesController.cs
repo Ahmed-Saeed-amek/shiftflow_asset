@@ -21,7 +21,7 @@ public class AssetActionTypesController : Controller
     {
         var category = await _db.AssetCategories.FindAsync(categoryId);
         if (category == null) return NotFound();
-        var actionTypes = await _db.AssetActionTypes.Include(a => a.Causes)
+        var actionTypes = await _db.AssetActionTypes.AsNoTracking().Include(a => a.Causes)
             .Where(a => a.CategoryId == categoryId).OrderBy(a => a.Name).ToListAsync();
         ViewBag.Category = category;
         return View(actionTypes);
@@ -114,7 +114,7 @@ public class AssetActionTypesController : Controller
         var categoryIds = new List<int> { categoryId };
         if (category?.ParentCategoryId != null) categoryIds.Add(category.ParentCategoryId.Value);
 
-        var actionTypes = await _db.AssetActionTypes.Where(a => categoryIds.Contains(a.CategoryId) && a.IsActive)
+        var actionTypes = await _db.AssetActionTypes.AsNoTracking().Where(a => categoryIds.Contains(a.CategoryId) && a.IsActive)
             .OrderBy(a => a.Name).Select(a => new { a.Id, a.Name, a.NameAr }).ToListAsync();
         return Json(actionTypes);
     }
@@ -123,7 +123,7 @@ public class AssetActionTypesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetReportAction)]
     public async Task<IActionResult> CausesByActionType(int actionTypeId)
     {
-        var causes = await _db.AssetActionCauses.Where(c => c.ActionTypeId == actionTypeId && c.IsActive)
+        var causes = await _db.AssetActionCauses.AsNoTracking().Where(c => c.ActionTypeId == actionTypeId && c.IsActive)
             .OrderBy(c => c.Name).Select(c => new { c.Id, c.Name, c.NameAr }).ToListAsync();
         return Json(causes);
     }

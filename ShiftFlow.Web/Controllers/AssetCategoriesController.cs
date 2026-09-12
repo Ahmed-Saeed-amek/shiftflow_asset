@@ -25,7 +25,7 @@ public class AssetCategoriesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Index()
     {
-        var categories = await _db.AssetCategories.Include(c => c.Subcategories)
+        var categories = await _db.AssetCategories.AsNoTracking().Include(c => c.Subcategories)
             .OrderBy(c => c.Name).ToListAsync();
         return View(categories.Where(c => c.ParentCategoryId == null).ToList());
     }
@@ -112,7 +112,7 @@ public class AssetCategoriesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> ByParent(int parentId)
     {
-        var subcategories = await _db.AssetCategories.Where(c => c.ParentCategoryId == parentId)
+        var subcategories = await _db.AssetCategories.AsNoTracking().Where(c => c.ParentCategoryId == parentId)
             .OrderBy(c => c.Name).Select(c => new { c.Id, c.Name, c.NameAr }).ToListAsync();
         return Json(subcategories);
     }

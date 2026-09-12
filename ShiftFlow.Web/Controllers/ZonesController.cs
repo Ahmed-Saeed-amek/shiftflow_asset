@@ -121,7 +121,7 @@ public class ZonesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var zone = await _db.Zones.FirstOrDefaultAsync(z => z.Id == id);
+        var zone = await _db.Zones.AsNoTracking().FirstOrDefaultAsync(z => z.Id == id);
         if (zone == null) return NotFound();
         await PopulateLookupsAsync();
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");

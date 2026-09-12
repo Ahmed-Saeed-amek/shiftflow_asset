@@ -22,7 +22,7 @@ public class OrderTypesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var types = await _db.OrderTypes.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
+        var types = await _db.OrderTypes.AsNoTracking().OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
         return View(types);
     }
 
@@ -59,7 +59,7 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"An order type named '{vm.Name}' already exists.";
             return RedirectToAction(nameof(Index));
         }
-        var usedColors = await _db.OrderTypes.Select(t => t.Color).ToListAsync();
+        var usedColors = await _db.OrderTypes.AsNoTracking().Select(t => t.Color).ToListAsync();
         _db.OrderTypes.Add(new OrderType
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,

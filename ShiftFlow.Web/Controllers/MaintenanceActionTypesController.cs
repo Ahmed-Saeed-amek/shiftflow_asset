@@ -18,9 +18,9 @@ public class MaintenanceActionTypesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
     {
-        var types = await _db.MaintenanceActionTypes.Include(m => m.Category)
+        var types = await _db.MaintenanceActionTypes.AsNoTracking().Include(m => m.Category)
             .OrderBy(m => m.Category == null ? "" : m.Category.Name).ThenBy(m => m.Name).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
+        ViewBag.Categories = await _db.AssetCategories.AsNoTracking().Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
             .OrderBy(c => c.Name).ToListAsync();
         return View(types);
     }
