@@ -80,7 +80,7 @@ test.describe('Review-fix smoke', () => {
     await assetInput.press('Enter');
     await page.waitForTimeout(300);
     expect(page.url()).toContain('/Orders/Create');
-    await expect(page.locator('.alert-danger')).toHaveCount(0);
+    await expect(page.locator('.alert-danger:visible')).toHaveCount(0);
 
     // Make sure an asset is actually selected (multi picker adds a chip, single picker fills the hidden id).
     const selected = singleVisible

@@ -731,3 +731,13 @@ window.scanAssetQr = function (onResolved) {
       });
   });
 };
+
+// Filter bars: changing a dropdown applies immediately (one less click); the Filter button
+// remains for the free-text search and for keyboard users.
+document.addEventListener('change', function (e) {
+  var sel = e.target;
+  if (!(sel instanceof HTMLSelectElement)) return;
+  var form = sel.closest('form.filter-bar');
+  if (!form || sel.hasAttribute('data-no-autosubmit')) return;
+  if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.submit();
+});

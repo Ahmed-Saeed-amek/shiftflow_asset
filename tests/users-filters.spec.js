@@ -45,8 +45,10 @@ test.describe('Users page filters', () => {
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const text = (await rowsOf(page).first().textContent() ?? '').trim();
-    expect(text.length === 0 || /no records|no users|no results/i.test(text)).toBeTruthy();
+    // The redesigned list renders an empty-state card instead of a placeholder table row.
+    const rowCount = await rowsOf(page).count();
+    const body = (await page.locator('main, body').first().textContent() ?? '');
+    expect(rowCount === 0 && /no users|no records|no results/i.test(body)).toBeTruthy();
   });
 
   test('role filter narrows the list and every row carries that role', async ({ page }) => {
@@ -71,7 +73,7 @@ test.describe('Users page filters', () => {
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const clearLink = page.locator('a:has-text("Clear")');
+    const clearLink = page.locator('a:has-text("Clear")').first();
     await expect(clearLink).toBeVisible();
     await clearLink.click();
     await page.waitForLoadState('domcontentloaded');

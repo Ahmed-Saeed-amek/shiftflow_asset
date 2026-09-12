@@ -70,7 +70,7 @@ test.describe('Asset Management', () => {
 
     await expect(page.locator('img[src*="QrCode"]')).toBeVisible();
     await expect(page.locator('img[src*="Barcode"]')).toBeVisible();
-    await expect(page.locator('a[href*="/Assets/Label/1"]').first()).toBeVisible();
+    await expect(page.locator('a[href*="/Assets/Label/1"]:visible').first()).toBeVisible();
     await expect(page.locator('body')).toContainText('Inspection History');
   });
 

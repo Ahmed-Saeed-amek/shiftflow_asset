@@ -205,12 +205,18 @@
     });
     // Enter used to submit the surrounding form mid-search (see site.js typeaheadKeys):
     // Enter now picks the highlighted row, Up/Down move it, Escape closes the list.
-    if (window.typeaheadKeys) {
+    // This inline script runs before site.js (loaded at the end of <body>), so bind once the
+    // DOM is ready; until then a bare Enter must still never submit the surrounding form.
+    searchEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !searchEl.dataset.taBound) e.preventDefault(); });
+    const bindSearchKeys = () => {
+        if (!window.typeaheadKeys || searchEl.dataset.taBound) return;
+        searchEl.dataset.taBound = '1';
         window.typeaheadKeys(searchEl, resultsEl, {
             onOpen: () => search(searchEl.value.trim()),
             onClose: () => resultsEl.classList.add('d-none')
         });
-    }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindSearchKeys); else bindSearchKeys();
     document.addEventListener('click', e => { if (!root.contains(e.target)) resultsEl.classList.add('d-none'); });
 
     const scanBtn = root.querySelector('[data-scan]');
@@ -349,12 +355,17 @@
             refreshZoneClearVisibility();
         });
         zoneSearchEl.addEventListener('focus', () => renderZoneResults(zoneSearchEl.value.trim()));
-        if (window.typeaheadKeys) {
+        // Same load-order note as the asset search above: site.js is not loaded yet at parse time.
+        zoneSearchEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !zoneSearchEl.dataset.taBound) e.preventDefault(); });
+        const bindZoneKeys = () => {
+            if (!window.typeaheadKeys || zoneSearchEl.dataset.taBound) return;
+            zoneSearchEl.dataset.taBound = '1';
             window.typeaheadKeys(zoneSearchEl, zoneResultsEl, {
                 onOpen: () => renderZoneResults(zoneSearchEl.value.trim()),
                 onClose: () => zoneResultsEl.classList.add('d-none')
             });
-        }
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindZoneKeys); else bindZoneKeys();
         document.addEventListener('click', e => { if (!zoneWrap.contains(e.target)) zoneResultsEl.classList.add('d-none'); });
 
         addByLocationBtn.addEventListener('click', async () => {
