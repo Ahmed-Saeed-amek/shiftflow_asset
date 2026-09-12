@@ -51,10 +51,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RecurringOrderAsset> RecurringOrderAssets => Set<RecurringOrderAsset>();
     public DbSet<SparePart> SpareParts => Set<SparePart>();
     public DbSet<SparePartAsset> SparePartAssets => Set<SparePartAsset>();
+    public DbSet<OrderNumberSequence> OrderNumberSequences => Set<OrderNumberSequence>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        // Atomic per-prefix/year order-number allocator (OrderNumberGenerator). The table name and
+        // the unique index are load-bearing: the insert-on-missing path uses raw SQL and relies on
+        // the unique violation to detect a concurrent seed.
+        b.Entity<OrderNumberSequence>(e =>
+        {
+            e.ToTable("OrderNumberSequences");
+            e.Property(x => x.Prefix).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.Prefix, x.Year }).IsUnique();
+        });
 
         // ── ApplicationRole ──────────────────────────────────────────────────
         b.Entity<ApplicationRole>(e =>

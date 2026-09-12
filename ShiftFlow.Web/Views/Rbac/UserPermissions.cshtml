@@ -31,20 +31,6 @@
     </div>
 </div>
 
-@if (TempData["Success"] is string msg)
-{
-    <div class="alert alert-success alert-dismissible fade show">
-        <i class="bi bi-check-circle me-2"></i>@msg
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
-@if (TempData["Error"] is string err)
-{
-    <div class="alert alert-danger alert-dismissible fade show">
-        <i class="bi bi-exclamation-circle me-2"></i>@err
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
 @if (isSelf)
 {
     <div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert">

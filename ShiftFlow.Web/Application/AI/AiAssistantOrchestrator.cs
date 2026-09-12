@@ -177,14 +177,19 @@ public class AiAssistantOrchestrator
 
         new(ChatTool.CreateFunctionTool("findEmployee",
             "Search for an employee by name or email to resolve their user ID for an inspection order or group assignment.",
-            BinaryData.FromString("""{"type":"object","properties":{"query":{"type":"string","description":"Employee name or email"}},"required":["query"]}""")), null),
+            BinaryData.FromString("""{"type":"object","properties":{"query":{"type":"string","description":"Employee name or email"}},"required":["query"]}""")),
+            PermissionCatalog.InspectionOrderManage),
 
+        // Directory-style lookups only exist to feed the manager-gated write tools below, so they
+        // carry the same gate; otherwise any AiAssistant.Use holder could enumerate every user's
+        // email and every group's membership.
         new(ChatTool.CreateFunctionTool("listGroups",
-            "List every Group available for inspection order assignment."), null),
+            "List every Group available for inspection order assignment."), PermissionCatalog.GroupManage),
 
         new(ChatTool.CreateFunctionTool("getGroupDetail",
             "Get a specific Group's members.",
-            BinaryData.FromString("""{"type":"object","properties":{"groupId":{"type":"integer","description":"The group ID"}},"required":["groupId"]}""")), null),
+            BinaryData.FromString("""{"type":"object","properties":{"groupId":{"type":"integer","description":"The group ID"}},"required":["groupId"]}""")),
+            PermissionCatalog.GroupManage),
 
         new(ChatTool.CreateFunctionTool("getAssetRepairGuidance",
             "For a specific tracked asset (by its numeric ID — never invent one; resolve it from a tool result or " +

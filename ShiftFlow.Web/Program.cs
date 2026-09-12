@@ -185,6 +185,9 @@ builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IRecurringOrderService, RecurringOrderService>();
 builder.Services.AddScoped<ISparePartService, SparePartService>();
 builder.Services.AddScoped<IAssetScopeService, AssetScopeService>();
+builder.Services.AddOrderServices();      // IOrderCreationService
+builder.Services.AddLookupCache();        // ILookupCache (dropdown lookups, 5-min TTL)
+builder.Services.AddNavPermissions();     // INavPermissions (per-request sidebar permission set)
 builder.Services.AddHostedService<PreventiveMaintenanceSchedulerService>();
 builder.Services.AddHostedService<RecurringOrderSchedulerService>();
 

@@ -30,10 +30,6 @@
                             @Loc.T("Temporary password"): <code>@TempData["TempPassword"]</code>
                         </div>
                     }
-                    @if (TempData["Error"] != null)
-                    {
-                        <div class="alert alert-danger small">@TempData["Error"]</div>
-                    }
                     @if (Model.UserId == null)
                     {
                         <form method="post" asp-action="CreateLogin">

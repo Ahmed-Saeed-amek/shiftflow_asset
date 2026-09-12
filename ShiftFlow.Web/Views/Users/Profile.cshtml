@@ -71,10 +71,6 @@
 {
     <div class="alert alert-success small">@Loc.T("Temporary password"): <code>@TempData["TempPassword"]</code></div>
 }
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger small">@TempData["Error"]</div>
-}
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body p-4">
