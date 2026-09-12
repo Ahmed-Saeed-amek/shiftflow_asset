@@ -2,23 +2,52 @@
 @{
     // The partial does NOT translate: every caller already passes Loc.T("…") (or a live value
     // such as an asset tag). Translating again here would also try to translate user data.
+    // Same rule applies to Model.Breadcrumbs labels.
     var actions = (Model as PageHeaderWithActions)?.Actions;
+    var crumbs = Model.Breadcrumbs;
 }
-<div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-2">
+<div class="page-header d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-2">
     <div class="text-break" style="min-width:0">
+        @if (crumbs is { Count: > 0 })
+        {
+            @* Detail/create/edit pages get this instead of a Back button — it is the only way up
+               in the app, so it renders above the title on every such page. The "/" separator is
+               set in CSS (--bs-breadcrumb-divider) so it flips automatically under dir="rtl". *@
+            <nav aria-label="Breadcrumb">
+                <ol class="breadcrumb small mb-1">
+                    @for (var i = 0; i < crumbs.Count; i++)
+                    {
+                        var (label, url) = crumbs[i];
+                        var isLast = i == crumbs.Count - 1;
+                        if (!isLast && !string.IsNullOrWhiteSpace(url))
+                        {
+                            <li class="breadcrumb-item"><a href="@url">@label</a></li>
+                        }
+                        else
+                        {
+                            <li class="breadcrumb-item active" aria-current="page">@label</li>
+                        }
+                    }
+                </ol>
+            </nav>
+        }
         <h1 class="fs-3 fw-bold font-heading mb-0">@Model.Title</h1>
         @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
         {
             <p class="text-muted small mt-1 mb-0">@Model.Subtitle</p>
         }
     </div>
+    @* Action convention (see NOTES-shared.md): at most one .btn-primary, up to two
+       .btn-outline-* secondaries, everything else — destructive actions included — inside the
+       _HeaderMoreMenu "More" dropdown. .page-header__actions wraps cleanly and goes full-width
+       under 576px. *@
     @if (actions != null)
     {
-        <div class="d-flex flex-wrap gap-2">@actions</div>
+        <div class="page-header__actions d-flex flex-wrap gap-2">@actions</div>
     }
     else if (!string.IsNullOrWhiteSpace(Model.ActionsHtml))
     {
         @* Legacy string form, kept for the existing callers listed in NOTES-frontend.md. *@
-        <div class="d-flex flex-wrap gap-2">@Html.Raw(Model.ActionsHtml)</div>
+        <div class="page-header__actions d-flex flex-wrap gap-2">@Html.Raw(Model.ActionsHtml)</div>
     }
 </div>
