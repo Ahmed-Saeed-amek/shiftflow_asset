@@ -197,6 +197,20 @@ builder.Services.Configure<AzureOpenAIOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<AzureSpeechOptions>(builder.Configuration.GetSection("AzureSpeech"));
 builder.Services.Configure<AiAssistantOptions>(builder.Configuration.GetSection("AiAssistant"));
 builder.Services.AddScoped<IAiInspectionToolFunctions, AiInspectionToolFunctions>();
+// One tool class per module, all scoped (they hold the request's DbContext and asset scope) and
+// injected into the orchestrator, which owns the tool registry and the permission gate.
+builder.Services.AddScoped<AiAssetToolFunctions>();
+builder.Services.AddScoped<AiWorkOrderToolFunctions>();
+builder.Services.AddScoped<AiMaintenanceToolFunctions>();
+builder.Services.AddScoped<AiInventoryToolFunctions>();
+builder.Services.AddScoped<AiContractVendorToolFunctions>();
+builder.Services.AddScoped<AiZoneToolFunctions>();
+builder.Services.AddScoped<AiReportToolFunctions>();
+builder.Services.AddScoped<AiInsightToolFunctions>();
+// Confirm tokens for destructive/bulk actions. Singleton over IMemoryCache: a token issued on one
+// request is redeemed on a later one, so the store itself must outlive the request (the action it
+// holds resolves its services from the confirming request's own scope).
+builder.Services.AddSingleton<IPendingActionStore, PendingActionStore>();
 builder.Services.AddScoped<AiAssistantOrchestrator>();
 
 // Asset repair-video lookup (getAssetRepairGuidance tool) — scoped to one asset ID at a time,
