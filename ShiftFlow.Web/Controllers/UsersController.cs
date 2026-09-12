@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +26,7 @@ public class UsersController : Controller
     private readonly IAuthorizationService _authZ;
     private readonly ILanguageService _loc;
     private readonly IAuditService _audit;
+    private readonly ILogger<UsersController> _logger;
 
     public UsersController(
         UserManager<ApplicationUser> um,
@@ -37,29 +37,65 @@ public class UsersController : Controller
         IEntraDirectoryService directory,
         IAuthorizationService authZ,
         ILanguageService loc,
-        IAuditService audit)
-    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; _loc = loc; _audit = audit; }
+        IAuditService audit,
+        ILogger<UsersController> logger)
+    { _um = um; _db = db; _rm = rm; _email = email; _whatsApp = whatsApp; _directory = directory; _authZ = authZ; _loc = loc; _audit = audit; _logger = logger; }
+
+    private const int PageSize = 25;
 
     [Authorize(Policy = PermissionCatalog.UserView)]
-    public async Task<IActionResult> Index(string? role, string? search)
+    public async Task<IActionResult> Index(string? role, string? search, int page = 1)
     {
-        var (users, rolesByUser) = await GetFilteredUsersAsync(role, search);
+        if (page < 1) page = 1;
+
+        var query = FilteredUsersQuery(role, search);
+        var totalCount = await query.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+
+        var users = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
+        var rolesByUser = await RolesByUserAsync(users);
 
         ViewBag.RolesByUser = rolesByUser;
         ViewBag.RoleFilter = role;
         ViewBag.SearchFilter = search;
+        ViewBag.TotalCount = totalCount;
+        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
         ViewBag.RoleOptions = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
         ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
         return View(users);
     }
 
-    // Shared by Index and ExportExcel so the exported rows always match whatever the caller was
-    // currently looking at (respecting the same role/search filters), not the full unfiltered list.
-    private async Task<(List<ApplicationUser> Users, Dictionary<string, IList<string>> RolesByUser)> GetFilteredUsersAsync(string? role, string? search)
+    // Filtering happens in SQL (role via a join on AspNetUserRoles, search via EF's own
+    // translated Contains) — the previous version pulled every user into memory first and
+    // filtered the list there. Shared by Index and ExportExcel so the exported rows always match
+    // whatever the caller was looking at; Index additionally pages, the export doesn't.
+    private IQueryable<ApplicationUser> FilteredUsersQuery(string? role, string? search)
     {
-        var users = await _db.Users.AsNoTracking().Include(u => u.Location).OrderBy(u => u.FullName).ToListAsync();
+        var query = _db.Users.AsNoTracking().Include(u => u.Location).AsQueryable();
 
-        // Build userId→roles map in one query instead of N per-user GetRolesAsync calls
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            var r = role.Trim();
+            query = query.Where(u => _db.UserRoles
+                .Join(_db.Roles, ur => ur.RoleId, ro => ro.Id, (ur, ro) => new { ur.UserId, ro.Name })
+                .Any(x => x.UserId == u.Id && x.Name == r));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(u =>
+                (u.FullName != null && EF.Functions.Like(u.FullName, $"%{term}%")) ||
+                (u.Email != null && EF.Functions.Like(u.Email, $"%{term}%")));
+        }
+
+        return query.OrderBy(u => u.FullName);
+    }
+
+    // One query for the userId→roles map instead of N per-user GetRolesAsync calls.
+    private async Task<Dictionary<string, IList<string>>> RolesByUserAsync(List<ApplicationUser> users)
+    {
         var userIds = users.Select(u => u.Id).ToList();
         var rolesByUser = await _db.UserRoles
             .AsNoTracking()
@@ -68,24 +104,16 @@ public class UsersController : Controller
             .GroupBy(x => x.UserId)
             .ToDictionaryAsync(g => g.Key, g => (IList<string>)g.Select(x => x.Name!).ToList());
 
-        // Ensure every user has an entry even if they have no roles
         foreach (var u in users)
             rolesByUser.TryAdd(u.Id, []);
-
-        if (!string.IsNullOrWhiteSpace(role))
-            users = users.Where(u => rolesByUser[u.Id].Contains(role)).ToList();
-        if (!string.IsNullOrWhiteSpace(search))
-            users = users.Where(u =>
-                (u.FullName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (u.Email?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
-
-        return (users, rolesByUser);
+        return rolesByUser;
     }
 
     [Authorize(Policy = PermissionCatalog.UserView)]
     public async Task<IActionResult> ExportExcel(string? role, string? search)
     {
-        var (users, rolesByUser) = await GetFilteredUsersAsync(role, search);
+        var users = await FilteredUsersQuery(role, search).ToListAsync();
+        var rolesByUser = await RolesByUserAsync(users);
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         using var pkg = new ExcelPackage();
@@ -157,6 +185,10 @@ public class UsersController : Controller
     public async Task<IActionResult> MyOrders(bool showAll = false, string? range = null, string? category = null, DateTime? fromDate = null, DateTime? toDate = null)
     {
         if (User.IsInRole("Vendor")) return RedirectToAction("Index", "VendorPortal");
+        // MyWork.View is checked here rather than as a policy attribute so the Vendor redirect
+        // above still runs (vendors have their own portal and never hold MyWork.View). Matches
+        // the sidebar, which already gates the My Home/My Orders links on this permission.
+        if (!(await _authZ.AuthorizeAsync(User, PermissionCatalog.MyWorkView)).Succeeded) return Forbid();
 
         var id = _um.GetUserId(User)!;
         // The date range only makes sense when browsing history (showAll) — a still-open order
@@ -184,7 +216,7 @@ public class UsersController : Controller
 
     // Unified employee-facing history: their own Inspection/QuickCheck orders and assigned
     // standalone Maintenance Orders, grouped by calendar month, most recent first.
-    [Authorize]
+    [Authorize(Policy = PermissionCatalog.MyWorkView)]
     public async Task<IActionResult> MyHistory()
     {
         var id = _um.GetUserId(User)!;
@@ -345,7 +377,16 @@ public class UsersController : Controller
     {
         if (!ModelState.IsValid) { await LoadVB(); return View(vm); }
 
-        var tempPassword = GenerateTempPassword();
+        // Validated before anything is committed — a role that doesn't exist, or one this caller
+        // isn't allowed to grant, must not produce a half-created account.
+        if (!await CanAssignRoleAsync(vm.Role))
+        {
+            ModelState.AddModelError(nameof(vm.Role), _loc.T("That role is not available to assign."));
+            await LoadVB();
+            return View(vm);
+        }
+
+        var tempPassword = TempPasswordGenerator.Generate();
 
         var user = new ApplicationUser
         {
@@ -498,8 +539,6 @@ public class UsersController : Controller
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static string GenerateTempPassword() => ShiftFlow.Web.Services.TempPasswordGenerator.Generate();
-
     [HttpPost, Authorize(Policy = PermissionCatalog.UserManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)
     {
@@ -517,39 +556,59 @@ public class UsersController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        // Remove claims and logins first to avoid FK conflicts on databases without cascade delete
-        var claims = await _um.GetClaimsAsync(user);
-        if (claims.Count > 0)
-            await _um.RemoveClaimsAsync(user, claims);
+        // Inspection order assignments/reports, group memberships, work/maintenance orders and
+        // audit log entries are deliberately Restrict/NoAction on the user FK, so DeleteAsync fails
+        // at the DB level for anyone with real history. Previously the role/claim/login removals
+        // ran first and were NOT rolled back when that happened, leaving a role-less but still
+        // active account. Check deletability up front, then run the removals and the delete inside
+        // one transaction so a late failure undoes all of it.
+        var hasHistory = await _db.AuditLogs.AnyAsync(a => a.UserId == id)
+            || await _db.InspectionOrders.AnyAsync(o => o.AssignedToUserId == id || o.CreatedByUserId == id)
+            || await _db.MaintenanceOrders.AnyAsync(m => m.AssignedToUserId == id || m.CreatedByUserId == id)
+            || await _db.WorkOrders.AnyAsync(w => w.AssignedToUserId == id || w.CreatedByUserId == id)
+            || await _db.GroupMembers.AnyAsync(m => m.UserId == id);
+        if (hasHistory)
+        {
+            TempData["Error"] = string.Format(
+                _loc.T("'{0}' has order or audit history and cannot be deleted. Deactivate the account instead to remove their access."),
+                user.FullName);
+            return RedirectToAction(nameof(Index));
+        }
 
-        var logins = await _um.GetLoginsAsync(user);
-        foreach (var login in logins)
-            await _um.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
-
-        var roles = await _um.GetRolesAsync(user);
-        if (roles.Count > 0)
-            await _um.RemoveFromRolesAsync(user, roles);
-
+        await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
+            var claims = await _um.GetClaimsAsync(user);
+            if (claims.Count > 0)
+                await _um.RemoveClaimsAsync(user, claims);
+
+            var logins = await _um.GetLoginsAsync(user);
+            foreach (var login in logins)
+                await _um.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+
+            var roles = await _um.GetRolesAsync(user);
+            if (roles.Count > 0)
+                await _um.RemoveFromRolesAsync(user, roles);
+
             var result = await _um.DeleteAsync(user);
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                await _audit.LogAsync("Delete", "User", id, currentUserId!, oldValue: user.FullName);
-                TempData["Success"] = $"User '{user.FullName}' deleted.";
-            }
-            else
+                await tx.RollbackAsync();
                 TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
+                return RedirectToAction(nameof(Index));
+            }
+
+            await tx.CommitAsync();
+            await _audit.LogAsync("Delete", "User", id, currentUserId!, oldValue: user.FullName);
+            TempData["Success"] = string.Format(_loc.T("User {0} deleted."), user.FullName);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
-            // Inspection order assignments/reports, group memberships, and audit log entries are
-            // deliberately Restrict/NoAction on the user FK, so deleting anyone with real activity
-            // history fails at the DB level — that's intentional, it protects those records from
-            // being silently orphaned or lost. Deactivating instead revokes access without touching
-            // that history.
-            TempData["Error"] = $"'{user.FullName}' has inspection order or audit history and cannot be deleted. " +
-                "Deactivate the account instead to remove their access.";
+            await tx.RollbackAsync();
+            _logger.LogWarning(ex, "Delete failed for user {UserId}", id);
+            TempData["Error"] = string.Format(
+                _loc.T("'{0}' has order or audit history and cannot be deleted. Deactivate the account instead to remove their access."),
+                user.FullName);
         }
 
         return RedirectToAction(nameof(Index));
@@ -604,7 +663,7 @@ public class UsersController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var tempPassword = GenerateTempPassword();
+        var tempPassword = TempPasswordGenerator.Generate();
         var token = await _um.GeneratePasswordResetTokenAsync(user);
         var result = await _um.ResetPasswordAsync(user, token, tempPassword);
         if (!result.Succeeded)
@@ -638,7 +697,10 @@ public class UsersController : Controller
         }
         catch (EntraDirectorySearchException ex)
         {
-            return Json(new { error = ex.Message });
+            // ex.Message carries Graph/tenant detail (endpoint, tenant id, config diagnostics) —
+            // log it, return a generic message.
+            _logger.LogError(ex, "Entra directory search failed for query {Query}", q);
+            return Json(new { error = _loc.T("Directory search is unavailable right now. Contact an administrator.") });
         }
 
         var results = new List<object>();
@@ -675,6 +737,12 @@ public class UsersController : Controller
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(role))
         {
             TempData["Error"] = "Missing required fields for import.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!await CanAssignRoleAsync(role))
+        {
+            TempData["Error"] = _loc.T("That role is not available to assign.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -728,7 +796,38 @@ public class UsersController : Controller
 
     private async Task LoadVB()
     {
-        ViewBag.Roles = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+        ViewBag.Roles = await AssignableRoleNamesAsync();
         ViewBag.RoleNameArByName = await _rm.Roles.ToDictionaryAsync(r => r.Name!, r => r.NameAr);
     }
+
+    /// <summary>Roles the caller is allowed to hand out. Anyone with User.Manage could previously
+    /// post role="Admin" (or any other role holding System.IsAdmin) and mint a full administrator;
+    /// those roles are only assignable by a caller who already holds System.IsAdmin. Used both to
+    /// build the dropdowns and to validate what actually comes back on the POST.</summary>
+    private async Task<List<string>> AssignableRoleNamesAsync()
+    {
+        var allRoles = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name!).ToListAsync();
+        if ((await _authZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded)
+            return allRoles;
+
+        var adminRoleIds = await _db.RolePermissions
+            .Where(rp => rp.PermissionName == PermissionCatalog.IsAdmin)
+            .Select(rp => rp.RoleId)
+            .ToListAsync();
+        var adminRoleNames = await _rm.Roles
+            .Where(r => adminRoleIds.Contains(r.Id))
+            .Select(r => r.Name!)
+            .ToListAsync();
+
+        return allRoles
+            .Where(n => !string.Equals(n, "Admin", StringComparison.OrdinalIgnoreCase)
+                     && !adminRoleNames.Contains(n, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>True when the role exists AND the caller may assign it.</summary>
+    private async Task<bool> CanAssignRoleAsync(string? roleName) =>
+        !string.IsNullOrWhiteSpace(roleName)
+        && await _rm.RoleExistsAsync(roleName)
+        && (await AssignableRoleNamesAsync()).Contains(roleName, StringComparer.OrdinalIgnoreCase);
 }

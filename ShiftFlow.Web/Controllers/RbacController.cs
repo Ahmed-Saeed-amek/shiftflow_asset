@@ -19,6 +19,7 @@ public class RbacController : Controller
     private readonly ApplicationDbContext _db;
     private readonly IAuditService _audit;
     private readonly ILanguageService _loc;
+    private readonly IAuthorizationService _authZ;
 
     public RbacController(
         IPermissionService permissions,
@@ -26,8 +27,10 @@ public class RbacController : Controller
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext db,
         IAuditService audit,
-        ILanguageService loc)
+        ILanguageService loc,
+        IAuthorizationService authZ)
     {
+        _authZ = authZ;
         _permissions = permissions;
         _roleManager = roleManager;
         _userManager = userManager;
@@ -37,6 +40,31 @@ public class RbacController : Controller
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
+
+    private const int PageSize = 25;
+
+    /// <summary>Permissions that confer (or can be used to confer) full control. Only a caller who
+    /// already holds System.IsAdmin may grant them or assign a role that carries them.</summary>
+    private static readonly string[] PrivilegedPermissions = [PermissionCatalog.IsAdmin, PermissionCatalog.RbacManage];
+
+    private async Task<bool> CallerIsAdminAsync() =>
+        (await _authZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded;
+
+    /// <summary>Role names a non-admin caller must not be able to hand out: "Admin" plus any role
+    /// that itself holds System.IsAdmin (which would make the grantee an administrator anyway).</summary>
+    private async Task<HashSet<string>> PrivilegedRoleNamesAsync()
+    {
+        var roleIds = await _db.RolePermissions
+            .Where(rp => rp.PermissionName == PermissionCatalog.IsAdmin)
+            .Select(rp => rp.RoleId)
+            .ToListAsync();
+        var names = await _roleManager.Roles
+            .Where(r => roleIds.Contains(r.Id))
+            .Select(r => r.Name!)
+            .ToListAsync();
+        names.Add("Admin");
+        return new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+    }
 
     // -------------------------------------------------------------------------
     // Role CRUD
@@ -129,6 +157,28 @@ public class RbacController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // Every posted role must exist, and a caller without System.IsAdmin must not be able to
+        // add "Admin" (or any role holding System.IsAdmin) to anyone — Rbac.Manage alone was
+        // previously enough to self-promote to full administrator.
+        var existingRoleNames = (await _roleManager.Roles.Select(r => r.Name!).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknownRoles = addRoles.Concat(removeRoles).Where(r => !existingRoleNames.Contains(r)).Distinct().ToList();
+        if (unknownRoles.Count > 0)
+        {
+            TempData["Error"] = _loc.T("Unknown role '{0}'.", unknownRoles[0]);
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!await CallerIsAdminAsync())
+        {
+            var privileged = await PrivilegedRoleNamesAsync();
+            if (addRoles.Any(privileged.Contains))
+            {
+                TempData["Error"] = _loc.T("Only a system administrator can assign administrator roles.");
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         int changed = 0;
         var errors  = new List<string>();
         var selfSkipped = false;
@@ -197,14 +247,41 @@ public class RbacController : Controller
     // Index — lists all roles and all users side-by-side
     // -------------------------------------------------------------------------
 
-    public async Task<IActionResult> Index()
+    // Search and paging happen in SQL — the view used to receive every user in the system and
+    // filter them with client-side JavaScript.
+    public async Task<IActionResult> Index(string? search, string? role, int page = 1)
     {
+        if (page < 1) page = 1;
         var roles = await _roleManager.Roles.OrderBy(r => r.Name).ToListAsync();
-        var users = await _db.Users.AsNoTracking().OrderBy(u => u.FullName).ToListAsync();
 
-        // Single query instead of N per-user GetRolesAsync calls
+        var query = _db.Users.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(u =>
+                (u.FullName != null && EF.Functions.Like(u.FullName, $"%{term}%")) ||
+                (u.Email != null && EF.Functions.Like(u.Email, $"%{term}%")));
+        }
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            var userRoleNames = _db.UserRoles
+                .Join(_db.Roles, ur => ur.RoleId, ro => ro.Id, (ur, ro) => new { ur.UserId, ro.Name });
+            // "__none__" is the view's "no role assigned" option.
+            query = role == "__none__"
+                ? query.Where(u => !userRoleNames.Any(x => x.UserId == u.Id))
+                : query.Where(u => userRoleNames.Any(x => x.UserId == u.Id && x.Name == role));
+        }
+        query = query.OrderBy(u => u.FullName);
+
+        var totalCount = await query.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        var users = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
+
+        var userIds = users.Select(u => u.Id).ToList();
         var rolesByUser = await _db.UserRoles
             .AsNoTracking()
+            .Where(ur => userIds.Contains(ur.UserId))
             .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
             .GroupBy(x => x.UserId)
             .ToDictionaryAsync(g => g.Key, g => (IList<string>)g.Select(x => x.Name!).ToList());
@@ -214,6 +291,16 @@ public class RbacController : Controller
 
         ViewBag.RolesByUser = rolesByUser;
         ViewBag.Roles = roles;
+        ViewBag.SearchFilter = search;
+        ViewBag.RoleFilter = role;
+        ViewBag.TotalCount = totalCount;
+        // Roles this caller may hand out via the bulk bar — mirrors the server-side check in
+        // BulkAssignRoles so the UI doesn't offer something the POST will reject.
+        HashSet<string> privileged = await CallerIsAdminAsync()
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : await PrivilegedRoleNamesAsync();
+        ViewBag.AssignableRoleNames = roles.Select(r => r.Name!).Where(n => !privileged.Contains(n)).OrderBy(n => n).ToList();
+        ViewBag.Pagination = new ShiftFlow.Web.ViewModels.PaginationModel { Page = page, TotalPages = totalPages };
         return View(users);
     }
 
@@ -244,7 +331,6 @@ public class RbacController : Controller
         var role = await _roleManager.FindByIdAsync(roleId);
         if (role is null) return NotFound();
 
-        var allPerms = PermissionCatalog.All;
         var currentlyGranted = (await _permissions.GetRolePermissionsAsync(roleId))
             .Select(rp => rp.PermissionName)
             .ToHashSet();
@@ -261,6 +347,28 @@ public class RbacController : Controller
         }
 
         granted ??= [];
+
+        // allPerms was computed and never used — every posted name went straight into the DB, so a
+        // hand-crafted POST could write arbitrary permission rows. Reject anything not in the
+        // catalog instead.
+        var unknown = granted.Where(p => !PermissionCatalog.All.Contains(p)).Distinct().ToList();
+        if (unknown.Count > 0)
+        {
+            TempData["Error"] = _loc.T("Unknown permission '{0}'.", unknown[0]);
+            return RedirectToAction(nameof(RolePermissions), new { roleId });
+        }
+
+        // Rbac.Manage / System.IsAdmin are the two permissions that let their holder grant
+        // themselves everything else — only a caller who already holds System.IsAdmin may add them.
+        if (!await CallerIsAdminAsync())
+        {
+            var escalating = PrivilegedPermissions.Where(p => granted.Contains(p) && !currentlyGranted.Contains(p)).ToList();
+            if (escalating.Count > 0)
+            {
+                TempData["Error"] = _loc.T("Only a system administrator can grant '{0}'.", escalating[0]);
+                return RedirectToAction(nameof(RolePermissions), new { roleId });
+            }
+        }
 
         // Self-lockout protection, same idea as BulkAssignRoles: if the admin submitting this form
         // is themselves a member of the role being edited, don't let the save strip the two
@@ -353,7 +461,27 @@ public class RbacController : Controller
         denyList ??= [];
 
         var allPerms = PermissionCatalog.All;
+        var unknown = allowList.Concat(denyList).Where(p => !allPerms.Contains(p)).Distinct().ToList();
+        if (unknown.Count > 0)
+        {
+            TempData["Error"] = _loc.T("Unknown permission '{0}'.", unknown[0]);
+            return RedirectToAction(nameof(UserPermissions), new { userId });
+        }
+
         var existingOverrides = await _permissions.GetUserPermissionOverridesAsync(userId);
+
+        // Same escalation guard as SaveRolePermissions: an Allow override on Rbac.Manage /
+        // System.IsAdmin is a direct grant of full control.
+        if (!await CallerIsAdminAsync())
+        {
+            var alreadyAllowed = existingOverrides.Where(o => o.IsGranted).Select(o => o.PermissionName).ToHashSet();
+            var escalating = PrivilegedPermissions.Where(p => allowList.Contains(p) && !alreadyAllowed.Contains(p)).ToList();
+            if (escalating.Count > 0)
+            {
+                TempData["Error"] = _loc.T("Only a system administrator can grant '{0}'.", escalating[0]);
+                return RedirectToAction(nameof(UserPermissions), new { userId });
+            }
+        }
 
         // Same lost-update race fixed for Group membership (round 19) and role permissions above —
         // reject a submit whose snapshot of what was actually in effect no longer matches the DB.
