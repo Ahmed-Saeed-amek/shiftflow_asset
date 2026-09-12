@@ -11,7 +11,8 @@
 
 <form method="get" class="row g-2 mb-3 align-items-center">
     <div class="col-auto">
-        <input type="text" name="q" value="@ViewBag.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search by order # or asset tag…")" style="min-width:220px" />
+        <label for="vendorSearch" class="visually-hidden">@Loc.T("Search")</label>
+        <input type="text" id="vendorSearch" name="q" value="@ViewBag.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search by order # or asset tag…")" style="min-width:220px" />
     </div>
     <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
@@ -49,7 +50,8 @@
                     @foreach (var w in Model)
                     {
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = w.Id })'">
-                            <td class="small font-monospace">@w.WorkOrderNumber</td>
+                            @* A real link, not row-click only - see WorkOrders/Index. *@
+                            <td class="small font-monospace"><a asp-action="Details" asp-route-id="@w.Id" class="text-decoration-none">@w.WorkOrderNumber</a></td>
                             <td class="small">@w.Asset?.AssetTag</td>
                             <td class="d-none d-lg-table-cell">
                                 @if (w.SourceContractId != null)
