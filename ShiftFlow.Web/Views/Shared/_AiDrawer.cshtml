@@ -1,0 +1,30 @@
+@*
+    Slide-over AI assistant. Included by _Layout on every page for users who hold
+    AiAssistantUse — except the AI Assistant page itself, where the full-page chat is
+    already on screen (the ids inside _AiChat are unique per page).
+
+    A plain Bootstrap offcanvas: Escape closes it and focus is restored to the launcher
+    for free; ai-assistant.js adds "focus the composer on open" and the session-scoped
+    open/closed memory. `offcanvas-end` is mirrored automatically by the RTL Bootstrap
+    build (_HeadLinks), so in Arabic it slides in from the start side.
+*@
+<div class="offcanvas offcanvas-end ai-drawer" tabindex="-1" id="aiDrawer" aria-labelledby="aiDrawerTitle">
+    <div class="offcanvas-header ai-drawer-header">
+        <h6 class="offcanvas-title" id="aiDrawerTitle">
+            <i class="bi bi-robot me-1" aria-hidden="true"></i>@Loc.T("STEP Assistant")
+        </h6>
+        <div class="ai-drawer-actions">
+            <a asp-controller="AiAssistant" asp-action="Index" class="btn btn-sm btn-link ai-drawer-link"
+               title="@Loc.T("Open full page")">
+                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>@Loc.T("Open full page")
+            </a>
+            <button type="button" class="btn-clear" id="btnClear" aria-label="@Loc.T("Clear conversation")">
+                @Loc.T("Clear")
+            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="@Loc.T("Close")"></button>
+        </div>
+    </div>
+    <div class="offcanvas-body ai-drawer-body">
+        <partial name="_AiChat" />
+    </div>
+</div>
