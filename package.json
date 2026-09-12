@@ -1,7 +1,7 @@
 {
-  "name": "solution-1",
+  "name": "shiftflow",
   "version": "1.0.0",
-  "description": "A maintenance and operations management system for electrical utility infrastructure, built for the Ministry of Electricity, Water & Renewable Energy — Kuwait. Tracks work orders, emergency tickets, preventive maintenance, safety permits (PTW), assets, spare parts, shifts, and leave requests across multiple stations, with role-based access and bilingual (EN/AR, RTL) support.",
+  "description": "Playwright end-to-end tests for the ShiftFlow asset-maintenance web app",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",

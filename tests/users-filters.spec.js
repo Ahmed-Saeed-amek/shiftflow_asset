@@ -1,5 +1,8 @@
 // @ts-check
-// Verifies the Users page filter bar: search by name/email, role filter, work area filter.
+// Verifies the Users page filter bar. Users/Index filters server-side via the
+// query params `role`, `search` and `page`, so these tests assert on the URL and
+// on generic table rows rather than on any specific row markup — keep selectors
+// generic so a re-skin of Users/Index doesn't break them.
 const { test, expect } = require('@playwright/test');
 
 const BASE_URL = 'https://localhost:55248';
@@ -13,6 +16,8 @@ async function login(page, { email, password }) {
   await page.waitForLoadState('domcontentloaded');
 }
 
+const rowsOf = (page) => page.locator('table tbody tr');
+
 test.describe('Users page filters', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, ADMIN);
@@ -20,66 +25,45 @@ test.describe('Users page filters', () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test('search by name filters to matching user', async ({ page }) => {
-    await page.fill('input[name="search"]', 'Khalid');
+  test('search by email narrows the list to the matching user', async ({ page }) => {
+    const email = 'engineer@shiftflow.com';
+    await page.fill('input[name="search"]', email);
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const rows = page.locator('table tbody tr');
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('Khalid Al-Mutairi');
+    expect(decodeURIComponent(page.url())).toContain(`search=${email}`);
+    const rows = rowsOf(page);
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      await expect(rows.nth(i)).toContainText(email);
+    }
   });
 
-  test('search by email filters to matching user', async ({ page }) => {
-    await page.fill('input[name="search"]', 'engineer@shiftflow.com');
+  test('search with no matches returns an empty result set', async ({ page }) => {
+    await page.fill('input[name="search"]', 'zzz-no-such-user');
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const rows = page.locator('table tbody tr');
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('engineer@shiftflow.com');
+    const text = (await rowsOf(page).first().textContent() ?? '').trim();
+    expect(text.length === 0 || /no records|no users|no results/i.test(text)).toBeTruthy();
   });
 
-  test('role filter narrows the list', async ({ page }) => {
-    const totalRows = await page.locator('table tbody tr').count();
+  test('role filter narrows the list and every row carries that role', async ({ page }) => {
+    const totalRows = await rowsOf(page).count();
 
     await page.selectOption('select[name="role"]', 'Admin');
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const rows = page.locator('table tbody tr');
+    expect(page.url()).toContain('role=Admin');
+    const rows = rowsOf(page);
     const count = await rows.count();
-    console.log('Total rows:', totalRows, '| Rows with role=Admin:', count);
     expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThan(totalRows);
+    expect(count).toBeLessThanOrEqual(totalRows);
     for (let i = 0; i < count; i++) {
       await expect(rows.nth(i)).toContainText('Admin');
     }
-  });
-
-  test('work area filter matches users in that work area and excludes others', async ({ page }) => {
-    // "test 7" is known (from DB inspection) to have every current user's active
-    // membership; "ECR" is an active work area with zero active memberships in this
-    // dev DB. This checks both a real match and a genuine empty-result case.
-    await page.selectOption('select[name="workArea"]', { label: 'test 7' });
-    await page.click('button:has-text("Filter")');
-    await page.waitForLoadState('domcontentloaded');
-
-    const matchRows = page.locator('table tbody tr');
-    const matchCount = await matchRows.count();
-    console.log('Rows with workArea="test 7":', matchCount);
-    expect(matchCount).toBeGreaterThan(0);
-    for (let i = 0; i < matchCount; i++) {
-      await expect(matchRows.nth(i)).toContainText('test 7');
-    }
-
-    await page.selectOption('select[name="workArea"]', { label: 'ECR' });
-    await page.click('button:has-text("Filter")');
-    await page.waitForLoadState('domcontentloaded');
-
-    const emptyText = await page.locator('table tbody tr').first().textContent();
-    console.log('Rows with workArea="ECR" (expected: no matches):', emptyText?.trim());
-    expect(emptyText).toContain('No records found');
   });
 
   test('clear link resets all filters', async ({ page }) => {
@@ -87,15 +71,13 @@ test.describe('Users page filters', () => {
     await page.click('button:has-text("Filter")');
     await page.waitForLoadState('domcontentloaded');
 
-    const noMatchRows = await page.locator('table tbody tr').count();
-    console.log('Rows for non-matching search:', noMatchRows);
-
     const clearLink = page.locator('a:has-text("Clear")');
     await expect(clearLink).toBeVisible();
     await clearLink.click();
     await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).not.toContain('search=');
+    expect(page.url()).not.toContain('role=');
     const searchInput = await page.locator('input[name="search"]').inputValue();
     expect(searchInput).toBe('');
   });

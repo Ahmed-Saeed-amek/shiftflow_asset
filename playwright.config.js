@@ -5,8 +5,9 @@ module.exports = defineConfig({
   testDir: './tests',
   timeout: 30000,
   use: {
+    baseURL: 'https://localhost:55248',
     ignoreHTTPSErrors: true,   // self-signed dev cert
-    headless: false,           // show browser for debugging
+    headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

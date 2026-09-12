@@ -1,6 +1,6 @@
 // @ts-check
 // Responsive design verification suite. Checks a representative sample of
-// pages across all tiers (see the responsive-design plan) at 5 standard
+// pages across the app at 5 standard
 // breakpoints for horizontal overflow, plus sidebar drawer and modal
 // behavior below the 992px (lg) breakpoint where the layout switches from
 // a static sidebar to a mobile overlay drawer.
@@ -35,30 +35,30 @@ async function assertNoOverflow(page, label) {
   expect(overflow.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
-// Representative sample: Tier 1/2 (layout+calendars), all Tier 3, and a
-// spread of Tier 4 CRUD pages across different controllers.
+// Representative sample of real routes: dashboards/analytics, the order and
+// asset-management list pages, administration pages, and the personal 'My Work' pages.
 const PAGES = [
-  { path: '/Dashboard', role: 'admin', label: 'Dashboard (Tier 3)' },
-  { path: '/Dashboard/Maintenance', role: 'admin', label: 'Maintenance Dashboard (Tier 3)' },
-  { path: '/ShiftAnalytics', role: 'admin', label: 'Task Analytics (Tier 3)' },
-  { path: '/Shifts/Calendar', role: 'admin', label: 'Shift Calendar (Tier 2)' },
-  { path: '/ShiftOps/MySchedule', role: 'engineer', label: 'My Schedule (Tier 2)' },
-  { path: '/ShiftOps/Shift?id=1&tab=roster', role: 'admin', label: 'Shift Roster (Tier 3)' },
-  { path: '/ShiftOps/Shift?id=1&tab=tasks', role: 'admin', label: 'Shift Tasks (Tier 3)' },
-  { path: '/ShiftMaker/Details?id=1', role: 'admin', label: 'Schedule Details (Tier 3)' },
-  { path: '/Users/Profile/' + 'c5d38409-921f-4935-87d0-fc1dac76baa3', role: 'admin', label: 'User Profile (Tier 3)' },
-  { path: '/Users', role: 'admin', label: 'Users list (Tier 4)' },
-  { path: '/Shifts', role: 'admin', label: 'Shifts list (Tier 4)' },
-  { path: '/Assets', role: 'admin', label: 'Assets list (Tier 4)' },
-  { path: '/EmergencyTickets', role: 'admin', label: 'Emergency Tickets list (Tier 4)' },
-  { path: '/SafetyPermits', role: 'admin', label: 'Safety Permits list (Tier 4)' },
-  { path: '/MaintenanceSchedules', role: 'admin', label: 'Maintenance Schedules list (Tier 4)' },
-  { path: '/ShiftMaker/Areas', role: 'admin', label: 'Work Areas (Tier 4)' },
-  { path: '/ShiftMaker/Groups', role: 'admin', label: 'Groups (Tier 4)' },
-  { path: '/Rbac', role: 'admin', label: 'RBAC (Tier 4)' },
-  { path: '/ChangeRequests/MyRequests', role: 'engineer', label: 'My Requests (Tier 4, modal host)' },
-  { path: '/MyHome', role: 'engineer', label: 'My Home (Tier 4)' },
+  { path: '/Dashboard', role: 'admin', label: 'Executive Dashboard' },
+  { path: '/ZoneOverview', role: 'admin', label: 'Zone Overview' },
+  { path: '/SparePartsAnalytics', role: 'admin', label: 'Spare Parts Analytics' },
+  { path: '/Orders', role: 'admin', label: 'All Orders list' },
+  { path: '/InspectionOrders', role: 'admin', label: 'Inspection Orders list' },
+  { path: '/MaintenanceOrders', role: 'admin', label: 'Maintenance Orders list' },
+  { path: '/Assets', role: 'admin', label: 'Assets list' },
+  { path: '/WorkOrders', role: 'admin', label: 'Work Orders list' },
+  { path: '/Vendors', role: 'admin', label: 'Vendors list' },
+  { path: '/Contracts', role: 'admin', label: 'Contracts list' },
+  { path: '/SpareParts', role: 'admin', label: 'Spare Parts list' },
+  { path: '/Zones', role: 'admin', label: 'Asset Locations (Zones)' },
+  { path: '/AssetCategories', role: 'admin', label: 'Asset Categories' },
+  { path: '/Users', role: 'admin', label: 'Users list' },
+  { path: '/Rbac', role: 'admin', label: 'RBAC (Permissions)' },
+  { path: '/UserAssetScopes', role: 'admin', label: 'Asset Visibility' },
+  { path: '/AuditLogs', role: 'admin', label: 'Audit Logs' },
+  { path: '/MyHome', role: 'engineer', label: 'My Home' },
+  { path: '/Users/MyOrders', role: 'engineer', label: 'My Orders' },
 ];
+
 
 for (const vp of VIEWPORTS) {
   test.describe(`viewport ${vp.name}`, () => {
@@ -143,32 +143,16 @@ test.describe('mobile nav list touch scrolling', () => {
 });
 
 test.describe('modals stay within viewport at 375x667', () => {
-  test('MyRequests transfer modal', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 667 });
-    await login(page, ENGINEER);
-    await page.goto(`${BASE_URL}/ChangeRequests/MyRequests`, { waitUntil: 'domcontentloaded' });
-    const btn = page.locator('button[data-bs-target="#transferModal"]:not([disabled])');
-    if (await btn.count() === 0) {
-      test.skip(true, 'no enabled transfer button available in current data set');
-    }
-    await btn.click();
-    const modal = page.locator('#transferModal .modal-dialog');
-    await expect(modal).toBeVisible();
-    const box = await modal.boundingBox();
-    const viewport = page.viewportSize();
-    expect(box && viewport && box.x >= 0 && box.x + box.width <= viewport.width + 1).toBeTruthy();
-  });
-
-  test('ShiftMaker Groups assign modal', async ({ page }) => {
+  test('Work Orders list modal stays inside the viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, ADMIN);
-    await page.goto(`${BASE_URL}/ShiftMaker/Groups`, { waitUntil: 'domcontentloaded' });
-    const btn = page.locator('[data-bs-target="#assignModal"]').first();
+    await page.goto(`${BASE_URL}/WorkOrders`, { waitUntil: 'domcontentloaded' });
+    const btn = page.locator('[data-bs-toggle="modal"]').first();
     if (await btn.count() === 0) {
-      test.skip(true, 'no assign-member trigger available in current data set');
+      test.skip(true, 'no modal trigger available in current data set');
     }
     await btn.click();
-    const modal = page.locator('#assignModal .modal-dialog');
+    const modal = page.locator('.modal.show .modal-dialog');
     await expect(modal).toBeVisible();
     const box = await modal.boundingBox();
     const viewport = page.viewportSize();
