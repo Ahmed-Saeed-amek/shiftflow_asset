@@ -1,4 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap');
+/* ===========================================================================
+   ShiftFlow / STEP design tokens (defined on :root below)
+   Fonts are loaded with <link rel="preconnect"> + <link rel="stylesheet"> from
+   Views/Shared/_HeadLinks.cshtml — an @import here blocked on this file parsing
+   first, costing an extra round trip before the font request even started.
+
+   Surfaces   --background --card --border --input --muted --muted-foreground
+              --foreground --secondary
+   Brand      --primary --primary-foreground --accent --ring
+   Semantic   --success --warning --destructive
+   Charts     --chart-1 … --chart-5 (categorical series colours, in order)
+   Shape      --radius --radius-lg --card-shadow --card-shadow-hover
+   Type       --font-heading --font-body  (.font-heading applies the former)
+   Sidebar    --sidebar-background --sidebar-primary --sidebar-accent --sidebar-border
+
+   All colour tokens are bare HSL channels, so use them as hsl(var(--x)) and
+   hsl(var(--x) / .15) for a tint. Don't hard-code the hex of a token elsewhere
+   in this file — changing the palette then silently misses those copies.
+   =========================================================================== */
 
 /* Not a Bootstrap utility class — every row-clickable table across the app (Assets, Work
    Orders, Vendors, Contracts, Zones, Inspection Orders, My Orders, Vendor Portal, etc.) applies
@@ -49,6 +67,9 @@
   --chart-4: 354 70% 54%;
   --chart-5: 262 52% 47%;
 
+  --card-shadow: 0 4px 12px rgba(17,24,39,.12), 0 2px 4px rgba(17,24,39,.08);
+  --card-shadow-hover: 0 10px 24px rgba(17,24,39,.16);
+
   --radius: 0.625rem;      /* 10px — buttons, inputs, badges */
   --radius-lg: 0.875rem;   /* 14px — cards, modals, dropdowns */
   --font-heading: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
@@ -78,6 +99,12 @@
   --bs-body-color: hsl(var(--foreground));
   --bs-link-color: hsl(var(--primary));
   --bs-link-hover-color: hsl(var(--primary));
+  /* Every card in the app is marked `card border-0 shadow-sm`, and Bootstrap's
+     .shadow-sm sets box-shadow with !important — which beat the designed .card
+     shadow below, so the intended elevation never actually rendered. Remapping
+     Bootstrap's own variable makes the utility class paint the designed shadow. */
+  --bs-box-shadow-sm: var(--card-shadow);
+  --bs-box-shadow: var(--card-shadow-hover);
 }
 
 body {
@@ -109,8 +136,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background-color: #0369A1;
-  border-color: #0369A1;
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
   color: #fff;
 }
 .btn-primary:hover, .btn-primary:focus {
@@ -118,12 +145,12 @@ h1, h2, h3, h4, h5, h6 {
   border-color: #075985;
 }
 .btn-outline-primary {
-  color: #0369A1;
-  border-color: #0369A1;
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
 }
 .btn-outline-primary:hover {
-  background-color: #0369A1;
-  border-color: #0369A1;
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
   color: #fff;
 }
 /* Same contrast problem as the primary retint above, found while checking for other
@@ -157,7 +184,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #fff;
 }
 .btn, .btn-sm { border-radius: var(--radius); }
-.text-primary { color: #0369A1 !important; }
+.text-primary { color: hsl(var(--primary)) !important; }
 
 /* Guarantees the footer sits at the true viewport bottom even when
    #sidebar drops out of flow (its position:fixed mobile breakpoint below)
@@ -211,7 +238,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: .7rem;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: #0369A1;
+  color: hsl(var(--primary));
   padding: .25rem .5rem;
 }
 #sidebar .nav-link {
@@ -236,13 +263,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 #sidebar .nav-link:hover,
 #sidebar .nav-link.active {
-  background: rgba(3,105,161,.08);
-  color: #0369A1 !important;
+  background: hsl(var(--primary) / .08);
+  color: hsl(var(--primary)) !important;
 }
 #sidebar .nav-link.active { font-weight: 600; }
 #sidebar .nav-link:hover i,
 #sidebar .nav-link.active i {
-  background: #0369A1;
+  background: hsl(var(--primary));
   color: #fff;
 }
 #sidebar .nav-group-chevron { transition: transform .15s; }
@@ -318,10 +345,10 @@ body.sidebar-locked { overflow: hidden; }
   background-color: hsl(var(--card));
   border-radius: var(--radius-lg);
   border-color: hsl(var(--border));
-  box-shadow: 0 4px 12px rgba(17,24,39,.12), 0 2px 4px rgba(17,24,39,.08);
+  box-shadow: var(--card-shadow);
 }
 .card:hover.card-hover {
-  box-shadow: 0 10px 24px rgba(17,24,39,.16) !important;
+  box-shadow: var(--card-shadow-hover) !important;
   transition: box-shadow .2s;
 }
 /* Bootstrap's default card-header/card-footer use a subtly tinted overlay
@@ -440,8 +467,7 @@ body.sidebar-locked { overflow: hidden; }
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     /* Not overflow:hidden — that rounds the corners but also clips any dropdown
-       menu (e.g. "Mark Attendance" in Shift.cshtml) opened inside the row,
-       making its options invisible on phones. Cells have no distinct
+       menu opened inside the row, making its options invisible on phones. Cells have no distinct
        background of their own, so square corners peeking through are a
        non-issue in practice. */
     overflow: visible;
@@ -464,23 +490,23 @@ body.sidebar-locked { overflow: hidden; }
     letter-spacing: .02em;
     text-align: start;
   }
-  /* A colspan cell holding its own Bootstrap grid (see InspectionChecklist.cshtml's
-     inline defect-report form) shouldn't be squeezed by the label/value flex layout
+  /* A colspan cell holding its own Bootstrap grid (see the
+     inline defect-report form in InspectionOrders/Details.cshtml) shouldn't be squeezed by the label/value flex layout
      meant for simple cells — let it render as a normal block so its own row/col
      grid stacks the way it already does everywhere else in the app. */
   .table-card-stack .inline-form-row td { display: block; justify-content: normal; }
-  /* Outcome action buttons (see InspectionChecklist.cshtml) — full-width, side by
+  /* Outcome action buttons (InspectionOrders/Details.cshtml) — full-width, side by
      side, for easy tapping instead of tiny inline buttons. */
   .outcome-actions .outcome-btn { flex: 1 1 0; }
   /* .table-responsive sets overflow-x:auto, which makes browsers implicitly pair
      overflow-y:auto too — clipping any absolutely-positioned dropdown menu (e.g.
-     "Mark Attendance") that opens inside a stacked card and overflows past the
+     a row action menu) that opens inside a stacked card and overflows past the
      wrapper's auto-fit height. Horizontal scrolling is irrelevant once the table
      has collapsed into cards, so drop the clipping entirely at this breakpoint. */
   .table-responsive:has(.table-card-stack) { overflow: visible; }
 }
 
-/* Swipeable nav-tabs strip (see Shift.cshtml) — keep each tab at its
+/* Swipeable nav-tabs strip — keep each tab at its
    natural width so the row scrolls instead of squeezing labels onto
    multiple lines. */
 .nav-tabs.overflow-x-auto .nav-item { flex-shrink: 0; }
@@ -496,32 +522,8 @@ body.sidebar-locked { overflow: hidden; }
   .gap-1:has(.btn) { gap: .5rem !important; }
 }
 
-/* Task-row status select (see Shift.cshtml) — fixed 130px reads fine once
-   the row has wrapped onto its own line at narrow widths (flex-wrap on the
-   task-row), but should still cap out rather than stretch full-width next
-   to the icon/history/delete buttons on that wrapped line. */
-.task-status-select { width: 130px; max-width: 100%; }
-
-/* Mobile-only collapsible sections (see Shift.cshtml "Add Task"/"Report
-   Incident" forms) — collapsed by default on phones so the tab opens on
-   the list the user came to check, not a form; always expanded at md+
-   where there's room for both. */
-@media (min-width: 768px) {
-  .mobile-collapsible.collapse:not(.show) { display: block; }
-}
-
-/* Task row trailing action cluster (status select/history/delete, see
-   Shift.cshtml) — once it wraps to its own line on a narrow screen it
-   should fill the row and spread its items apart rather than clumping to
-   the start. Bootstrap's stock CDN build has no responsive width utilities
-   (w-md-auto doesn't exist), hence a small dedicated class instead. */
-@media (max-width: 767.98px) {
-  .task-actions { width: 100%; justify-content: space-between; }
-}
-
 /* Badges & form controls */
 .badge { font-size: .76rem; font-weight: 500; border-radius: 0.5rem; }
-.bg-purple { background-color: #a78bfa !important; } /* "HandedOver" task status badge */
 .btn-sm, .form-control, .form-select { border-radius: var(--radius); }
 /* Bootstrap's .btn-sm renders ~30px tall — comfortable for a mouse, under the ~44px a touch
    target needs to be reliably tappable without missing (same class of fix as [data-chip]
@@ -551,8 +553,8 @@ body.sidebar-locked { overflow: hidden; }
   background-color: hsl(var(--card));
 }
 .form-control:focus, .form-select:focus {
-  border-color: #0369A1;
-  box-shadow: 0 0 0 0.2rem rgba(3,105,161,0.15);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 0.2rem hsl(var(--primary) / 0.15);
 }
 
 /* Dropdowns / popovers */
@@ -597,82 +599,6 @@ body.sidebar-locked { overflow: hidden; }
 html[dir="rtl"] body { text-align: right; }
 html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px solid hsl(var(--border)); }
 
-/* Shift calendar */
-.cal-nav-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  background: #fff;
-  color: hsl(var(--foreground));
-  transition: background .15s;
-}
-.cal-nav-btn:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
-
-.cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-}
-.cal-weekday {
-  text-align: center;
-  font-size: .78rem;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted));
-  padding: .6rem 0;
-}
-.cal-weekday:first-child { border-start-start-radius: var(--radius-lg); }
-.cal-weekday:last-child { border-start-end-radius: var(--radius-lg); }
-
-.cal-cell {
-  min-height: 92px;
-  padding: .4rem .45rem;
-  border-bottom: 1px solid hsl(var(--border));
-  border-inline-end: 1px solid transparent;
-}
-.cal-cell.cal-outside { background: hsl(var(--muted) / 0.6); }
-.cal-cell.cal-outside .cal-daynum { color: hsl(var(--muted-foreground)); }
-.cal-daynum { font-size: .85rem; font-weight: 500; margin-bottom: .25rem; }
-.cal-cell.cal-today {
-  border: 2px solid #0369A1;
-  border-radius: var(--radius);
-  margin: -1px;
-}
-.cal-cell.cal-today .cal-daynum { color: #0369A1; font-weight: 700; }
-.cal-chip {
-  display: block;
-  font-size: .7rem;
-  background: rgba(3,105,161,0.10);
-  color: #0369A1;
-  border-radius: 0.5rem;
-  padding: .05rem .35rem;
-  margin-bottom: .15rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-decoration: none;
-}
-.cal-chip:hover { background: rgba(3,105,161,0.18); color: #0369A1; }
-.cal-more { font-size: .7rem; color: hsl(var(--muted-foreground)); }
-
-/* Compact calendar on phones/small tablets — shrink cells instead of letting
-   7 columns compress into illegible slivers. Weekday labels can use two
-   spans, `<span class="d-none d-md-inline">Monday</span><span
-   class="d-md-none">Mon</span>`, to swap to abbreviations under the same
-   breakpoint. If content still doesn't fit at 320px even compacted, wrap
-   .cal-grid in a `.cal-scroll` container to fall back to horizontal scroll
-   rather than cramming unreadable columns. */
-@media (max-width: 767.98px) {
-  .cal-cell { min-height: 56px; padding: .25rem; font-size: .75rem; }
-  .cal-daynum { font-size: .75rem; margin-bottom: .1rem; }
-  .cal-chip { font-size: .65rem; padding: .02rem .25rem; }
-}
-.cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.cal-scroll .cal-grid { min-width: 640px; }
-
 /* Floating AI avatar widget. Tried moving this to the inline-start corner to dodge list
    pages' right-aligned row actions (Users, Vendors, etc. all use text-end) — but a fresh-eyes
    pass across more pages found start-corner is net worse: it lands on left-aligned names,
@@ -689,12 +615,12 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #0369A1;
+  background: hsl(var(--primary));
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(3,105,161,0.35);
+  box-shadow: 0 8px 24px hsl(var(--primary) / 0.35);
   cursor: pointer;
   transition: transform .2s;
 }
@@ -759,4 +685,65 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Shared component + accessibility rules
+   --------------------------------------------------------------------------- */
+
+/* Used by _PageHeader/_KpiCard and a few Details views, but never actually
+   defined — the class was a no-op and those headings fell back to --font-body. */
+.font-heading { font-family: var(--font-heading); }
+
+/* Sidebar logo — was an inline style="width:90px" on the <img>. */
+.sidebar-logo { width: 90px; object-fit: contain; }
+
+/* Typeahead dropdowns (site.js typeaheadKeys): the keyboard-highlighted row.
+   Deliberately distinct from :hover so moving the mouse and using the arrow
+   keys can't leave two rows looking equally "chosen". */
+.list-group .ta-active,
+.list-group .ta-active:hover {
+  background-color: hsl(var(--primary) / .10);
+  color: hsl(var(--primary));
+}
+
+/* Toasts (_Toast.cshtml). Above the sidebar drawer (1045) and its backdrop, and
+   above Bootstrap modals' 1055 so a message raised from a modal is still visible. */
+#toastStack { z-index: 1090; }
+.app-toast { border-radius: var(--radius); }
+.app-toast-success { background-color: hsl(var(--success) / .12); color: hsl(var(--success)); }
+.app-toast-error { background-color: hsl(var(--destructive) / .12); color: hsl(var(--destructive)); }
+
+/* The AI avatar bubble is a real <button> now (it used to be a div with an inline
+   onclick, unreachable by keyboard) — strip the default button chrome. */
+#floatingAvatar .avatar-bubble { border: none; padding: 0; appearance: none; }
+
+/* Skip link — the sidebar is ~25 links deep, so keyboard and screen-reader users
+   had to tab through the whole nav on every page to reach the content. Visible
+   only while focused. */
+.skip-link {
+  position: absolute;
+  inset-inline-start: .5rem;
+  top: -3rem;
+  z-index: 1100;
+  padding: .5rem .9rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  text-decoration: none;
+  transition: top .15s ease-in-out;
+}
+.skip-link:focus { top: .5rem; color: hsl(var(--primary-foreground)); }
+/* <main> is focused programmatically by the skip link (tabindex="-1"); it should
+   not then draw a focus ring around the entire page. */
+main:focus { outline: none; }
+
+/* Keyboard focus was relying on Bootstrap's per-component :focus shadows, which
+   several elements here override (sidebar links, chips, .btn-close, table row
+   buttons) — leaving no visible indicator at all in places. One token-coloured
+   :focus-visible ring, so it never shows for mouse/touch interaction. */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: var(--radius);
 }

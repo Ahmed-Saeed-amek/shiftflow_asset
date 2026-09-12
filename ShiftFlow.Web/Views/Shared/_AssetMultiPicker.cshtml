@@ -71,7 +71,7 @@
                 <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2" data-chip data-id="@chip.Id">
                     @chip.Label
                     <input type="hidden" name="@Model.Name" value="@chip.Id" />
-                    <button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>
+                    <button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="@Loc.T("Remove")"></button>
                 </span>
             }
         </div>
@@ -111,8 +111,20 @@
         const chip = document.createElement('span');
         chip.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2';
         chip.setAttribute('data-chip', ''); chip.dataset.id = id;
-        chip.innerHTML = `${label}<input type="hidden" name="${inputName}" value="${id}"><button type="button" class="btn-close btn-close-sm" style="font-size:.6rem" data-remove aria-label="Remove"></button>`;
-        chip.querySelector('[data-remove]').addEventListener('click', () => { chip.remove(); refreshClearAllVisibility(); });
+        // Built as nodes rather than an innerHTML template: the label is an asset name entered
+        // by another user, so interpolating it into markup here was a stored-XSS path.
+        chip.appendChild(document.createTextNode(label));
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden'; hiddenInput.name = inputName; hiddenInput.value = id;
+        chip.appendChild(hiddenInput);
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-close btn-close-sm';
+        removeBtn.style.fontSize = '.6rem';
+        removeBtn.setAttribute('data-remove', '');
+        removeBtn.setAttribute('aria-label', jsRemoveLabel);
+        chip.appendChild(removeBtn);
+        removeBtn.addEventListener('click', () => { chip.remove(); refreshClearAllVisibility(); });
         chipsEl.appendChild(chip);
         refreshClearAllVisibility();
     }
@@ -121,6 +133,20 @@
     clearAllBtn.addEventListener('click', () => { chipsEl.innerHTML = ''; refreshClearAllVisibility(); });
 
     const jsNoMatches = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("No matching assets")));
+    const jsRemoveLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Remove")));
+    const jsLoadFailed = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Couldn't load — please try again.")));
+
+    // Shared with site.js: r.ok check + JSON, so a 500/403 is never mistaken for "no results".
+    const getJson = window.fetchJson || (url => fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }));
+    function showError(listEl) {
+        if (window.showListError) { window.showListError(listEl); return; }
+        listEl.textContent = jsLoadFailed;
+        listEl.classList.remove('d-none');
+    }
+    function reportError() {
+        if (window.showToast) window.showToast(jsLoadFailed, 'error');
+    }
 
     // Selecting a result re-focuses the search box (so the user can immediately type the next
     // asset) — but focus's own listener re-runs search() on the now-empty term, and the backend
@@ -131,8 +157,13 @@
     let suppressNextFocusSearch = false;
 
     async function search(term) {
-        const res = await fetch(`/Assets/Search?q=${encodeURIComponent(term)}`);
-        const items = await res.json();
+        let items;
+        try {
+            items = await getJson(`/Assets/Search?q=${encodeURIComponent(term)}`);
+        } catch (e) {
+            showError(resultsEl);
+            return;
+        }
         resultsEl.innerHTML = '';
         const available = items.filter(i => !selectedIds().includes(i.id));
         if (available.length === 0) {
@@ -172,6 +203,14 @@
         if (suppressNextFocusSearch) { suppressNextFocusSearch = false; return; }
         search(searchEl.value.trim());
     });
+    // Enter used to submit the surrounding form mid-search (see site.js typeaheadKeys):
+    // Enter now picks the highlighted row, Up/Down move it, Escape closes the list.
+    if (window.typeaheadKeys) {
+        window.typeaheadKeys(searchEl, resultsEl, {
+            onOpen: () => search(searchEl.value.trim()),
+            onClose: () => resultsEl.classList.add('d-none')
+        });
+    }
     document.addEventListener('click', e => { if (!root.contains(e.target)) resultsEl.classList.add('d-none'); });
 
     const scanBtn = root.querySelector('[data-scan]');
@@ -210,7 +249,15 @@
         catSel.addEventListener('change', async () => {
             subSel.innerHTML = `<option value="">${@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("All")))}</option>`;
             if (!catSel.value) { subWrap.classList.add('d-none'); addByCategoryBtn.disabled = true; return; }
-            const subs = await (await fetch(`/AssetCategories/ByParent?parentId=${catSel.value}`)).json();
+            let subs;
+            try {
+                subs = await getJson(`/AssetCategories/ByParent?parentId=${encodeURIComponent(catSel.value)}`);
+            } catch (e) {
+                reportError();
+                subWrap.classList.add('d-none');
+                addByCategoryBtn.disabled = true;
+                return;
+            }
             subs.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = localName(s); subSel.appendChild(opt); });
             subWrap.classList.toggle('d-none', subs.length === 0);
             addByCategoryBtn.disabled = false;
@@ -229,8 +276,10 @@
                     url = `/Assets/ByLocation?${p}`;
                 }
             }
-            const items = await (await fetch(url)).json();
-            items.forEach(i => addChip(i.id, `${i.assetTag} — ${i.name}`));
+            try {
+                const items = await getJson(url);
+                items.forEach(i => addChip(i.id, `${i.assetTag} — ${i.name}`));
+            } catch (e) { reportError(); }
         });
     }
 
@@ -285,7 +334,12 @@
             zoneWrap.classList.add('d-none'); addByLocationBtn.disabled = true;
             refreshZoneClearVisibility();
             if (!locCatSel.value) return;
-            zonesInCategory = await (await fetch(`/Zones/ByCategory?locationCategoryId=${locCatSel.value}`)).json();
+            try {
+                zonesInCategory = await getJson(`/Zones/ByCategory?locationCategoryId=${encodeURIComponent(locCatSel.value)}`);
+            } catch (e) {
+                reportError();
+                return;
+            }
             zoneWrap.classList.remove('d-none');
             addByLocationBtn.disabled = false;
         });
@@ -295,6 +349,12 @@
             refreshZoneClearVisibility();
         });
         zoneSearchEl.addEventListener('focus', () => renderZoneResults(zoneSearchEl.value.trim()));
+        if (window.typeaheadKeys) {
+            window.typeaheadKeys(zoneSearchEl, zoneResultsEl, {
+                onOpen: () => renderZoneResults(zoneSearchEl.value.trim()),
+                onClose: () => zoneResultsEl.classList.add('d-none')
+            });
+        }
         document.addEventListener('click', e => { if (!zoneWrap.contains(e.target)) zoneResultsEl.classList.add('d-none'); });
 
         addByLocationBtn.addEventListener('click', async () => {
@@ -306,8 +366,10 @@
                 const categoryId = subSel && subSel.value ? subSel.value : (catSel && catSel.value ? catSel.value : null);
                 if (categoryId) params.set('categoryId', categoryId);
             }
-            const items = await (await fetch(`/Assets/ByLocation?${params}`)).json();
-            items.forEach(i => addChip(i.id, `${i.assetTag} — ${i.name}`));
+            try {
+                const items = await getJson(`/Assets/ByLocation?${params}`);
+                items.forEach(i => addChip(i.id, `${i.assetTag} — ${i.name}`));
+            } catch (e) { reportError(); }
         });
     }
 })();

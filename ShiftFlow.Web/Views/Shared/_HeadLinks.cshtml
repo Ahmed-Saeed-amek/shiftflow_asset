@@ -1,0 +1,22 @@
+@* Shared <head> CDN links. Used by _Layout and by every layout-less page (Login, Home/Error,
+   Account/AccessDenied) so the Bootstrap/icon/font URLs, their pinned versions and their SRI
+   hashes live in exactly one place. Loads the RTL Bootstrap build when the UI is Arabic. *@
+@if (Loc.IsRTL)
+{
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css"
+          integrity="sha384-nU14brUcp6StFntEOOEBvcJm4huWjB0OcIeQ3fltAfSmuZFrkAif0T+UtNGlKKQv" crossorigin="anonymous" />
+}
+else
+{
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous" />
+}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+      integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous" />
+@* Was an @@import at the top of site.css — an @@import blocks on site.css parsing first, so the
+   font request only started after a full extra round trip. No SRI: the Google Fonts stylesheet is
+   generated per user-agent, so its bytes (and therefore its hash) are not stable. *@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Cairo:wght@400;500;600;700&display=swap" />
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

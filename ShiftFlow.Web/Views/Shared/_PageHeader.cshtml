@@ -1,14 +1,24 @@
 @model ShiftFlow.Web.ViewModels.PageHeaderModel
+@{
+    // The partial does NOT translate: every caller already passes Loc.T("…") (or a live value
+    // such as an asset tag). Translating again here would also try to translate user data.
+    var actions = (Model as PageHeaderWithActions)?.Actions;
+}
 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 gap-2">
     <div class="text-break" style="min-width:0">
-        <h1 class="fs-3 fw-bold font-heading mb-0">@Loc.T(Model.Title)</h1>
+        <h1 class="fs-3 fw-bold font-heading mb-0">@Model.Title</h1>
         @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
         {
-            <p class="text-muted small mt-1 mb-0">@Loc.T(Model.Subtitle)</p>
+            <p class="text-muted small mt-1 mb-0">@Model.Subtitle</p>
         }
     </div>
-    @if (!string.IsNullOrWhiteSpace(Model.ActionsHtml))
+    @if (actions != null)
     {
-        <div class="d-flex gap-2">@Html.Raw(Model.ActionsHtml)</div>
+        <div class="d-flex flex-wrap gap-2">@actions</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.ActionsHtml))
+    {
+        @* Legacy string form, kept for the existing callers listed in NOTES-frontend.md. *@
+        <div class="d-flex flex-wrap gap-2">@Html.Raw(Model.ActionsHtml)</div>
     }
 </div>

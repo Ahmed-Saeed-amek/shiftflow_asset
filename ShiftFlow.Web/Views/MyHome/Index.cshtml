@@ -1,6 +1,9 @@
 @using ShiftFlow.Web.ViewModels
+@using ShiftFlow.Web.Services
 @{
     ViewData["Title"] = Loc.T("My Home");
+    // Same per-request permission set the sidebar uses — no extra AuthorizeAsync calls.
+    var perms = await Context.GetNavPermissionsAsync();
     var recentOrders = (List<MyWorkOrderRow>)ViewBag.RecentOrders;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Welcome back") + ", " + (string)ViewBag.UserName,Subtitle=Loc.T("Here's what's on your plate today")})" />
@@ -48,7 +51,41 @@
             <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-grid me-2"></i>@Loc.T("Quick Links")</div>
             <div class="list-group list-group-flush">
                 <a asp-controller="Users" asp-action="MyOrders" class="list-group-item list-group-item-action"><i class="bi bi-list-check me-2 text-muted"></i>@Loc.T("My Orders")</a>
+                <a asp-controller="Users" asp-action="MyHistory" class="list-group-item list-group-item-action"><i class="bi bi-clock-history me-2 text-muted"></i>@Loc.T("My History")</a>
+                @if (perms.CanReportAssetAction)
+                {
+                    @* WorkOrders/Report needs an assetId, and the fastest way a field user has one
+                       is the asset's own printed QR label — so this scans first, then opens the
+                       report form for whatever was scanned. *@
+                    <button type="button" class="list-group-item list-group-item-action" id="quickReportAction">
+                        <i class="bi bi-megaphone me-2 text-muted"></i>@Loc.T("Report Action")
+                        <span class="d-block small text-muted">@Loc.T("Scan an asset's QR label to report an action on it")</span>
+                    </button>
+                }
+                @* Opens the shared QR modal from _Layout (site.js lazily loads the decoder) and
+                   navigates straight to whatever asset was scanned. *@
+                <button type="button" class="list-group-item list-group-item-action" id="quickScanQr">
+                    <i class="bi bi-qr-code-scan me-2 text-muted"></i>@Loc.T("Scan QR Code")
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    var reportBtn = document.getElementById('quickReportAction');
+    if (reportBtn) {
+        reportBtn.addEventListener('click', function () {
+            window.scanAssetQr(function (asset) {
+                if (asset) window.location.href = '/WorkOrders/Report?assetId=' + asset.id;
+            });
+        });
+    }
+    document.getElementById('quickScanQr').addEventListener('click', function () {
+        window.scanAssetQr(function (asset) {
+            if (asset) window.location.href = '/Assets/Details/' + asset.id;
+        });
+    });
+</script>
+}
