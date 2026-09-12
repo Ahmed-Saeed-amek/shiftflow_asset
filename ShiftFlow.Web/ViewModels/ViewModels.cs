@@ -200,6 +200,28 @@ public class AuditLogIndexViewModel
     public PaginationModel Pagination { get; set; } = new();
 }
 
+/// <summary>One row of the contracts list. IsExpired is the single definition of the
+/// EndDate-derived status the Index view used to compute inline.</summary>
+public class ContractRow
+{
+    public int Id { get; set; }
+    public string? ContractNumber { get; set; }
+    public string? VendorName { get; set; }
+    public string ContractType { get; set; } = string.Empty;
+    public DateTime StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public int AssetCount { get; set; }
+    public bool IsExpired => EndDate != null && EndDate < DateTime.UtcNow.Date;
+    public string StatusLabel => IsExpired ? "Expired" : "Active";
+}
+
+public class ContractIndexViewModel
+{
+    public List<ContractRow> Contracts { get; set; } = [];
+    public int TotalCount { get; set; }
+    public PaginationModel Pagination { get; set; } = new();
+}
+
 public class AssetChip
 {
     public int Id { get; set; }

@@ -4,7 +4,7 @@
     var labels = (Dictionary<int, string>)ViewBag.ScopeValueLabels;
     var groupScopes = (List<GroupAssetScope>)ViewBag.GroupScopes;
     var groupLabels = (Dictionary<int, string>)ViewBag.GroupScopeValueLabels;
-    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New") + "</a>";
+    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New user scope") + "</a>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Visibility"),Subtitle=Loc.T("Restrict which assets a specific employee can see"),ActionsHtml=actionsHtml})" />
 
@@ -39,7 +39,7 @@
 
 <div class="d-flex align-items-center justify-content-between mb-2">
     <h6 class="fw-semibold mb-0">@Loc.T("By Group")</h6>
-    <a asp-action="CreateGroup" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New")</a>
+    <a asp-action="CreateGroup" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New group scope")</a>
 </div>
 <div class="form-text mb-2">@Loc.T("A member's own individual scope above always overrides their group's scope here.")</div>
 <div class="card border-0 shadow-sm">

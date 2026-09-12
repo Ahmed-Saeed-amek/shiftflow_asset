@@ -6,6 +6,8 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -15,10 +17,14 @@ public class ContractsController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly IContractService _contractService;
+    private readonly ILookupCache _lookups;
+    private readonly ILanguageService _loc;
+    private readonly ILogger<ContractsController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
-    public ContractsController(ApplicationDbContext db, IContractService contractService, UserManager<ApplicationUser> userManager)
+    public ContractsController(ApplicationDbContext db, IContractService contractService, ILookupCache lookups,
+        ILanguageService loc, ILogger<ContractsController> logger, UserManager<ApplicationUser> userManager)
     {
-        _db = db; _contractService = contractService; _userManager = userManager;
+        _db = db; _contractService = contractService; _lookups = lookups; _loc = loc; _logger = logger; _userManager = userManager;
     }
 
     private const int PageSize = 25;
@@ -27,38 +33,50 @@ public class ContractsController : Controller
     public async Task<IActionResult> Index(int page = 1)
     {
         if (page < 1) page = 1;
-        var query = _db.Contracts.Include(c => c.Vendor).Include(c => c.AssetLinks)
-            .OrderByDescending(c => c.StartDate);
+        var query = _db.Contracts.AsNoTracking().OrderByDescending(c => c.StartDate);
         var totalCount = await query.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         if (page > totalPages) page = totalPages;
-        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
-        ViewBag.TotalCount = totalCount;
 
-        var contracts = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
-        return View(contracts);
+        // Asset counts are projected rather than Include(AssetLinks) loading every link row.
+        var contracts = await query.Skip((page - 1) * PageSize).Take(PageSize)
+            .Select(c => new ContractRow
+            {
+                Id = c.Id, ContractNumber = c.ContractNumber, VendorName = c.Vendor!.Name,
+                ContractType = c.ContractType, StartDate = c.StartDate, EndDate = c.EndDate,
+                AssetCount = c.AssetLinks.Count,
+            })
+            .ToListAsync();
+
+        return View(new ContractIndexViewModel
+        {
+            Contracts = contracts,
+            TotalCount = totalCount,
+            Pagination = new PaginationModel { Page = page, TotalPages = totalPages },
+        });
     }
 
     [Authorize(Policy = PermissionCatalog.ContractView)]
     public async Task<IActionResult> ExportExcel()
     {
         var bytes = await _contractService.ExportToExcelAsync();
-        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Contracts_{DateTime.Today:yyyyMMdd}.xlsx");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Contracts_{DateTime.UtcNow:yyyyMMdd}.xlsx");
     }
 
     [Authorize(Policy = PermissionCatalog.ContractView)]
     public async Task<IActionResult> ExportPdf()
     {
         var bytes = await _contractService.ExportToPdfAsync();
-        return File(bytes, "application/pdf", $"Contracts_{DateTime.Today:yyyyMMdd}.pdf");
+        return File(bytes, "application/pdf", $"Contracts_{DateTime.UtcNow:yyyyMMdd}.pdf");
     }
 
     [Authorize(Policy = PermissionCatalog.ContractView)]
     public async Task<IActionResult> Details(int id)
     {
-        var contract = await _db.Contracts.Include(c => c.Vendor)
+        var contract = await _db.Contracts.AsNoTracking().Include(c => c.Vendor)
             .Include(c => c.AssetLinks).ThenInclude(l => l.Asset)
             .Include(c => c.Attachments)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
         if (contract == null) return NotFound();
         if (contract.ContractType == "Preventive Maintenance")
@@ -103,7 +121,7 @@ public class ContractsController : Controller
     [Authorize(Policy = PermissionCatalog.ContractManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var contract = await _db.Contracts.Include(c => c.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(c => c.Id == id);
+        var contract = await _db.Contracts.AsNoTracking().Include(c => c.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(c => c.Id == id);
         if (contract == null) return NotFound();
         await PopulateLookupsAsync();
         ViewBag.SelectedAssetChips = contract.AssetLinks
@@ -148,20 +166,57 @@ public class ContractsController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.ContractManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadAttachment(int id, List<IFormFile>? files)
     {
+        // The storage helper writes every file to disk before it inserts any row, so a bad contract
+        // id used to leave an orphan directory of uploads behind and then fail on the FK.
+        if (!await _db.Contracts.AsNoTracking().AnyAsync(c => c.Id == id)) return NotFound();
+
         var userId = _userManager.GetUserId(User)!;
-        var rejected = await ShiftFlow.Web.Services.ContractAttachmentStorage.SaveAsync(_db, id, files, userId);
+        var uploadDir = ContractAttachmentStorage.ResolvePhysicalPath($"/uploads/contracts/{id}");
+        var filesBefore = Directory.Exists(uploadDir)
+            ? Directory.GetFiles(uploadDir).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        List<(string FileName, string Reason)> rejected;
+        try
+        {
+            rejected = await ContractAttachmentStorage.SaveAsync(_db, id, files, userId);
+        }
+        catch (DbUpdateException ex)
+        {
+            // The rows never landed, so the bytes on disk are orphans — clean up whatever this
+            // request wrote rather than leaving unreferenced files behind forever.
+            DeleteOrphans(uploadDir, filesBefore);
+            _logger.LogError(ex, "Contract attachment upload failed for contract {ContractId}.", id);
+            TempData["Error"] = _loc.T("Couldn't save the attachment(s). Please try again.");
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         if (rejected.Count > 0)
             TempData["Error"] = string.Join(" ", rejected.Select(r => $"{r.FileName}: {r.Reason}"));
         else if (files is { Count: > 0 })
-            TempData["Success"] = "Attachment(s) uploaded.";
+            TempData["Success"] = _loc.T("Attachment(s) uploaded.");
         return RedirectToAction(nameof(Details), new { id });
     }
 
-    /// <summary>Downloads a contract attachment — anyone with Contract.View, same as Details.</summary>
-    [Authorize(Policy = PermissionCatalog.ContractView)]
-    public async Task<IActionResult> DownloadAttachment(int attachmentId)
+    private void DeleteOrphans(string dir, HashSet<string> keep)
     {
-        var attachment = await _db.ContractAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId);
+        if (!Directory.Exists(dir)) return;
+        foreach (var path in Directory.GetFiles(dir).Where(f => !keep.Contains(f)))
+        {
+            try { System.IO.File.Delete(path); }
+            catch (IOException ex) { _logger.LogWarning(ex, "Could not remove orphaned upload {Path}.", path); }
+            catch (UnauthorizedAccessException ex) { _logger.LogWarning(ex, "Could not remove orphaned upload {Path}.", path); }
+        }
+    }
+
+    /// <summary>Downloads a contract attachment — anyone with Contract.View, same as Details. The
+    /// attachment must belong to the contract named in the route, so a guessed attachment id can't
+    /// be fetched through an unrelated contract.</summary>
+    [Authorize(Policy = PermissionCatalog.ContractView)]
+    public async Task<IActionResult> DownloadAttachment(int id, int attachmentId)
+    {
+        var attachment = await _db.ContractAttachments.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == attachmentId && a.ContractId == id);
         if (attachment == null) return NotFound();
         var path = ShiftFlow.Web.Services.ContractAttachmentStorage.ResolvePhysicalPath(attachment.FilePath);
         if (!System.IO.File.Exists(path)) return NotFound();
@@ -185,15 +240,14 @@ public class ContractsController : Controller
     private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)
     {
         if (assetIds == null || assetIds.Count == 0) return [];
-        return await _db.Assets.Where(a => assetIds.Contains(a.Id))
+        return await _db.Assets.AsNoTracking().Where(a => assetIds.Contains(a.Id))
             .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name }).ToListAsync();
     }
 
     private async Task PopulateLookupsAsync()
     {
-        ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
-        ViewBag.NewAssetZoneOptions = await _db.Zones.Include(z => z.LocationCategory)
-            .OrderBy(z => z.LocationCategory!.Id).ThenBy(z => z.Name).ToListAsync();
+        ViewBag.Vendors = await _lookups.ActiveVendorsAsync();
+        ViewBag.Categories = await _lookups.TopLevelCategoriesAsync();
+        ViewBag.NewAssetZoneOptions = await _lookups.ZonesAsync();
     }
 }
