@@ -1,133 +1,137 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model AssetIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Assets");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
     var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetExport)).Succeeded;
-    string actionsHtml = "";
+    var hasFilter = Model.LocationCategoryId != null || Model.ZoneId != null || Model.CategoryId != null
+                    || Model.Status != null || !string.IsNullOrEmpty(Model.Q) || Model.AssignedToMe;
+
+    // Header actions: the shared export pair (outline) + a single primary "New Asset".
+    var actions = new HtmlContentBuilder();
     if (canExport)
-        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
-                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
+    {
+        actions.AppendHtml(await Html.PartialAsync("_ExportButtons",
+            new ExportButtonsModel { ExcelUrl = Url.Action("ExportExcel"), PdfUrl = Url.Action("ExportPdf") }));
+    }
     if (canManage)
-        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Asset") + "</a>";
+    {
+        Func<object?, IHtmlContent> newAsset = @<a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New Asset")</a>;
+        actions.AppendHtml(newAsset(null));
+    }
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Assets"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model='new PageHeaderWithActions { Title = Loc.T("Assets"), Subtitle = Loc.T("Every tracked asset, its zone and its current status."), Actions = actions }' />
 
 @if (Model.IsScoped)
 {
     <div class="alert alert-info small py-2"><i class="bi bi-eye me-1"></i>@Loc.T("Your view is restricted to a specific zone, area, or category assigned by your manager.")</div>
 }
 
-<form method="get" class="row g-2 mb-3 align-items-center">
-    <div class="col-auto">
-        <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm w-100 w-sm-auto" placeholder="@Loc.T("Search")" aria-label="@Loc.T("Search")" />
-    </div>
-    <div class="col-auto">
-        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Status")</option>
-            @foreach (var s in Model.Statuses)
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search")" aria-label="@Loc.T("Search")" />
+    <select name="status" class="form-select form-select-sm" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("Status")</option>
+        @foreach (var s in Model.Statuses)
+        {
+            <option value="@s" selected="@(Model.Status==s)">@Loc.T(s)</option>
+        }
+    </select>
+    <select name="categoryId" class="form-select form-select-sm" aria-label="@Loc.T("Category")">
+        <option value="">@Loc.T("Category")</option>
+        <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=Model.Categories, SelectedId=Model.CategoryId})" />
+    </select>
+    @if (Model.LocationCategoryLocked)
+    {
+        var lockedLocCat = Model.LocationCategories.FirstOrDefault();
+        <input type="hidden" name="locationCategoryId" value="@Model.LocationCategoryId" />
+        <span class="form-control form-control-sm bg-body-secondary text-muted d-inline-flex align-items-center gap-1 w-auto" title="@Loc.T("Locked to your assigned scope")">
+            <i class="bi bi-lock-fill small"></i>@(lockedLocCat != null ? Loc.LocalizedName(lockedLocCat.Name, lockedLocCat.NameAr) : Loc.T("Zone Category"))
+        </span>
+    }
+    else
+    {
+        <select name="locationCategoryId" class="form-select form-select-sm" aria-label="@Loc.T("Zone Category")">
+            <option value="">@Loc.T("Zone Category")</option>
+            @foreach (var cat in Model.LocationCategories)
             {
-                <option value="@s" selected="@(Model.Status==s)">@Loc.T(s)</option>
+                <option value="@cat.Id" selected="@(Model.LocationCategoryId==cat.Id)">@Loc.LocalizedName(cat.Name, cat.NameAr)</option>
             }
         </select>
-    </div>
-    <div class="col-auto">
-        <select name="categoryId" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Category")</option>
-            <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=Model.Categories, SelectedId=Model.CategoryId})" />
-        </select>
-    </div>
-    <div class="col-auto">
-        @if (Model.LocationCategoryLocked)
-        {
-            var lockedLocCat = Model.LocationCategories.FirstOrDefault();
-            <input type="hidden" name="locationCategoryId" value="@Model.LocationCategoryId" />
-            <div class="form-control form-control-sm bg-body-secondary text-muted d-flex align-items-center gap-1" title="@Loc.T("Locked to your assigned scope")">
-                <i class="bi bi-lock-fill small"></i>@(lockedLocCat != null ? Loc.LocalizedName(lockedLocCat.Name, lockedLocCat.NameAr) : Loc.T("Location Category"))
-            </div>
-        }
-        else
-        {
-            <select name="locationCategoryId" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">@Loc.T("Location Category")</option>
-                @foreach (var cat in Model.LocationCategories)
-                {
-                    <option value="@cat.Id" selected="@(Model.LocationCategoryId==cat.Id)">@Loc.LocalizedName(cat.Name, cat.NameAr)</option>
-                }
-            </select>
-        }
-    </div>
-    <div class="col-auto">
-        @if (Model.ZoneLocked)
-        {
-            var lockedZone = Model.Zones.FirstOrDefault();
-            <input type="hidden" name="zoneId" value="@Model.ZoneId" />
-            <div class="form-control form-control-sm bg-body-secondary text-muted d-flex align-items-center gap-1" title="@Loc.T("Locked to your assigned scope")">
-                <i class="bi bi-lock-fill small"></i>@(lockedZone?.Name ?? Loc.T("Zone"))
-            </div>
-        }
-        else
-        {
-            <select name="zoneId" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">@Loc.T("Zone")</option>
-                @foreach (var g in Model.Zones.GroupBy(z => z.LocationCategory!.Name))
-                {
-                    <optgroup label="@g.Key">
-                        @foreach (var z in g)
-                        {
-                            <option value="@z.Id" selected="@(Model.ZoneId==z.Id)">@z.Name</option>
-                        }
-                    </optgroup>
-                }
-            </select>
-        }
-    </div>
-    <div class="col-auto form-check d-flex align-items-center pt-1">
-        <input type="checkbox" class="form-check-input" id="assignedToMe" name="assignedToMe" value="true" checked="@Model.AssignedToMe" onchange="this.form.submit()" />
-        <label class="form-check-label small ms-1" for="assignedToMe">@Loc.T("Assigned to me")</label>
-    </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
-    </div>
-    @if (Model.LocationCategoryId != null || Model.ZoneId != null || Model.CategoryId != null || Model.Status != null || !string.IsNullOrEmpty(Model.Q) || Model.AssignedToMe)
-    {
-        <div class="col-auto">
-            <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")</a>
-        </div>
     }
-    <div class="col-auto ms-auto text-muted small">@Model.TotalCount @Loc.T("records")</div>
+    @if (Model.ZoneLocked)
+    {
+        var lockedZone = Model.Zones.FirstOrDefault();
+        <input type="hidden" name="zoneId" value="@Model.ZoneId" />
+        <span class="form-control form-control-sm bg-body-secondary text-muted d-inline-flex align-items-center gap-1 w-auto" title="@Loc.T("Locked to your assigned scope")">
+            <i class="bi bi-lock-fill small"></i>@(lockedZone?.Name ?? Loc.T("Zone"))
+        </span>
+    }
+    else
+    {
+        <select name="zoneId" class="form-select form-select-sm" aria-label="@Loc.T("Zone")">
+            <option value="">@Loc.T("Zone")</option>
+            @foreach (var g in Model.Zones.GroupBy(z => z.LocationCategory!.Name))
+            {
+                <optgroup label="@g.Key">
+                    @foreach (var z in g)
+                    {
+                        <option value="@z.Id" selected="@(Model.ZoneId==z.Id)">@z.Name</option>
+                    }
+                </optgroup>
+            }
+        </select>
+    }
+    <div class="form-check small mb-0 d-flex align-items-center gap-1">
+        <input type="checkbox" class="form-check-input mt-0" id="assignedToMe" name="assignedToMe" value="true" checked="@Model.AssignedToMe" />
+        <label class="form-check-label" for="assignedToMe">@Loc.T("Assigned to me")</label>
+    </div>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
 </form>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Category")</th><th class="d-none d-xl-table-cell">@Loc.T("Zone")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
-            <tbody>
-                @if (Model.Assets.Count == 0)
-                {
-                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var a in Model.Assets)
-                {
-                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = a.Id })'">
-                        <td class="small text-muted font-monospace"><a asp-action="Details" asp-route-id="@a.Id" class="d-inline-block text-truncate text-decoration-none" title="@a.AssetTag" onclick="event.stopPropagation()">@a.AssetTag</a></td>
-                        <td><span class="d-inline-block text-truncate asset-name-cell" title="@a.Name">@a.Name</span></td>
-                        <td class="d-none d-lg-table-cell">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
-                        <td class="small d-none d-xl-table-cell">@(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null) <span class="text-muted">(@(a.Zone?.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null))</span></td>
-                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@a.Status" /></td>
-                        <td onclick="event.stopPropagation()">
-                            @if (canManage)
-                            {
-                                <a asp-action="Edit" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+@if (Model.Assets.Count == 0)
+{
+    <partial name="_EmptyState" model='new EmptyStateModel {
+        Icon = "bi-box",
+        Title = hasFilter ? Loc.T("No assets match these filters") : Loc.T("No assets yet"),
+        Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : Loc.T("Add your first asset to start tracking it."),
+        ActionUrl = (!hasFilter && canManage) ? Url.Action("Create") : null,
+        ActionLabel = (!hasFilter && canManage) ? Loc.T("New Asset") : null }' />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Status")</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.Assets)
+                    {
+                        <tr class="row-link" data-href="@Url.Action("Details", new { id = a.Id })">
+                            <td data-label="@Loc.T("Asset Tag")"><a asp-action="Details" asp-route-id="@a.Id" class="fw-semibold text-decoration-none" title="@a.AssetTag">@a.AssetTag</a></td>
+                            <td data-label="@Loc.T("Name")"><span class="d-inline-block text-truncate asset-name-cell" title="@a.Name">@a.Name</span></td>
+                            <td data-label="@Loc.T("Category")" data-hide-mobile class="small">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
+                            <td data-label="@Loc.T("Zone")" class="small">
+                                @(a.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null)
+                                @if (a.Zone?.LocationCategory is { } cat)
+                                {
+                                    <span class="text-muted">(@Loc.LocalizedName(cat.Name, cat.NameAr))</span>
+                                }
+                            </td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@a.Status" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-<partial name="_Pagination" model="Model.Pagination" />
+    <partial name="_Pagination" model="Model.Pagination" />
+}
 
-<style>.asset-name-cell{max-width:320px}td a.text-truncate{max-width:160px}</style>
+<style>.asset-name-cell{max-width:320px}</style>

@@ -18,27 +18,62 @@
         "Maintenance" => "bg-warning-subtle text-warning-emphasis",
         _ => "bg-info-subtle text-info-emphasis",
     };
-}
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait"),ActionsHtml="<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-primary btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("Export PDF") + "</a>"})" />
 
+    var exportActions = await Html.PartialAsync("_ExportButtons", new ExportButtonsModel { PdfUrl = Url.Action("ExportPdf") });
+}
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = Loc.T("Executive Dashboard"),
+    Subtitle = Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait"),
+    Actions = exportActions }' />
+
+@* Every KPI is a question with an answer one list away, so each tile links to that list already
+   filtered — previously they were dead ends you had to re-find by hand in the nav. *@
 <div class="row g-3 mb-4">
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=kpis.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=Model.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Groups"),Value=kpis.ActiveGroups.ToString(),Icon="bi-people",Color="violet"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{kpis.DefectiveAssets}/{kpis.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=kpis.OpenWorkOrders.ToString(),Subtitle=kpis.CriticalOpenWorkOrders>0?$"{kpis.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Low Stock Parts"),Value=kpis.LowStockPartsCount.ToString(),Icon="bi-boxes",Color="amber"})" /></div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="Orders" asp-action="Index" asp-route-status="Open">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=kpis.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="Orders" asp-action="Index" asp-route-overdue="true">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=Model.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="Groups" asp-action="Index">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Groups"),Value=kpis.ActiveGroups.ToString(),Icon="bi-people",Color="violet"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="Assets" asp-action="Index" asp-route-status="Defective">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{kpis.DefectiveAssets}/{kpis.TotalAssets}",Icon="bi-box-seam",Color="red"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="WorkOrders" asp-action="Index">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=kpis.OpenWorkOrders.ToString(),Subtitle=kpis.CriticalOpenWorkOrders>0?$"{kpis.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" />
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a class="text-decoration-none d-block h-100" asp-controller="SpareParts" asp-action="Index" asp-route-lowStockOnly="true">
+            <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Low Stock Parts"),Value=kpis.LowStockPartsCount.ToString(),Icon="bi-boxes",Color="amber"})" />
+        </a>
+    </div>
 </div>
 
 <div class="row g-3 mb-4">
     <div class="col-12 col-md-6">
-        <div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold border-0">@Loc.T("Inspection Orders by Status")</div>
-            <div class="card-body"><div class="chart-wrap"><canvas id="orderStatusChart" aria-label="@Loc.T("Inspection Orders by Status")" role="img"></canvas></div></div></div>
+        @* h-100 on both cards (the chart card was missing it) so the pair lines up on desktop
+           instead of the chart card stopping short of the overdue list beside it. *@
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-bar-chart me-2"></i>@Loc.T("Inspection Orders by Status")</div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="orderStatusChart" aria-label="@Loc.T("Inspection Orders by Status")" role="img"></canvas></div></div>
+        </div>
     </div>
     <div class="col-12 col-md-6">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
-                <span class="fw-semibold">@Loc.T("Overdue Orders")</span>
+                <span class="fw-semibold"><i class="bi bi-alarm me-2"></i>@Loc.T("Overdue Orders")</span>
                 <a asp-controller="Orders" asp-action="Index" asp-route-overdue="true" class="small text-decoration-none">@Loc.T("View all")</a>
             </div>
             <div class="list-group list-group-flush">
@@ -55,7 +90,7 @@
                                     @o.OrderNumber
                                     <span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span>
                                 </div>
-                                <div class="small text-muted">@(o.AssignedToLabel ?? "—") · @Loc.T("Due") @o.DueDate?.ToString("dd/MM/yyyy")</div>
+                                <div class="small text-muted">@(o.AssignedToLabel ?? "—") · @Loc.T("Due") @(o.DueDate is { } due ? Loc.TDate(due.ToString("dd/MM/yyyy")) : "—")</div>
                             </div>
                             <partial name="_StatusBadge" model="@o.Status" />
                         </div>
@@ -69,8 +104,9 @@
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-0">
-                <span class="fw-semibold">@Loc.T("Recent Orders")</span>
+            <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
+                <span class="fw-semibold"><i class="bi bi-clock-history me-2"></i>@Loc.T("Recent Orders")</span>
+                <a asp-controller="Orders" asp-action="Index" class="small text-decoration-none">@Loc.T("View all")</a>
             </div>
             <div class="list-group list-group-flush">
                 @if (recentOrders.Count == 0)

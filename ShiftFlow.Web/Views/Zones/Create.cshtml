@@ -1,6 +1,9 @@
-@model ZoneViewModel
+﻿@model ZoneViewModel
 @{ ViewData["Title"] = Loc.T("New Zone"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Zone")})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("New Zone"),
+    Subtitle = Loc.T("Add a zone and, optionally, pin it on the map."),
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Zones"), Url.Action("Index")), (Loc.T("New Zone"), null) } }' />
 <partial name="_Form" model="Model" />
 
 @section Scripts {

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,10 +30,30 @@ public class ContractsController : Controller
     private const int PageSize = 25;
 
     [Authorize(Policy = PermissionCatalog.ContractView)]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int page = 1, string? q = null, int? vendorId = null,
+        string? contractType = null, string? status = null)
     {
         if (page < 1) page = 1;
-        var query = _db.Contracts.AsNoTracking().OrderByDescending(c => c.StartDate);
+        var filtered = _db.Contracts.AsNoTracking().AsQueryable();
+        if (vendorId is > 0)
+            filtered = filtered.Where(c => c.VendorId == vendorId);
+        if (!string.IsNullOrWhiteSpace(contractType))
+            filtered = filtered.Where(c => c.ContractType == contractType);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            // Same rule ContractRow.StatusLabel applies, pushed into SQL so paging/count agree.
+            var today = DateTime.UtcNow.Date;
+            filtered = status == "Expired"
+                ? filtered.Where(c => c.EndDate != null && c.EndDate < today)
+                : filtered.Where(c => c.EndDate == null || c.EndDate >= today);
+        }
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            filtered = filtered.Where(c => (c.ContractNumber != null && c.ContractNumber.Contains(term))
+                                        || (c.Vendor != null && c.Vendor.Name.Contains(term)));
+        }
+        var query = filtered.OrderByDescending(c => c.StartDate);
         var totalCount = await query.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         if (page > totalPages) page = totalPages;
@@ -53,6 +73,11 @@ public class ContractsController : Controller
             Contracts = contracts,
             TotalCount = totalCount,
             Pagination = new PaginationModel { Page = page, TotalPages = totalPages },
+            Q = q,
+            VendorId = vendorId,
+            ContractType = contractType,
+            Status = status,
+            Vendors = await _lookups.ActiveVendorsAsync(),
         });
     }
 

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,17 +33,35 @@ public class RecurringOrdersController : Controller
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q = null, int? orderTypeId = null, string? status = null)
     {
-        var schedules = await _db.RecurringOrders.AsNoTracking()
+        var query = _db.RecurringOrders.AsNoTracking()
             .Include(r => r.OrderType)
             .Include(r => r.AssetLinks)
             .Include(r => r.AssignedToUser)
             .Include(r => r.AssignedToGroup)
             .Include(r => r.Vendor)
-            .OrderByDescending(r => r.CreatedDate)
-            .ToListAsync();
-        return View(schedules);
+            .AsQueryable();
+        if (orderTypeId is > 0)
+            query = query.Where(r => r.OrderTypeId == orderTypeId);
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(r => r.IsActive == (status == "Active"));
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            query = query.Where(r => r.OrderType!.Name.Contains(term)
+                                  || (r.OrderType.NameAr != null && r.OrderType.NameAr.Contains(term)));
+        }
+        var schedules = await query.OrderByDescending(r => r.CreatedDate).ToListAsync();
+        return View(new RecurringOrderIndexViewModel
+        {
+            Schedules = schedules,
+            TotalCount = schedules.Count,
+            Q = q,
+            OrderTypeId = orderTypeId,
+            Status = status,
+            OrderTypes = await _lookups.ActiveOrderTypesAsync(),
+        });
     }
 
     public async Task<IActionResult> Create()

@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model ZoneDetailsViewModel
 @inject IAuthorizationService AuthZ
 @{
@@ -6,18 +7,25 @@
     var localizedName = Loc.LocalizedName(zone.Name, zone.NameAr);
     ViewData["Title"] = localizedName;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
-    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = zone.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
     var categoryLocalized = zone.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null;
+
+    Func<object?, IHtmlContent> editBtn = @<a href="@Url.Action("Edit", new { id = zone.Id })" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>@Loc.T("Edit")</a>;
+    var actions = new HtmlContentBuilder();
+    if (canManage) { actions.AppendHtml(editBtn(null)); }
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
 
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=localizedName,Subtitle=categoryLocalized,ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = localizedName,
+    Subtitle = categoryLocalized,
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Zones"), Url.Action("Index")), (localizedName, null) },
+    Actions = actions }' />
 
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
-                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(zone.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Location Category")</span><span class="small fw-semibold">@categoryLocalized</span></div>
+                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(zone.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Zone Category")</span><span class="small fw-semibold">@categoryLocalized</span></div>
                 @if (!string.IsNullOrWhiteSpace(zone.Address))
                 {
                     <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Address")</span><span class="small fw-semibold text-end">@zone.Address</span></div>
@@ -46,22 +54,22 @@
     </div>
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Assets")</div>
+            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-box me-2"></i>@Loc.T("Assets")</div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 table-card-stack">
                     <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Status")</th></tr></thead>
                     <tbody>
                         @if (Model.Assets.Count == 0)
                         {
-                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No assets in this zone yet")</td></tr>
                         }
                         @foreach (var a in Model.Assets)
                         {
-                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "Assets", new { id = a.Id })'">
-                                <td class="small font-monospace">@a.AssetTag</td>
-                                <td>@a.Name</td>
-                                <td class="small">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
-                                <td><partial name="_StatusBadge" model="@a.Status" /></td>
+                            <tr class="row-link" data-href="@Url.Action("Details", "Assets", new { id = a.Id })">
+                                <td data-label="@Loc.T("Asset Tag")"><a asp-controller="Assets" asp-action="Details" asp-route-id="@a.Id" class="fw-semibold text-decoration-none">@a.AssetTag</a></td>
+                                <td data-label="@Loc.T("Name")">@a.Name</td>
+                                <td data-label="@Loc.T("Category")" data-hide-mobile class="small">@(a.Category is { } aCat ? Loc.LocalizedName(aCat.Name, aCat.NameAr) : null)</td>
+                                <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@a.Status" /></td>
                             </tr>
                         }
                     </tbody>

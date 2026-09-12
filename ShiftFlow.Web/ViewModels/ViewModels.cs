@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using ShiftFlow.Application.Services;
@@ -38,7 +38,7 @@ public class KpiCardModel
     public string Color { get; set; } = "primary";
 }
 
-public class PageHeaderModel
+public partial class PageHeaderModel
 {
     public string Title { get; set; } = string.Empty;
     public string? Subtitle { get; set; }
@@ -174,6 +174,12 @@ public class ZoneIndexViewModel
     public List<ZoneRow> Zones { get; set; } = [];
     public int TotalCount { get; set; }
     public PaginationModel Pagination { get; set; } = new();
+    /// <summary>Free-text filter over zone name (EN/AR) and address.</summary>
+    public string? Q { get; set; }
+    /// <summary>Selected zone-category filter ("Zone Category" in the UI).</summary>
+    public int? LocationCategoryId { get; set; }
+    /// <summary>Options for the zone-category filter.</summary>
+    public List<LocationCategory> LocationCategories { get; set; } = [];
 }
 
 /// <summary>Zone details with its in-scope assets passed alongside, rather than Included on the
@@ -220,6 +226,26 @@ public class ContractIndexViewModel
     public List<ContractRow> Contracts { get; set; } = [];
     public int TotalCount { get; set; }
     public PaginationModel Pagination { get; set; } = new();
+    /// <summary>Free-text filter over contract number and vendor name.</summary>
+    public string? Q { get; set; }
+    public int? VendorId { get; set; }
+    public string? ContractType { get; set; }
+    /// <summary>"Active" or "Expired" — matches ContractRow.StatusLabel.</summary>
+    public string? Status { get; set; }
+    public List<Vendor> Vendors { get; set; } = [];
+}
+
+/// <summary>Filters + the matching recurring schedules for RecurringOrders/Index.</summary>
+public class RecurringOrderIndexViewModel
+{
+    public List<RecurringOrder> Schedules { get; set; } = [];
+    public int TotalCount { get; set; }
+    /// <summary>Free-text filter over the order type name.</summary>
+    public string? Q { get; set; }
+    public int? OrderTypeId { get; set; }
+    /// <summary>"Active" or "Inactive".</summary>
+    public string? Status { get; set; }
+    public List<OrderType> OrderTypes { get; set; } = [];
 }
 
 public class AssetChip

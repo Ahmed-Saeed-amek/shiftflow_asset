@@ -1,14 +1,14 @@
-@model List<OrderType>
+﻿@model List<OrderType>
 @{
     ViewData["Title"] = Loc.T("Order Types");
     string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#orderTypeModal' data-modal-create='orderTypeModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order Type") + "</button>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Order Types"),Subtitle=Loc.T("Shared by Inspection Orders and Maintenance Orders"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Order Types"),Subtitle=Loc.T("Shared by Inspection Orders and Maintenance Orders."),ActionsHtml=actionsHtml})" />
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th></th><th>@Loc.T("Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Prefix")</th><th class="d-none d-xl-table-cell">@Loc.T("Direct Fix")</th><th class="d-none d-xl-table-cell">@Loc.T("Assets")</th><th class="d-none d-xl-table-cell">@Loc.T("Assign To")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
+        <table class="table table-hover align-middle mb-0 table-card-stack">
+            <thead><tr><th></th><th>@Loc.T("Name")</th><th>@Loc.T("Prefix")</th><th>@Loc.T("Direct Fix")</th><th>@Loc.T("Assets")</th><th>@Loc.T("Assign To")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
@@ -17,28 +17,39 @@
                 @foreach (var t in Model)
                 {
                     <tr>
-                        <td><span class="d-inline-block rounded-circle" style="width:14px;height:14px;background-color:@t.Color" title="@t.Color"></span></td>
-                        <td>@Loc.LocalizedName(t.Name, t.NameAr)</td>
-                        <td class="small font-monospace d-none d-lg-table-cell">@t.Prefix</td>
-                        <td class="d-none d-xl-table-cell">@(t.IsDirectFix ? Loc.T("Yes") : Loc.T("No"))</td>
-                        <td class="small d-none d-xl-table-cell">@(t.AllowsMultipleAssets ? Loc.T("Multiple") : Loc.T("Single"))</td>
-                        <td class="small d-none d-xl-table-cell">@Loc.T(t.AssignmentMode)</td>
-                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
-                        <td class="text-nowrap">
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
-                                    data-modal-edit="orderTypeModal"
-                                    data-id="@t.Id" data-name="@t.Name" data-name-ar="@t.NameAr" data-prefix="@t.Prefix"
-                                    data-sort-order="@t.SortOrder" data-tracks-defect-outcome="@(t.TracksDefectOutcome ? "true" : "false")"
-                                    data-requires-vendor="@(t.RequiresVendor ? "true" : "false")" data-is-active="@(t.IsActive ? "true" : "false")"
-                                    data-is-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-allows-multiple-assets="@(t.AllowsMultipleAssets ? "true" : "false")"
-                                    data-assignment-mode="@t.AssignmentMode" data-requires-approval="@(t.RequiresApproval ? "true" : "false")">
-                                @Loc.T("Edit")
-                            </button>
-                            <form method="post" asp-action="Delete" asp-route-id="@t.Id" class="d-inline"
-                                  onsubmit="return confirm('@Loc.T("Delete this order type? Only allowed if no orders or schedules use it.")')">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="@Loc.T("Delete")"><i class="bi bi-trash"></i></button>
-                            </form>
+                        <td data-label="@Loc.T("Colour")"><span class="d-inline-block rounded-circle" style="width:14px;height:14px;background-color:@t.Color" title="@t.Color"></span></td>
+                        <td data-label="@Loc.T("Name")" class="fw-semibold">@Loc.LocalizedName(t.Name, t.NameAr)</td>
+                        <td data-label="@Loc.T("Prefix")" class="small fw-semibold">@t.Prefix</td>
+                        @* "Yes / No" and "Single / Multiple" said nothing on their own — spell out what
+                           the flag actually means, in the same words the edit modal uses. *@
+                        <td data-label="@Loc.T("Direct Fix")" class="small">@(t.IsDirectFix ? Loc.T("Direct fix") : Loc.T("Survey"))</td>
+                        <td data-label="@Loc.T("Assets")" class="small">@(t.AllowsMultipleAssets ? Loc.T("Multiple assets") : Loc.T("Single asset"))</td>
+                        <td data-label="@Loc.T("Assign To")" data-hide-mobile class="small">@Loc.T(t.AssignmentMode)</td>
+                        <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="text-end">
+                            <div class="dropdown row-actions">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
+                                                data-modal-edit="orderTypeModal"
+                                                data-id="@t.Id" data-name="@t.Name" data-name-ar="@t.NameAr" data-prefix="@t.Prefix"
+                                                data-sort-order="@t.SortOrder" data-tracks-defect-outcome="@(t.TracksDefectOutcome ? "true" : "false")"
+                                                data-requires-vendor="@(t.RequiresVendor ? "true" : "false")" data-is-active="@(t.IsActive ? "true" : "false")"
+                                                data-is-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-allows-multiple-assets="@(t.AllowsMultipleAssets ? "true" : "false")"
+                                                data-assignment-mode="@t.AssignmentMode" data-requires-approval="@(t.RequiresApproval ? "true" : "false")">
+                                            <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                        </button>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="post" asp-action="Delete" asp-route-id="@t.Id" class="m-0">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-danger" data-confirm="@Loc.T("Delete this order type? Only allowed if no orders or schedules use it.")"><i class="bi bi-trash me-2"></i>@Loc.T("Delete")</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
                         </td>
                     </tr>
                 }
@@ -62,19 +73,19 @@
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Name")</label>
+                            <label class="form-label required" for="otName">@Loc.T("Name")</label>
                             <input name="Name" id="otName" class="form-control" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <label class="form-label" for="otNameAr">@Loc.T("Name (Arabic)")</label>
                             <input name="NameAr" id="otNameAr" class="form-control" dir="rtl" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Order Number Prefix")</label>
+                            <label class="form-label required" for="otPrefix">@Loc.T("Order Number Prefix")</label>
                             <input name="Prefix" id="otPrefix" class="form-control" placeholder="INS" required maxlength="10" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small">@Loc.T("Sort Order")</label>
+                            <label class="form-label" for="otSortOrder">@Loc.T("Sort Order")</label>
                             <input name="SortOrder" id="otSortOrder" type="number" class="form-control" value="0" />
                         </div>
                         <div class="col-12">
@@ -97,7 +108,7 @@
                             <div class="form-check">
                                 <input type="checkbox" name="RequiresApproval" id="otRequiresApproval" class="form-check-input" value="true" />
                                 <label class="form-check-label small" for="otRequiresApproval">@Loc.T("Requires manager approval before closing")</label>
-                                <div class="form-text" id="otRequiresApprovalHint" style="display:none">@Loc.T("Redundant here — a vendor-routed order already needs a manager's Confirm step before it closes.")</div>
+                                <div class="help-text" id="otRequiresApprovalHint" style="display:none">@Loc.T("Redundant here — a vendor-routed order already needs a manager's Confirm step before it closes.")</div>
                             </div>
                             <div class="form-check">
                                 <input type="checkbox" name="IsActive" id="otIsActive" class="form-check-input" value="true" checked />
@@ -106,7 +117,7 @@
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Assign To")</label>
+                            <label class="form-label" for="otAssignmentMode">@Loc.T("Assign To")</label>
                             <select name="AssignmentMode" id="otAssignmentMode" class="form-select">
                                 <option value="Either">@Loc.T("Either (Employee or Group)")</option>
                                 <option value="EmployeeOnly">@Loc.T("Employee only")</option>

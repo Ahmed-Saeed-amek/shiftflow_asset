@@ -1,31 +1,44 @@
-@model List<AssetActionType>
+﻿@model List<AssetActionType>
 @{
     var category = (AssetCategory)ViewBag.Category;
     ViewData["Title"] = Loc.T("Manage Actions");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Manage Actions"),Subtitle=Loc.LocalizedName(category.Name, category.NameAr)})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("Manage Actions"),
+    Subtitle = Loc.LocalizedName(category.Name, category.NameAr),
+    Breadcrumbs = new List<(string Label, string? Url)> {
+        (Loc.T("Asset Categories"), Url.Action("Index", "AssetCategories")),
+        (Loc.LocalizedName(category.Name, category.NameAr), null),
+        (Loc.T("Manage Actions"), null) } }' />
 
 <div class="row g-3">
     @foreach (var actionType in Model)
     {
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
-                    <span class="fw-semibold">@actionType.Name</span>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 gap-2">
+                    <span class="fw-semibold"><i class="bi bi-wrench-adjustable me-2"></i>@actionType.Name</span>
                     <div class="d-flex align-items-center gap-2">
                         <partial name="_StatusBadge" model="@(actionType.IsActive ? "Active" : "Inactive")" />
-                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeEditModal"
-                                data-modal-edit="actionTypeEditModal"
-                                data-id="@actionType.Id" data-name="@actionType.Name" data-name-ar="@actionType.NameAr"
-                                data-is-active="@(actionType.IsActive ? "true" : "false")">
-                            @Loc.T("Edit")
-                        </button>
+                        <div class="dropdown row-actions">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#actionTypeEditModal"
+                                            data-modal-edit="actionTypeEditModal"
+                                            data-id="@actionType.Id" data-name="@actionType.Name" data-name-ar="@actionType.NameAr"
+                                            data-is-active="@(actionType.IsActive ? "true" : "false")">
+                                        <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
                 <div class="list-group list-group-flush">
                     @if (actionType.Causes.Count == 0)
                     {
-                        <div class="list-group-item text-muted small text-center py-2">@Loc.T("No records found")</div>
+                        <div class="list-group-item text-muted small text-center py-2">@Loc.T("No causes yet")</div>
                     }
                     @foreach (var cause in actionType.Causes.OrderBy(c => c.Name))
                     {
@@ -33,12 +46,19 @@
                             <span class="small">@cause.Name</span>
                             <div class="d-flex align-items-center gap-2">
                                 <partial name="_StatusBadge" model="@(cause.IsActive ? "Active" : "Inactive")" />
-                                <button type="button" class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#causeEditModal"
-                                        data-modal-edit="causeEditModal"
-                                        data-id="@cause.Id" data-name="@cause.Name" data-name-ar="@cause.NameAr"
-                                        data-is-active="@(cause.IsActive ? "true" : "false")">
-                                    @Loc.T("Edit")
-                                </button>
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#causeEditModal"
+                                                    data-modal-edit="causeEditModal"
+                                                    data-id="@cause.Id" data-name="@cause.Name" data-name-ar="@cause.NameAr"
+                                                    data-is-active="@(cause.IsActive ? "true" : "false")">
+                                                <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     }
@@ -48,7 +68,7 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="ActionTypeId" value="@actionType.Id" />
                         <input type="text" name="Name" class="form-control form-control-sm" placeholder="@Loc.T("New Cause")" required />
-                        <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">+ @Loc.T("Cause")</button>
+                        <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Cause")</button>
                     </form>
                 </div>
             </div>
@@ -56,13 +76,13 @@
     }
     <div class="col-md-6">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white fw-semibold border-0">@Loc.T("New Action Type")</div>
+            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Action Type")</div>
             <div class="card-body">
                 <form method="post" asp-action="Create" class="d-flex gap-2">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="CategoryId" value="@category.Id" />
                     <input type="text" name="Name" class="form-control form-control-sm" placeholder="@Loc.T("Name")" required />
-                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">+ @Loc.T("Action Type")</button>
+                    <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Add")</button>
                 </form>
             </div>
         </div>

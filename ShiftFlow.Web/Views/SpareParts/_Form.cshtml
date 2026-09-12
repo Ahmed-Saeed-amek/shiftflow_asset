@@ -1,4 +1,4 @@
-@model SparePartViewModel
+﻿@model SparePartViewModel
 @{
     // Stock only shown/editable here on Create — Edit's form leaves it out entirely so a catalog-
     // metadata edit can never accidentally change the on-hand count; use the Details page's
@@ -13,27 +13,27 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Name")</label>
+                    <label asp-for="Name" class="form-label required">@Loc.T("Name")</label>
                     <input asp-for="Name" class="form-control" />
                     <span asp-validation-for="Name" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                    <label asp-for="NameAr" class="form-label">@Loc.T("Name (Arabic)")</label>
                     <input asp-for="NameAr" class="form-control" dir="rtl" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("SKU")</label>
+                    <label asp-for="Sku" class="form-label">@Loc.T("SKU")</label>
                     <input asp-for="Sku" class="form-control" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Unit Cost")</label>
+                    <label asp-for="UnitCost" class="form-label">@Loc.T("Unit Cost")</label>
                     <input asp-for="UnitCost" type="number" step="0.01" class="form-control" />
                     <span asp-validation-for="UnitCost" class="text-danger small"></span>
                 </div>
                 @if (isCreate)
                 {
                     <div class="col-md-4">
-                        <label class="form-label small">@Loc.T("Initial Stock Quantity")</label>
+                        <label asp-for="StockQuantity" class="form-label">@Loc.T("Initial Stock Quantity")</label>
                         <input asp-for="StockQuantity" type="number" min="0" class="form-control" />
                         <span asp-validation-for="StockQuantity" class="text-danger small"></span>
                     </div>
@@ -41,26 +41,26 @@
                 else
                 {
                     <div class="col-md-4 d-flex align-items-end">
-                        <div class="form-text mb-2">@Loc.T("Adjust stock quantity from the Details page.")</div>
+                        <div class="help-text mb-2">@Loc.T("Adjust stock quantity from the Details page.")</div>
                     </div>
                 }
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Reorder Threshold")</label>
+                    <label asp-for="ReorderThreshold" class="form-label">@Loc.T("Reorder Threshold")</label>
                     <input asp-for="ReorderThreshold" type="number" min="0" class="form-control" />
                     <span asp-validation-for="ReorderThreshold" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4 d-flex align-items-end">
                     <div class="form-check">
                         <input asp-for="IsActive" class="form-check-input" type="checkbox" />
-                        <label class="form-check-label small" asp-for="IsActive">@Loc.T("Active")</label>
+                        <label class="form-check-label" asp-for="IsActive">@Loc.T("Active")</label>
                     </div>
                 </div>
                 <div class="col-12">
-                    <label class="form-label small">@Loc.T("Compatible Assets")</label>
+                    <label class="form-label">@Loc.T("Compatible Assets")</label>
                     <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search assets this part fits…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
                 <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

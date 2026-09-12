@@ -1,4 +1,7 @@
-@model SparePartViewModel
+﻿@model SparePartViewModel
 @{ ViewData["Title"] = Loc.T("New Spare Part"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Spare Part")})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("New Spare Part"),
+    Subtitle = Loc.T("Add a part to the stock catalog."),
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Spare Parts"), Url.Action("Index")), (Loc.T("New Spare Part"), null) } }' />
 <partial name="_Form" model="Model" />

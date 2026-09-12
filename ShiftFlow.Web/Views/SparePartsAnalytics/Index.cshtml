@@ -7,31 +7,38 @@
     var totalCost = (decimal)ViewBag.TotalCost;
     var hasUncostedRows = (bool)ViewBag.HasUncostedRows;
     var categories = (List<AssetCategory>)ViewBag.Categories;
+    var from = (DateTime?)ViewBag.From;
+    var to = (DateTime?)ViewBag.To;
+    var categoryId = (int?)ViewBag.CategoryId;
+    var hasFilter = from != null || to != null || categoryId != null;
+    var noUsageTitle = Loc.T("No usage recorded yet");
+    var noUsageText = Loc.T("Parts consumed on work orders appear here once they are recorded.");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts Analytics")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts Analytics"),Subtitle=Loc.T("Where spare parts are going, and what they cost.")})" />
 
-<form method="get" class="row g-2 mb-3 align-items-end">
-    <div class="col-6 col-md-3">
-        <label class="form-label small">@Loc.T("From")</label>
-        <input type="date" name="from" value="@(((DateTime?)ViewBag.From)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
-    </div>
-    <div class="col-6 col-md-3">
-        <label class="form-label small">@Loc.T("To")</label>
-        <input type="date" name="to" value="@(((DateTime?)ViewBag.To)?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
-    </div>
-    <div class="col-6 col-md-3">
-        <label class="form-label small">@Loc.T("Category")</label>
-        <select name="categoryId" class="form-select form-select-sm">
-            <option value="">@Loc.T("All Categories")</option>
-            @foreach (var c in categories)
-            {
-                <option value="@c.Id" selected="@(((int?)ViewBag.CategoryId) == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
-            }
-        </select>
-    </div>
-    <div class="col-6 col-md-3">
-        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">@Loc.T("Filter")</button>
-    </div>
+@* Same .filter-bar shell as the list pages; the two date fields keep visible inline labels
+   because "From"/"To" cannot be carried by a date input's placeholder. *@
+<form method="get" class="filter-bar">
+    <label class="d-inline-flex align-items-center gap-1 small text-muted mb-0">
+        @Loc.T("From")
+        <input type="date" name="from" value="@(from?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+    </label>
+    <label class="d-inline-flex align-items-center gap-1 small text-muted mb-0">
+        @Loc.T("To")
+        <input type="date" name="to" value="@(to?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+    </label>
+    <select name="categoryId" class="form-select form-select-sm" aria-label="@Loc.T("Category")">
+        <option value="">@Loc.T("All Categories")</option>
+        @foreach (var c in categories)
+        {
+            <option value="@c.Id" selected="@(categoryId == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
 </form>
 
 @if (hasUncostedRows)
@@ -50,77 +57,86 @@
 
 <div class="tab-content">
     <div class="tab-pane fade show active" id="mostUsedTab">
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>@Loc.T("Spare Part")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Times Used")</th><th class="d-none d-md-table-cell">@Loc.T("Total Cost")</th></tr></thead>
-                    <tbody>
-                        @if (mostUsed.Count == 0)
-                        {
-                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
-                        }
-                        @foreach (var m in mostUsed)
-                        {
-                            <tr onclick="location.href='@Url.Action("Details", "SpareParts", new { id = m.SparePartId })'" class="cursor-pointer">
-                                <td class="small">@m.Name</td>
-                                <td class="small">@m.TotalQuantity</td>
-                                <td class="d-none d-sm-table-cell small">@m.UsageCount</td>
-                                <td class="d-none d-md-table-cell small">@m.TotalCost.ToString("0.00")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        @if (mostUsed.Count == 0)
+        {
+            <partial name="_EmptyState" model='new EmptyStateModel { Icon = "bi-box-seam", Title = noUsageTitle, Text = noUsageText }' />
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
+                        <thead><tr><th>@Loc.T("Spare Part")</th><th>@Loc.T("Total Quantity")</th><th>@Loc.T("Times Used")</th><th>@Loc.T("Total Cost")</th></tr></thead>
+                        <tbody>
+                            @foreach (var m in mostUsed)
+                            {
+                                <tr class="row-link" data-href="@Url.Action("Details", "SpareParts", new { id = m.SparePartId })">
+                                    <td data-label="@Loc.T("Spare Part")" class="fw-semibold">@m.Name</td>
+                                    <td data-label="@Loc.T("Total Quantity")" class="small">@m.TotalQuantity</td>
+                                    <td data-label="@Loc.T("Times Used")" class="small">@m.UsageCount</td>
+                                    <td data-label="@Loc.T("Total Cost")" class="small">@m.TotalCost.ToString("0.00")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        }
     </div>
 
     <div class="tab-pane fade" id="byAssetTab">
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>@Loc.T("Asset")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Distinct Parts")</th><th class="d-none d-md-table-cell">@Loc.T("Total Cost")</th></tr></thead>
-                    <tbody>
-                        @if (byAsset.Count == 0)
-                        {
-                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
-                        }
-                        @foreach (var a in byAsset)
-                        {
-                            <tr onclick="location.href='@Url.Action("Details", "Assets", new { id = a.AssetId })'" class="cursor-pointer">
-                                <td class="small">@a.AssetLabel</td>
-                                <td class="small">@a.TotalQuantity</td>
-                                <td class="d-none d-sm-table-cell small">@a.DistinctParts</td>
-                                <td class="d-none d-md-table-cell small">@a.TotalCost.ToString("0.00")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        @if (byAsset.Count == 0)
+        {
+            <partial name="_EmptyState" model='new EmptyStateModel { Icon = "bi-box-seam", Title = noUsageTitle, Text = noUsageText }' />
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
+                        <thead><tr><th>@Loc.T("Asset")</th><th>@Loc.T("Total Quantity")</th><th>@Loc.T("Distinct Parts")</th><th>@Loc.T("Total Cost")</th></tr></thead>
+                        <tbody>
+                            @foreach (var a in byAsset)
+                            {
+                                <tr class="row-link" data-href="@Url.Action("Details", "Assets", new { id = a.AssetId })">
+                                    <td data-label="@Loc.T("Asset")" class="fw-semibold">@a.AssetLabel</td>
+                                    <td data-label="@Loc.T("Total Quantity")" class="small">@a.TotalQuantity</td>
+                                    <td data-label="@Loc.T("Distinct Parts")" class="small">@a.DistinctParts</td>
+                                    <td data-label="@Loc.T("Total Cost")" class="small">@a.TotalCost.ToString("0.00")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        }
     </div>
 
     <div class="tab-pane fade" id="byCategoryTab">
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>@Loc.T("Category")</th><th>@Loc.T("Total Quantity")</th><th class="d-none d-sm-table-cell">@Loc.T("Total Cost")</th></tr></thead>
-                    <tbody>
-                        @if (byCategory.Count == 0)
-                        {
-                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No usage recorded yet")</td></tr>
-                        }
-                        @foreach (var c in byCategory)
-                        {
-                            <tr>
-                                <td class="small">@c.CategoryLabel</td>
-                                <td class="small">@c.TotalQuantity</td>
-                                <td class="d-none d-sm-table-cell small">@c.TotalCost.ToString("0.00")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        @if (byCategory.Count == 0)
+        {
+            <partial name="_EmptyState" model='new EmptyStateModel { Icon = "bi-box-seam", Title = noUsageTitle, Text = noUsageText }' />
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
+                        <thead><tr><th>@Loc.T("Category")</th><th>@Loc.T("Total Quantity")</th><th>@Loc.T("Total Cost")</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in byCategory)
+                            {
+                                <tr>
+                                    <td data-label="@Loc.T("Category")" class="fw-semibold">@c.CategoryLabel</td>
+                                    <td data-label="@Loc.T("Total Quantity")" class="small">@c.TotalQuantity</td>
+                                    <td data-label="@Loc.T("Total Cost")" class="small">@c.TotalCost.ToString("0.00")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        }
     </div>
 
     <div class="tab-pane fade" id="costTab">
@@ -130,7 +146,7 @@
             </div>
             <div class="col-md-8">
                 <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header bg-white fw-semibold border-0">@Loc.T("Monthly Cost Trend")</div>
+                    <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-graph-up me-2"></i>@Loc.T("Monthly Cost Trend")</div>
                     <div class="card-body"><div class="chart-wrap"><canvas id="costTrendChart" aria-label="@Loc.T("Monthly Cost Trend")" role="img"></canvas></div></div>
                 </div>
             </div>

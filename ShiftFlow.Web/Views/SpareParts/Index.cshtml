@@ -1,69 +1,85 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model SparePartIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Spare Parts");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.SparePartManage)).Succeeded;
-    string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Spare Part") + "</a>"
-        : "";
     var lowStockOnly = Model.LowStockOnly;
+    var hasFilter = lowStockOnly || !string.IsNullOrEmpty(Model.Q);
+
+    Func<object?, IHtmlContent> newPart = @<a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New Spare Part")</a>;
+    var actions = new HtmlContentBuilder();
+    if (canManage) { actions.AppendHtml(newPart(null)); }
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = Loc.T("Spare Parts"),
+    Subtitle = Loc.T("Stock levels and reorder thresholds for every part."),
+    Actions = actions }' />
 
-<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-    <div class="btn-group btn-group-sm" role="group">
-        <a href="@Url.Action("Index")" class="btn @(lowStockOnly ? "btn-outline-secondary" : "btn-secondary")">@Loc.T("All")</a>
-        <a href="@Url.Action("Index", new { lowStockOnly = true })" class="btn @(lowStockOnly ? "btn-danger" : "btn-outline-danger")">@Loc.T("Low Stock Only")</a>
+@* "Low stock only" was a two-button toggle group sitting outside the search form; as a checkbox
+   inside the one filter bar it submits together with the search term instead of discarding it. *@
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm"
+           placeholder="@Loc.T("Search by name or SKU")" aria-label="@Loc.T("Search by name or SKU")" />
+    <div class="form-check small mb-0 d-flex align-items-center gap-1">
+        <input type="checkbox" class="form-check-input mt-0" id="lowStockOnly" name="lowStockOnly" value="true" checked="@lowStockOnly" />
+        <label class="form-check-label" for="lowStockOnly">@Loc.T("Low stock only")</label>
     </div>
-    <form method="get" class="d-flex gap-2 flex-grow-1 w-100 w-sm-auto">
-        @if (lowStockOnly) { <input type="hidden" name="lowStockOnly" value="true" /> }
-        <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm w-100 w-sm-auto"
-               placeholder="@Loc.T("Search by name or SKU")" aria-label="@Loc.T("Search by name or SKU")" />
-        <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">@Loc.T("Search")</button>
-    </form>
-</div>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
+</form>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>@Loc.T("Name")</th>
-                    <th class="d-none d-sm-table-cell">@Loc.T("SKU")</th>
-                    <th>@Loc.T("Stock")</th>
-                    <th class="d-none d-md-table-cell">@Loc.T("Reorder Threshold")</th>
-                    <th>@Loc.T("Status")</th>
-                    <th class="text-end"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model.Parts.Count == 0)
-                {
-                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var p in Model.Parts)
-                {
-                    var isLow = p.IsLowStock;
-                    <tr class="cursor-pointer @(isLow ? "table-danger" : "")" onclick="location.href='@Url.Action("Details", new { id = p.Id })'">
-                        <td class="small"><a asp-action="Details" asp-route-id="@p.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@Loc.LocalizedName(p.Name, p.NameAr)</a></td>
-                        <td class="d-none d-sm-table-cell small font-monospace">@p.Sku</td>
-                        <td class="small">
-                            @p.StockQuantity
-                            @if (isLow)
-                            {
-                                <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-1">
-                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>@Loc.T("Low")
-                                </span>
-                            }
-                        </td>
-                        <td class="d-none d-md-table-cell small">@(p.ReorderThreshold?.ToString() ?? "—")</td>
-                        <td><partial name="_StatusBadge" model="@(p.IsActive ? "Active" : "Inactive")" /></td>
-                        <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
+@if (Model.Parts.Count == 0)
+{
+    <partial name="_EmptyState" model='new EmptyStateModel {
+        Icon = "bi-box-seam",
+        Title = hasFilter ? Loc.T("No spare parts match these filters") : Loc.T("No spare parts yet"),
+        Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : Loc.T("Add a part to start tracking its stock level."),
+        ActionUrl = (!hasFilter && canManage) ? Url.Action("Create") : null,
+        ActionLabel = (!hasFilter && canManage) ? Loc.T("New Spare Part") : null }' />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead>
+                    <tr>
+                        <th>@Loc.T("Name")</th>
+                        <th>@Loc.T("SKU")</th>
+                        <th>@Loc.T("Stock")</th>
+                        <th>@Loc.T("Reorder Threshold")</th>
+                        <th>@Loc.T("Status")</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Parts)
+                    {
+                        var isLow = p.IsLowStock;
+                        <tr class="row-link @(isLow ? "table-danger" : "")" data-href="@Url.Action("Details", new { id = p.Id })">
+                            <td data-label="@Loc.T("Name")"><a asp-action="Details" asp-route-id="@p.Id" class="fw-semibold text-decoration-none">@Loc.LocalizedName(p.Name, p.NameAr)</a></td>
+                            <td data-label="@Loc.T("SKU")" class="small">@p.Sku</td>
+                            <td data-label="@Loc.T("Stock")" class="small">
+                                @p.StockQuantity
+                                @if (isLow)
+                                {
+                                    <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-1">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i>@Loc.T("Low")
+                                    </span>
+                                }
+                            </td>
+                            <td data-label="@Loc.T("Reorder Threshold")" data-hide-mobile class="small">@(p.ReorderThreshold?.ToString() ?? "—")</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(p.IsActive ? "Active" : "Inactive")" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-<partial name="_Pagination" model="Model.Pagination" />
+    <partial name="_Pagination" model="Model.Pagination" />
+}

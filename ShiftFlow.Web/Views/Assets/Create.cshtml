@@ -1,4 +1,7 @@
 @model AssetViewModel
 @{ ViewData["Title"] = Loc.T("New Asset"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Asset")})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("New Asset"),
+    Subtitle = Loc.T("Register a new tracked asset."),
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Assets"), Url.Action("Index")), (Loc.T("New Asset"), null) } }' />
 <partial name="_Form" model="Model" />

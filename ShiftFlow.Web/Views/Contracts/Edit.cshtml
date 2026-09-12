@@ -1,4 +1,7 @@
-@model ContractViewModel
+﻿@model ContractViewModel
 @{ ViewData["Title"] = Model.ContractNumber ?? Loc.T("Contracts"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.ContractNumber ?? Loc.T("Contracts")})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("Edit Contract"),
+    Subtitle = Model.ContractNumber,
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Contracts"), Url.Action("Index")), (Model.ContractNumber ?? Loc.T("Contract"), Url.Action("Details", new { id = Model.Id })), (Loc.T("Edit"), null) } }' />
 <partial name="_Form" model="Model" />

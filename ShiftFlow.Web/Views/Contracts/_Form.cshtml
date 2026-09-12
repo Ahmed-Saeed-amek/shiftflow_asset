@@ -1,4 +1,4 @@
-@model ContractViewModel
+﻿@model ContractViewModel
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <form method="post">
@@ -19,7 +19,7 @@
             <div asp-validation-summary="All" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label asp-for="VendorId" class="form-label small">@Loc.T("Vendor")</label>
+                    <label asp-for="VendorId" class="form-label required">@Loc.T("Vendor")</label>
                     <select asp-for="VendorId" class="form-select">
                         <option value="0">@Loc.T("Select vendor…")</option>
                         @foreach (var v in (List<Vendor>)ViewBag.Vendors)
@@ -30,7 +30,7 @@
                     <span asp-validation-for="VendorId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="ContractType" class="form-label small">@Loc.T("Contract Type")</label>
+                    <label asp-for="ContractType" class="form-label required">@Loc.T("Contract Type")</label>
                     <select asp-for="ContractType" class="form-select">
                         @foreach (var t in Contract.ContractTypes)
                         {
@@ -39,25 +39,25 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="ContractNumber" class="form-label small">@Loc.T("Contract Number")</label>
+                    <label asp-for="ContractNumber" class="form-label">@Loc.T("Contract Number")</label>
                     <input asp-for="ContractNumber" class="form-control" />
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="StartDate" class="form-label small">@Loc.T("Start Date")</label>
+                    <label asp-for="StartDate" class="form-label required">@Loc.T("Start Date")</label>
                     <input asp-for="StartDate" type="date" class="form-control" />
                     <span asp-validation-for="StartDate" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="EndDate" class="form-label small">@Loc.T("End Date")</label>
+                    <label asp-for="EndDate" class="form-label">@Loc.T("End Date")</label>
                     <input asp-for="EndDate" type="date" class="form-control" />
                     <span asp-validation-for="EndDate" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="Cost" class="form-label small">@Loc.T("Cost")</label>
+                    <label asp-for="Cost" class="form-label">@Loc.T("Cost")</label>
                     <input asp-for="Cost" type="number" step="0.01" class="form-control" />
                 </div>
                 <div class="col-md-4" id="pmCadenceWrap" style="display:none">
-                    <label asp-for="PmCadence" class="form-label small">@Loc.T("Cadence")</label>
+                    <label asp-for="PmCadence" class="form-label">@Loc.T("Cadence")</label>
                     <select asp-for="PmCadence" class="form-select">
                         <option value="">@Loc.T("Select cadence…")</option>
                         @foreach (var c in Contract.PmCadences)
@@ -68,19 +68,20 @@
                     <span asp-validation-for="PmCadence" class="text-danger small"></span>
                 </div>
                 <div class="col-12">
-                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
+                    <label asp-for="Notes" class="form-label">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
                 </div>
                 <div class="col-12">
-                    <label asp-for="AssetIds" class="form-label small">@Loc.T("Linked Assets")</label>
+                    <label asp-for="AssetIds" class="form-label">@Loc.T("Linked Assets")</label>
+                    <div class="help-text mb-2">@Loc.T("Add by category with the picker below, or search for individual assets.")</div>
                     <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=(List<AssetCategory>)ViewBag.Categories})" />
                 </div>
                 <div class="col-12">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label small mb-0">@Loc.T("Create New Assets") <span id="newAssetCount" class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle rounded-pill ms-1" hidden>0</span></label>
+                        <label class="form-label mb-0">@Loc.T("Create New Assets") <span id="newAssetCount" class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle rounded-pill ms-1" hidden>0</span></label>
                         <button type="button" id="addNewAssetBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Add Asset")</button>
                     </div>
-                    <div class="form-text mb-2"><i class="bi bi-info-circle me-1"></i>@Loc.T("New assets are only created if this contract is saved successfully.")</div>
+                    <div class="help-text mb-2"><i class="bi bi-info-circle me-1"></i>@Loc.T("New assets are only created if this contract is saved successfully.")</div>
                     <div id="newAssetRows"></div>
                     <template id="newAssetRowTemplate">
                         <div class="border rounded p-2 mb-2 new-asset-row position-relative">
@@ -129,7 +130,7 @@
                     </template>
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
                 <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

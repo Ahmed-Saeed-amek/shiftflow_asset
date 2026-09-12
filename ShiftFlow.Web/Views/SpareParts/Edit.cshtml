@@ -1,4 +1,7 @@
-@model SparePartViewModel
+﻿@model SparePartViewModel
 @{ ViewData["Title"] = Model.Name; }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.Name})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("Edit Spare Part"),
+    Subtitle = Loc.LocalizedName(Model.Name, Model.NameAr),
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Spare Parts"), Url.Action("Index")), (Loc.LocalizedName(Model.Name, Model.NameAr), Url.Action("Details", new { id = Model.Id })), (Loc.T("Edit"), null) } }' />
 <partial name="_Form" model="Model" />
