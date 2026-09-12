@@ -43,8 +43,8 @@
 <link rel="stylesheet" href="~/css/ai-assistant.css" asp-append-version="true" />
 
 <partial name="_PageHeader" model="@(new PageHeaderModel {
-    Title = "AI Assistant",
-    Subtitle = "Ask about inspection orders, groups, and more — by voice or text." })" />
+    Title = Loc.T("AI Assistant"),
+    Subtitle = Loc.T("Ask STEP about inspection orders, groups, and more — by voice or text.") })" />
 
 <form class="d-none">@Html.AntiForgeryToken()</form>
 
@@ -52,18 +52,20 @@
     <div class="ai-side">
         <div class="ai-side-card">
             <div class="ai-side-card-header">
-                <h6>@Loc.T("AI Assistant")</h6>
+                <h6>@Loc.T("Assistant")</h6>
             </div>
 
-            <div class="ai-avatar-scene" id="avatarScene">
-                <video id="avatarVideo" autoplay playsinline muted></video>
-                <audio id="avatarAudio" autoplay></audio>
-                <div class="ai-avatar-overlay" id="avatarOverlay">
-                    <div class="ai-avatar-spinner d-none" id="avatarOverlaySpinner"></div>
-                    <span id="avatarOverlayText"></span>
-                    <button type="button" class="btn btn-sm btn-primary d-none" id="btnEnableVoice">
-                        @Loc.T("Enable voice")
-                    </button>
+            <div class="ai-side-card-body">
+                <div class="ai-avatar-scene" id="avatarScene">
+                    <video id="avatarVideo" autoplay playsinline muted></video>
+                    <audio id="avatarAudio" autoplay></audio>
+                    <div class="ai-avatar-overlay" id="avatarOverlay">
+                        <div class="ai-avatar-spinner d-none" id="avatarOverlaySpinner"></div>
+                        <span id="avatarOverlayText"></span>
+                        <button type="button" class="btn btn-sm btn-primary d-none" id="btnEnableVoice">
+                            @Loc.T("Enable voice")
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

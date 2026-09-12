@@ -1,27 +1,21 @@
 @model IReadOnlyList<ShiftFlow.Domain.Entities.Permission>
+@using ShiftFlow.Web.Services
 @{
     var role = (ApplicationRole)ViewBag.Role;
-    var roleLabel = Loc.LocalizedName(role.Name!, role.NameAr);
+    var roleLabel = RoleDisplay.Name(role.Name!, role.NameAr, Loc.Lang);
     var rolePerms = (HashSet<string>)ViewBag.RolePerms;
     var isOwnRole = (bool)ViewBag.IsOwnRole;
     // Group permissions by category
     var groups = Model.GroupBy(p => p.Category).OrderBy(g => g.Key);
-    var toggleAllLabelJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Toggle all"));
     ViewData["Title"] = $"{Loc.T("Permissions")} — {roleLabel}";
 }
 
-<div class="d-flex align-items-center gap-2 mb-4">
-    <a href="@Url.Action("Index","Rbac")" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
-    </a>
-    <div>
-        <h4 class="mb-0 fw-bold">
-            <i class="bi bi-shield-lock text-primary me-2"></i>@roleLabel
-            <span class="text-muted fw-normal fs-6 ms-1">— @Loc.T("Role Permissions")</span>
-        </h4>
-        <small class="text-muted">@Loc.T("Check the permissions this role should have. Changes apply to all users in this role.")</small>
-    </div>
-</div>
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = roleLabel,
+    Subtitle = Loc.T("Check the permissions this role should have. Changes apply to all users in this role."),
+    Breadcrumbs = new List<(string Label, string? Url)>{
+        (Loc.T("Permissions"), Url.Action("Index","Rbac")),
+        (roleLabel, null) } })" />
 
 @if (isOwnRole)
 {
@@ -59,6 +53,7 @@
                         <i class="bi @PermissionDisplay.GetCategoryIcon(group.Key) text-primary"></i>
                         <span class="fw-semibold small text-uppercase text-muted">@Loc.T(group.Key)</span>
                         <span class="badge bg-secondary-subtle text-secondary ms-1">@grantedInGroup/@totalInGroup</span>
+                        <button type="button" class="btn btn-link btn-sm p-0 ms-auto text-muted" data-toggle-all>@Loc.T("Toggle all")</button>
                     </div>
                     <div class="card-body py-2 px-3">
                         @foreach (var pair in pairsInGroup)
@@ -126,7 +121,10 @@
         }
     </div>
 
-    <div class="d-flex gap-2">
+    @* Sticky so Save stays reachable on a long permission grid. The inline position keeps that
+       true even before the shared .form-actions--sticky rule lands in site.css. *@
+    <div class="form-actions form-actions--sticky bg-body border-top py-3"
+         style="position:sticky;bottom:0;z-index:5">
         <button type="submit" class="btn btn-primary px-4">
             <i class="bi bi-floppy me-2"></i>@Loc.T("Save Permissions")
         </button>
@@ -154,23 +152,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Quick select helpers
-    document.querySelectorAll('.card').forEach(card => {
-        const header = card.querySelector('.card-header');
-        if (!header) return;
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-link btn-sm p-0 float-end text-muted';
-        toggleBtn.textContent = @Html.Raw(toggleAllLabelJson);
-        toggleBtn.onclick = () => {
+    // Quick select helper. The link itself is rendered in the card header (Razor) so it lines
+    // up with the category title and badge instead of being float-end'd in afterwards.
+    document.querySelectorAll('[data-toggle-all]').forEach(toggleBtn => {
+        const card = toggleBtn.closest('.card');
+        if (!card) return;
+        toggleBtn.addEventListener('click', () => {
             const boxes = [...card.querySelectorAll('input.standalone-checkbox')];
             const pairs = [...card.querySelectorAll('.rw-pair')];
             const anyUnchecked = boxes.some(b => !b.checked) ||
                 pairs.some(p => !p.querySelector('.rw-radio[value="both"]').checked);
             boxes.forEach(b => b.checked = anyUnchecked);
             pairs.forEach(p => setPairState(p, anyUnchecked ? 'both' : 'none'));
-        };
-        header.appendChild(toggleBtn);
+        });
     });
 });
 </script>

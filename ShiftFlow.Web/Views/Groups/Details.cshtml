@@ -6,19 +6,24 @@
     ViewData["Title"] = Model.Name;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.GroupManage)).Succeeded;
     var canViewProfiles = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
+    var groupLabel = Loc.LocalizedName(Model.Name, Model.NameAr);
     string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-outline-secondary btn-sm'><i class=\"bi bi-pencil me-1\"></i>" + Loc.T("Edit") + "</a>"
+        ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'><i class=\"bi bi-pencil me-1\"></i>" + Loc.T("Edit") + "</a>"
         : "";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.LocalizedName(Model.Name,Model.NameAr),Subtitle=Model.Description,ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = groupLabel,
+    Subtitle = Model.Description,
+    ActionsHtml = actionsHtml,
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Groups"), Url.Action("Index")), (groupLabel, null) } })" />
 
 <div class="d-flex align-items-center gap-2 mb-3">
     <partial name="_StatusBadge" model="@(Model.IsActive ? "Active" : "Inactive")" />
-    <span class="text-muted small">@Loc.T("Created") @Model.CreatedAt.ToString("dd/MM/yyyy")</span>
+    <span class="text-muted small">@Loc.T("Created") @Loc.TDate(Model.CreatedAt.ToString("dd/MM/yyyy"))</span>
 </div>
 
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-transparent border-0 fw-semibold">@Loc.T("Members") (@Model.Members.Count)</div>
+    <div class="card-header bg-transparent border-bottom py-2 px-3 fw-semibold">@Loc.T("Members") (@Model.Members.Count)</div>
     <div class="list-group list-group-flush">
         @if (Model.Members.Count == 0)
         {
@@ -40,5 +45,3 @@
         }
     </div>
 </div>
-
-<a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>

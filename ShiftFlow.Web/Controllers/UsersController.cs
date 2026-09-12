@@ -44,11 +44,11 @@ public class UsersController : Controller
     private const int PageSize = 25;
 
     [Authorize(Policy = PermissionCatalog.UserView)]
-    public async Task<IActionResult> Index(string? role, string? search, int page = 1)
+    public async Task<IActionResult> Index(string? role, string? search, string? status, int page = 1)
     {
         if (page < 1) page = 1;
 
-        var query = FilteredUsersQuery(role, search);
+        var query = FilteredUsersQuery(role, search, status);
         var totalCount = await query.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         if (page > totalPages) page = totalPages;
@@ -59,6 +59,7 @@ public class UsersController : Controller
         ViewBag.RolesByUser = rolesByUser;
         ViewBag.RoleFilter = role;
         ViewBag.SearchFilter = search;
+        ViewBag.StatusFilter = status;
         ViewBag.TotalCount = totalCount;
         ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
         ViewBag.RoleOptions = await _rm.Roles.OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
@@ -70,7 +71,7 @@ public class UsersController : Controller
     // translated Contains) — the previous version pulled every user into memory first and
     // filtered the list there. Shared by Index and ExportExcel so the exported rows always match
     // whatever the caller was looking at; Index additionally pages, the export doesn't.
-    private IQueryable<ApplicationUser> FilteredUsersQuery(string? role, string? search)
+    private IQueryable<ApplicationUser> FilteredUsersQuery(string? role, string? search, string? status = null)
     {
         var query = _db.Users.AsNoTracking().Include(u => u.Location).AsQueryable();
 
@@ -81,6 +82,11 @@ public class UsersController : Controller
                 .Join(_db.Roles, ur => ur.RoleId, ro => ro.Id, (ur, ro) => new { ur.UserId, ro.Name })
                 .Any(x => x.UserId == u.Id && x.Name == r));
         }
+
+        if (string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(u => u.IsActive);
+        else if (string.Equals(status, "Inactive", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(u => !u.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -110,9 +116,9 @@ public class UsersController : Controller
     }
 
     [Authorize(Policy = PermissionCatalog.UserView)]
-    public async Task<IActionResult> ExportExcel(string? role, string? search)
+    public async Task<IActionResult> ExportExcel(string? role, string? search, string? status)
     {
-        var users = await FilteredUsersQuery(role, search).ToListAsync();
+        var users = await FilteredUsersQuery(role, search, status).ToListAsync();
         var rolesByUser = await RolesByUserAsync(users);
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;

@@ -4,40 +4,64 @@
 @{
     ViewData["Title"] = Loc.T("Vendors");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorManage)).Succeeded;
+    var searchFilter = (string?)ViewBag.SearchFilter;
+    var statusFilter = (string?)ViewBag.StatusFilter;
+    var totalCount = (int)(ViewBag.TotalCount ?? Model.Count);
+    var hasFilter = !string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(statusFilter);
     string actionsHtml = canManage
-        ? "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#vendorModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Vendor") + "</button>"
+        ? "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#vendorModal' onclick='openCreate()'><i class=\"bi bi-plus-lg me-1\"></i>" + Loc.T("New Vendor") + "</button>"
         : "";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Vendors"),ActionsHtml=actionsHtml})" />
 
+<form method="get" class="filter-bar">
+    <input type="search" name="search" value="@searchFilter" class="form-control form-control-sm"
+           placeholder="@Loc.T("Search by name, contact, or email…")" style="max-width:260px" aria-label="@Loc.T("Search by name, contact, or email…")" />
+    <select name="status" class="form-select form-select-sm" style="max-width:170px" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("All Statuses")</option>
+        @foreach (var st in Vendor.Statuses)
+        {
+            <option value="@st" selected="@(st == statusFilter)">@Loc.T(st)</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@totalCount @Loc.T("records")</span>
+</form>
+
+@if (Model.Count == 0)
+{
+    <partial name="_EmptyState" model="@(new EmptyStateModel{
+        Icon = "bi-shop",
+        Title = hasFilter ? Loc.T("No vendors match these filters") : Loc.T("No vendors yet"),
+        Text = hasFilter ? Loc.T("Try a different search term or status.") : Loc.T("Add the first vendor to start assigning work orders."),
+        ActionUrl = hasFilter ? Url.Action("Index") : null,
+        ActionLabel = hasFilter ? Loc.T("Clear") : null })" />
+}
+else
+{
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Name")</th><th class="d-none d-md-table-cell">@Loc.T("Contact Name")</th><th class="d-none d-lg-table-cell">@Loc.T("Specialization")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
+        <table class="table table-hover align-middle mb-0 table-card-stack">
+            <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Contact Name")</th><th>@Loc.T("Specialization")</th><th>@Loc.T("Status")</th></tr></thead>
             <tbody>
-                @if (Model.Count == 0)
-                {
-                    <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
                 @foreach (var v in Model)
                 {
-                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = v.Id })'">
-                        <td><a href="@Url.Action("Details", new { id = v.Id })" class="text-decoration-none fw-semibold" onclick="event.stopPropagation()">@v.Name</a></td>
-                        <td class="small d-none d-md-table-cell">@v.ContactName</td>
-                        <td class="small d-none d-lg-table-cell">@v.Specialization</td>
-                        <td><partial name="_StatusBadge" model="@v.Status" /></td>
-                        <td onclick="event.stopPropagation()">
-                            @if (canManage)
-                            {
-                                <a href="@Url.Action("Edit", new { id = v.Id })" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
-                            }
-                        </td>
+                    <tr class="row-link" data-href="@Url.Action("Details", new { id = v.Id })">
+                        <td data-label="@Loc.T("Name")"><a href="@Url.Action("Details", new { id = v.Id })" class="fw-semibold">@v.Name</a></td>
+                        <td data-label="@Loc.T("Contact Name")" class="small">@v.ContactName</td>
+                        <td data-label="@Loc.T("Specialization")" class="small" data-hide-mobile>@v.Specialization</td>
+                        <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@v.Status" /></td>
                     </tr>
                 }
             </tbody>
         </table>
     </div>
 </div>
+}
 
 <partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
 
@@ -56,11 +80,11 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-8">
-                                <label class="form-label small">@Loc.T("Name")</label>
+                                <label class="form-label required" for="vName">@Loc.T("Name")</label>
                                 <input name="Name" id="vName" class="form-control" required />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">@Loc.T("Status")</label>
+                                <label class="form-label" for="vStatus">@Loc.T("Status")</label>
                                 <select name="Status" id="vStatus" class="form-select">
                                     @foreach (var s in Vendor.Statuses)
                                     {
@@ -69,23 +93,23 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                                <label class="form-label" for="vNameAr">@Loc.T("Name (Arabic)")</label>
                                 <input name="NameAr" id="vNameAr" class="form-control" dir="rtl" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small">@Loc.T("Contact Name")</label>
+                                <label class="form-label" for="vContactName">@Loc.T("Contact Name")</label>
                                 <input name="ContactName" id="vContactName" class="form-control" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">@Loc.T("Phone")</label>
+                                <label class="form-label" for="vPhone">@Loc.T("Phone")</label>
                                 <input name="Phone" id="vPhone" class="form-control" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">@Loc.T("Email")</label>
+                                <label class="form-label" for="vEmail">@Loc.T("Email")</label>
                                 <input name="Email" id="vEmail" type="email" class="form-control" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">@Loc.T("Specialization")</label>
+                                <label class="form-label" for="vSpecialization">@Loc.T("Specialization")</label>
                                 <input name="Specialization" id="vSpecialization" class="form-control" />
                             </div>
                         </div>

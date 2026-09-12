@@ -4,25 +4,51 @@
 @{
     ViewData["Title"] = Model.Name;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.VendorManage)).Succeeded;
-    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.Name,Subtitle=Model.Specialization,ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = Model.Name,
+    Subtitle = Model.Specialization,
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Vendors"), Url.Action("Index")), (Model.Name, null) } })" />
+
+@if (canManage)
+{
+    <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+        <a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>@Loc.T("Edit")
+        </a>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
+                @Loc.T("More")<i class="bi bi-chevron-down ms-1"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    @* Both triggers also live in the "Portal login" card below — this menu just
+                       surfaces them from the header; the forms themselves are unchanged. *@
+                    <a class="dropdown-item" href="#portalLogin">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>@(Model.UserId == null ? Loc.T("Create Login") : Loc.T("Reset Password"))
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+}
 
 <div class="row g-3">
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-bottom py-2 px-3 fw-semibold">@Loc.T("Details")</div>
             <div class="card-body">
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Status")</span><partial name="_StatusBadge" model="@Model.Status" /></div>
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Contact Name")</span><span class="small">@Model.ContactName</span></div>
                 <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("Phone")</span><span class="small">@Model.Phone</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Email")</span><span class="small">@Model.Email</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Email")</span><span class="small text-break">@Model.Email</span></div>
             </div>
         </div>
 
         @if (canManage)
         {
-            <div class="card border-0 shadow-sm mt-3">
-                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Portal Login")</div>
+            <div class="card border-0 shadow-sm mt-3" id="portalLogin">
+                <div class="card-header bg-transparent border-bottom py-2 px-3 fw-semibold">@Loc.T("Portal Login")</div>
                 <div class="card-body">
                     @if (TempData["TempPassword"] != null)
                     {
@@ -35,8 +61,9 @@
                         <form method="post" asp-action="CreateLogin">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="vendorId" value="@Model.Id" />
-                            <label class="form-label small">@Loc.T("Email")</label>
-                            <input type="email" name="email" class="form-control form-control-sm mb-2" value="@Model.Email" required />
+                            <label class="form-label required" for="portalEmail">@Loc.T("Email")</label>
+                            <input type="email" id="portalEmail" name="email" class="form-control form-control-sm mb-2" value="@Model.Email" required />
+                            <div class="help-text mb-2">@Loc.T("The vendor signs in to the portal with this address and a temporary password.")</div>
                             <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Create Login")</button>
                         </form>
                     }
@@ -46,7 +73,8 @@
                         <form method="post" asp-action="ResetPassword">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="vendorId" value="@Model.Id" />
-                            <button type="submit" class="btn btn-sm btn-outline-secondary w-100">@Loc.T("Reset Password")</button>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary w-100"
+                                    data-confirm="@Loc.T("Reset this user's password? They'll need the new temporary password to log in.")">@Loc.T("Reset Password")</button>
                         </form>
                     }
                 </div>
@@ -55,26 +83,30 @@
     </div>
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Work Orders")</div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Stage")</th></tr></thead>
-                    <tbody>
-                        @if (Model.WorkOrders.Count == 0)
-                        {
-                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                        }
-                        @foreach (var w in Model.WorkOrders.OrderByDescending(w => w.CreatedDate))
-                        {
-                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "WorkOrders", new { id = w.Id })'">
-                                <td class="small font-monospace">@w.WorkOrderNumber</td>
-                                <td class="small">@w.Asset?.AssetTag</td>
-                                <td><partial name="_StatusBadge" model="@w.Stage" /></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+            <div class="card-header bg-transparent border-bottom py-2 px-3 fw-semibold">@Loc.T("Work Orders")</div>
+            @if (Model.WorkOrders.Count == 0)
+            {
+                <div class="card-body text-center text-muted py-5">@Loc.T("No records found")</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
+                        <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Stage")</th></tr></thead>
+                        <tbody>
+                            @foreach (var w in Model.WorkOrders.OrderByDescending(w => w.CreatedDate))
+                            {
+                                var woUrl = Url.Action("Details", "WorkOrders", new { id = w.Id });
+                                <tr class="row-link" data-href="@woUrl">
+                                    <td data-label="@Loc.T("Work Order Number")"><a href="@woUrl" class="fw-semibold font-monospace small">@w.WorkOrderNumber</a></td>
+                                    <td data-label="@Loc.T("Asset Tag")" class="small">@w.Asset?.AssetTag</td>
+                                    <td data-label="@Loc.T("Stage")"><partial name="_StatusBadge" model="@w.Stage" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </div>
     </div>
 </div>

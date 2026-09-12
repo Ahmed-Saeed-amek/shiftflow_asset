@@ -1,10 +1,11 @@
 @model IReadOnlyList<ShiftFlow.Domain.Entities.Permission>
+@using ShiftFlow.Web.Services
 @{
     var user = (ShiftFlow.Domain.Entities.ApplicationUser)ViewBag.User;
     var userRoles = (IList<string>)ViewBag.UserRoles;
     var roleGrants = (Dictionary<string, HashSet<string>>)ViewBag.RoleGrants;
     var roleNameArByName = (Dictionary<string, string?>)ViewBag.RoleNameArByName;
-    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+    string RoleLabel(string roleName) => RoleDisplay.Name(roleName, roleNameArByName.GetValueOrDefault(roleName), Loc.Lang);
     var allowOverrides = (HashSet<string>)ViewBag.AllowOverrides;
     var denyOverrides = (HashSet<string>)ViewBag.DenyOverrides;
     var isSelf = (bool)ViewBag.IsSelf;
@@ -16,19 +17,23 @@
     var groups = Model.GroupBy(p => p.Category).OrderBy(g => g.Key);
 }
 
-<div class="d-flex align-items-center gap-2 mb-3">
-    <a href="@Url.Action("Index","Rbac")" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
-    </a>
-    <div>
-        <h4 class="mb-0 fw-bold">
-            <i class="bi bi-person-lock text-success me-2"></i>@user.FullName
-            <span class="text-muted fw-normal fs-6 ms-1">— @Loc.T("Permission Overrides")</span>
-        </h4>
-        <small class="text-muted">
-            @Loc.T("Roles"): @Html.Raw(string.Join(", ", userRoles.Select(r => $"<span class='badge bg-info-subtle text-info border border-info-subtle'>{System.Net.WebUtility.HtmlEncode(RoleLabel(r))}</span>")))
-        </small>
-    </div>
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = user.FullName,
+    Subtitle = Loc.T("Permission Overrides"),
+    Breadcrumbs = new List<(string Label, string? Url)>{
+        (Loc.T("Permissions"), Url.Action("Index","Rbac")),
+        (user.FullName, null) } })" />
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="text-muted small">@Loc.T("Roles"):</span>
+    @foreach (var r in userRoles)
+    {
+        <span class="badge bg-info-subtle text-info border border-info-subtle">@RoleLabel(r)</span>
+    }
+    @if (!userRoles.Any())
+    {
+        <span class="text-muted small">@Loc.T("No roles")</span>
+    }
 </div>
 
 @if (isSelf)
@@ -142,7 +147,10 @@
     <!-- Hidden inputs built by JS from radio selections -->
     <div id="hiddenInputs"></div>
 
-    <div class="d-flex gap-2">
+    @* Sticky so Save stays reachable on a long permission grid. The inline position keeps that
+       true even before the shared .form-actions--sticky rule lands in site.css. *@
+    <div class="form-actions form-actions--sticky bg-body border-top py-3"
+         style="position:sticky;bottom:0;z-index:5">
         <button type="submit" class="btn btn-primary px-4" id="saveBtn">
             <i class="bi bi-floppy me-2"></i>@Loc.T("Save Overrides")
         </button>

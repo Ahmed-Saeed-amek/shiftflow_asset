@@ -4,68 +4,121 @@
     var labels = (Dictionary<int, string>)ViewBag.ScopeValueLabels;
     var groupScopes = (List<GroupAssetScope>)ViewBag.GroupScopes;
     var groupLabels = (Dictionary<int, string>)ViewBag.GroupScopeValueLabels;
-    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New user scope") + "</a>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Visibility"),Subtitle=Loc.T("Restrict which assets a specific employee can see"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Visibility"),Subtitle=Loc.T("Restrict which assets a specific employee can see")})" />
 
-<h6 class="fw-semibold mb-2">@Loc.T("By Employee")</h6>
-<div class="card border-0 shadow-sm mb-4">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("User")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
-            <tbody>
-                @if (Model.Count == 0)
-                {
-                    <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var s in Model)
-                {
-                    <tr>
-                        <td>@s.User?.FullName</td>
-                        <td>@labels[s.Id]</td>
-                        <td>
-                            <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
-                            <form method="post" asp-action="Delete" asp-route-id="@s.Id" class="d-inline" onsubmit="return confirm('@Loc.T("Are you sure?")')">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger">@Loc.T("Delete")</button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+@* Both sections carry the same header shape: title on the start edge, its own primary button
+   right-aligned on the end edge. *@
+<div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+    <h6 class="fw-semibold mb-0">@Loc.T("By Employee")</h6>
+    <a asp-action="Create" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New user scope")</a>
 </div>
+@if (Model.Count == 0)
+{
+    <div class="mb-4">
+        <partial name="_EmptyState" model="@(new EmptyStateModel{
+            Icon = "bi-person-bounding-box",
+            Title = Loc.T("No employee scopes yet"),
+            Text = Loc.T("Without a scope an employee sees every asset they are otherwise permitted to see."),
+            ActionUrl = Url.Action("Create"),
+            ActionLabel = Loc.T("New user scope") })" />
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("User")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var s in Model)
+                    {
+                        var editUrl = Url.Action("Edit", new { id = s.Id });
+                        <tr class="row-link" data-href="@editUrl">
+                            <td data-label="@Loc.T("User")"><a href="@editUrl" class="fw-semibold">@s.User?.FullName</a></td>
+                            <td data-label="@Loc.T("Scope")">@labels[s.Id]</td>
+                            <td class="text-end pe-3">
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                                            aria-expanded="false" aria-label="@Loc.T("Actions")">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="@editUrl"><i class="bi bi-pencil me-2"></i>@Loc.T("Edit")</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" asp-action="Delete" asp-route-id="@s.Id">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="dropdown-item text-danger"
+                                                        data-confirm="@Loc.T("Delete this scope? {0} will see every asset they are otherwise permitted to see.", s.User?.FullName ?? "")">
+                                                    <i class="bi bi-trash me-2"></i>@Loc.T("Delete")
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
 
-<div class="d-flex align-items-center justify-content-between mb-2">
+<div class="d-flex align-items-center justify-content-between gap-2 mb-2">
     <h6 class="fw-semibold mb-0">@Loc.T("By Group")</h6>
-    <a asp-action="CreateGroup" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New group scope")</a>
+    <a asp-action="CreateGroup" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New group scope")</a>
 </div>
-<div class="form-text mb-2">@Loc.T("A member's own individual scope above always overrides their group's scope here.")</div>
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Group")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
-            <tbody>
-                @if (groupScopes.Count == 0)
-                {
-                    <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var s in groupScopes)
-                {
-                    <tr>
-                        <td>@Loc.LocalizedName(s.Group?.Name ?? "", s.Group?.NameAr)</td>
-                        <td>@groupLabels[s.Id]</td>
-                        <td>
-                            <a asp-action="EditGroup" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
-                            <form method="post" asp-action="DeleteGroup" asp-route-id="@s.Id" class="d-inline" onsubmit="return confirm('@Loc.T("Are you sure?")')">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger">@Loc.T("Delete")</button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<div class="help-text form-text mb-2">@Loc.T("A member's own individual scope above always overrides their group's scope here.")</div>
+@if (groupScopes.Count == 0)
+{
+    <partial name="_EmptyState" model="@(new EmptyStateModel{
+        Icon = "bi-people",
+        Title = Loc.T("No group scopes yet"),
+        Text = Loc.T("Scope a whole group at once instead of repeating the same rule per employee."),
+        ActionUrl = Url.Action("CreateGroup"),
+        ActionLabel = Loc.T("New group scope") })" />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("Group")</th><th>@Loc.T("Scope")</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var s in groupScopes)
+                    {
+                        var groupName = Loc.LocalizedName(s.Group?.Name ?? "", s.Group?.NameAr);
+                        var editUrl = Url.Action("EditGroup", new { id = s.Id });
+                        <tr class="row-link" data-href="@editUrl">
+                            <td data-label="@Loc.T("Group")"><a href="@editUrl" class="fw-semibold">@groupName</a></td>
+                            <td data-label="@Loc.T("Scope")">@groupLabels[s.Id]</td>
+                            <td class="text-end pe-3">
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                                            aria-expanded="false" aria-label="@Loc.T("Actions")">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="@editUrl"><i class="bi bi-pencil me-2"></i>@Loc.T("Edit")</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="post" asp-action="DeleteGroup" asp-route-id="@s.Id">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="dropdown-item text-danger"
+                                                        data-confirm="@Loc.T("Delete this scope? Members of {0} will see every asset they are otherwise permitted to see.", groupName)">
+                                                    <i class="bi bi-trash me-2"></i>@Loc.T("Delete")
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+}

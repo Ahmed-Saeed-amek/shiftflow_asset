@@ -1,4 +1,5 @@
 @model List<ApplicationUser>
+@using ShiftFlow.Web.Services
 @{
     ViewData["Title"] = Loc.T("Permissions Management");
     var roles        = (List<ApplicationRole>)ViewBag.Roles;
@@ -11,7 +12,7 @@
     var roleFilter   = (string?)ViewBag.RoleFilter;
     var totalCount   = (int)(ViewBag.TotalCount ?? 0);
     var roleNameArByName = roles.ToDictionary(r => r.Name!, r => r.NameAr);
-    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+    string RoleLabel(string roleName) => RoleDisplay.Name(roleName, roleNameArByName.GetValueOrDefault(roleName), Loc.Lang);
     var selectAtLeastOneUserJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Select at least one user."));
     var pickAtLeastOneRoleJson   = System.Text.Json.JsonSerializer.Serialize(Loc.T("Pick at least one role to add or remove."));
 }
@@ -144,6 +145,27 @@
             </div>
         </div>
 
+        <!-- Filters (submitted to the server - the list is paged, so filtering only the rows
+             currently rendered would silently miss matches) -->
+        <form method="get" class="filter-bar">
+            <input name="search" type="search" value="@searchFilter" class="form-control form-control-sm"
+                   placeholder="@Loc.T("Search by name or email…")" style="max-width:240px" aria-label="@Loc.T("Search by name or email…")" />
+            <select name="role" class="form-select form-select-sm" style="max-width:200px" aria-label="@Loc.T("Role")">
+                <option value="">@Loc.T("All roles")</option>
+                @foreach (var rn in roleNames)
+                {
+                    <option value="@rn" selected="@(rn == roleFilter)">@RoleLabel(rn)</option>
+                }
+                <option value="__none__" selected="@(roleFilter == "__none__")">@Loc.T("No role assigned")</option>
+            </select>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+            @if (!string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(roleFilter))
+            {
+                <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+            }
+            <span class="filter-bar__count text-muted small">@totalCount @Loc.T("records")</span>
+        </form>
+
         <!-- Users table -->
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-transparent border-bottom py-2 px-3">
@@ -157,27 +179,6 @@
                         <label class="form-check-label small text-muted" for="checkAll">@Loc.T("Select all")</label>
                     </div>
                 </div>
-                <!-- row 2: filters (submitted to the server - the list is paged, so filtering
-                     only the rows currently rendered would silently miss matches) -->
-                <form method="get" class="d-flex gap-2 flex-wrap">
-                    <input name="search" type="search" value="@searchFilter" class="form-control form-control-sm"
-                           placeholder="@Loc.T("Search by name or email…")" style="max-width:240px" />
-                    <select name="role" class="form-select form-select-sm" style="max-width:180px">
-                        <option value="">@Loc.T("All roles")</option>
-                        @foreach (var rn in roleNames)
-                        {
-                            <option value="@rn" selected="@(rn == roleFilter)">@RoleLabel(rn)</option>
-                        }
-                        <option value="__none__" selected="@(roleFilter == "__none__")">@Loc.T("No role assigned")</option>
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
-                    @if (!string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(roleFilter))
-                    {
-                        <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")
-                        </a>
-                    }
-                </form>
             </div>
 
             <div style="max-height:620px;overflow-y:auto" class="table-responsive">
@@ -225,9 +226,9 @@
                             <!-- Per-user permissions link -->
                             <td class="text-end pe-3">
                                 <a href="@Url.Action("UserPermissions","Rbac",new{userId=user.Id})"
-                                   class="btn btn-sm btn-outline-secondary py-1 px-2"
-                                   title="@Loc.T("Edit permission overrides")">
-                                    <i class="bi bi-shield-lock"></i>
+                                   class="btn btn-sm btn-outline-secondary py-1 px-2 text-nowrap"
+                                   title="@Loc.T("Edit permission overrides")" aria-label="@Loc.T("Permissions")">
+                                    <i class="bi bi-shield-lock"></i><span class="d-none d-sm-inline ms-1">@Loc.T("Permissions")</span>
                                 </a>
                             </td>
                         </tr>

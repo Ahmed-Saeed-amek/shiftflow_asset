@@ -1,4 +1,6 @@
 @model UserAssetScopeViewModel
-@{ ViewData["Title"] = Loc.T("Asset Visibility"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New")})" />
+@{ ViewData["Title"] = Loc.T("New user scope"); }
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = Loc.T("New user scope"),
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Asset Visibility"), Url.Action("Index")), (Loc.T("New user scope"), null) } })" />
 <partial name="_Form" model="Model" />

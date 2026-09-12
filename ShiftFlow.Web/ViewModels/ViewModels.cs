@@ -38,7 +38,7 @@ public class KpiCardModel
     public string Color { get; set; } = "primary";
 }
 
-public class PageHeaderModel
+public partial class PageHeaderModel
 {
     public string Title { get; set; } = string.Empty;
     public string? Subtitle { get; set; }
