@@ -22,6 +22,7 @@ public class AiAssistantController : Controller
     private const int MaxHistoryTurns = 12;
     private const int MaxHistoryTurnLength = 2000;
     private const int MaxHistoryBytes = 16 * 1024;
+    private const int MaxTokenLength = 64;
 
     private readonly AiAssistantOrchestrator _orchestrator;
     private readonly AzureSpeechOptions _speechOpts;
@@ -154,9 +155,8 @@ public class AiAssistantController : Controller
 
         try
         {
-            var answer = await _orchestrator.RunAsync(req.Text, history, userId, _loc.Lang, ct);
-            var voice = _loc.Lang == "ar" ? ArabicVoice : _aiOpts.DefaultVoice;
-            return Ok(new { answerText = answer, voice });
+            var result = await _orchestrator.RunAsync(req.Text, history, userId, _loc.Lang, SanitizeContext(req.Context), ct);
+            return Ok(new { answerText = result.Text, voice = Voice, attachments = result.Attachments });
         }
         catch (Exception ex)
         {
@@ -164,6 +164,92 @@ public class AiAssistantController : Controller
             return StatusCode(500, new { error = _loc.T("An error occurred processing your request. Please try again.") });
         }
     }
+
+    /// <summary>Carries out an action the assistant proposed and the user confirmed. The token is
+    /// single-use, expires after 10 minutes, must belong to the caller, and is re-checked against
+    /// the permission the proposing tool recorded — so a token leaked into someone else's session
+    /// is inert, and a permission revoked in between stops the action.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Confirm([FromBody] AiConfirmRequest? req, CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Token) || req.Token.Length > MaxTokenLength)
+            // Deliberately not localized: Translations.cs is owned by another change, and this
+            // is a malformed-request guard the UI never surfaces (the client only posts tokens it
+            // was just handed). See TRANSLATIONS-ai-backend.md for the string to localize on merge.
+            return BadRequest(new { error = "Confirmation token is required" });
+
+        var userId = _um.GetUserId(User)!;
+        try
+        {
+            var result = await _orchestrator.ConfirmAsync(req.Token, userId, _loc.Lang, ct);
+            return Ok(new { answerText = result.Text, voice = Voice, attachments = result.Attachments });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "AI assistant confirm failed");
+            return StatusCode(500, new { error = _loc.T("An error occurred processing your request. Please try again.") });
+        }
+    }
+
+    /// <summary>Throws away a pending action the user declined. Returns 200 either way — a token
+    /// that already expired is, from the caller's point of view, already dismissed.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Dismiss([FromBody] AiConfirmRequest? req)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.Token) || req.Token.Length > MaxTokenLength)
+            return BadRequest(new { error = "Confirmation token is required" });
+
+        _orchestrator.DiscardPending(req.Token, _um.GetUserId(User)!);
+        return Ok(new { ok = true });
+    }
+
+    private string Voice => _loc.Lang == "ar" ? ArabicVoice : _aiOpts.DefaultVoice;
+
+    /// <summary>The page context is client-supplied, so it is capped and its entityType is
+    /// allow-listed before it reaches the system prompt — it must not become a free-text injection
+    /// channel into the model's instructions.</summary>
+    private static AiPageContext? SanitizeContext(AiQueryContext? context)
+    {
+        if (context == null) return null;
+        var entityType = context.EntityType != null && AllowedEntityTypes.Contains(context.EntityType)
+            ? context.EntityType : null;
+        return new AiPageContext(
+            Cap(context.Page, 200),
+            entityType,
+            entityType == null ? null : Cap(EntityIdText(context.EntityId), 64),
+            Cap(context.Title, 200));
+    }
+
+    private static readonly HashSet<string> AllowedEntityTypes = new(StringComparer.Ordinal)
+    {
+        "WorkOrder", "InspectionOrder", "MaintenanceOrder", "Asset", "Zone", "SparePart",
+        "Contract", "Vendor", "User", "Group",
+    };
+
+    /// <summary>entityId arrives as either a JSON string ("WO-2026-0004") or a number (4) — the
+    /// contract allows both, and binding a number straight into a string property would 400 the
+    /// whole request, so it is read as a JsonElement and flattened here.</summary>
+    private static string? EntityIdText(System.Text.Json.JsonElement? entityId) => entityId?.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.String => entityId.Value.GetString(),
+        System.Text.Json.JsonValueKind.Number => entityId.Value.GetRawText(),
+        _ => null,
+    };
+
+    private static string? Cap(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
+    }
 }
 
-public record AiQueryRequest(string Text, List<ConversationTurn>? History);
+public record AiQueryRequest(string Text, List<ConversationTurn>? History, AiQueryContext? Context);
+
+/// <summary>Where the user is when they ask. EntityId is a string so the client can send either a
+/// numeric id or an order number without guessing which the backend wants.</summary>
+public record AiQueryContext(string? Page, string? EntityType, System.Text.Json.JsonElement? EntityId, string? Title);
+
+public record AiConfirmRequest(string Token);
