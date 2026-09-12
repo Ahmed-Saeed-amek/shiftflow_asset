@@ -1,4 +1,9 @@
 @model AssetViewModel
+@{
+    var selectedZone = ViewBag.SelectedZone as Zone;
+    var selectedZoneLabel = selectedZone == null ? null : Loc.LocalizedName(selectedZone.Name, selectedZone.NameAr);
+    var selectedZoneCategoryId = ViewBag.SelectedLocationCategoryId as int?;
+}
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <form method="post">
@@ -6,22 +11,22 @@
             <input type="hidden" asp-for="Id" />
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
-                <div class="col-md-4">
-                    <label asp-for="AssetTag" class="form-label small">@Loc.T("Asset Tag")</label>
+                <div class="col-md-6">
+                    <label asp-for="AssetTag" class="form-label required">@Loc.T("Asset Tag")</label>
                     <input asp-for="AssetTag" class="form-control" />
                     <span asp-validation-for="AssetTag" class="text-danger small"></span>
                 </div>
-                <div class="col-md-8">
-                    <label asp-for="Name" class="form-label small">@Loc.T("Name")</label>
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label required">@Loc.T("Name")</label>
                     <input asp-for="Name" class="form-control" />
                     <span asp-validation-for="Name" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="NameAr" class="form-label small">@Loc.T("Name (Arabic)")</label>
+                    <label asp-for="NameAr" class="form-label">@Loc.T("Name (Arabic)")</label>
                     <input asp-for="NameAr" class="form-control" dir="rtl" />
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="Status" class="form-label small">@Loc.T("Status")</label>
+                    <label asp-for="Status" class="form-label">@Loc.T("Status")</label>
                     <select asp-for="Status" class="form-select">
                         @foreach (var s in Asset.Statuses)
                         {
@@ -29,8 +34,8 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label for="categoryParentSelect" class="form-label small">@Loc.T("Category")</label>
+                <div class="col-md-6">
+                    <label for="categoryParentSelect" class="form-label required">@Loc.T("Category")</label>
                     <select id="categoryParentSelect" class="form-select">
                         <option value="">—</option>
                         @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
@@ -39,58 +44,78 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label for="categorySubSelect" class="form-label small">@Loc.T("Subcategory")</label>
+                <div class="col-md-6">
+                    <label for="categorySubSelect" class="form-label">@Loc.T("Subcategory")</label>
                     <select id="categorySubSelect" class="form-select" disabled>
                         <option value="">@Loc.T("None")</option>
                     </select>
                     <input type="hidden" asp-for="CategoryId" id="categoryIdHidden" />
                     <span asp-validation-for="CategoryId" class="text-danger small"></span>
+                    <div class="help-text">@Loc.T("Optional — leave empty to file the asset under the category itself.")</div>
                 </div>
-                <div class="col-md-8">
-                    <label asp-for="ZoneId" class="form-label small">@Loc.T("Zone")</label>
-                    @{
-                        var selectedZone = ViewBag.SelectedZone as Zone;
-                    }
-                    <partial name="_ZoneCombobox" model='new ZoneComboboxModel {
-                        Name = "ZoneId", LocationCategories = (List<LocationCategory>)ViewBag.LocationCategories,
-                        SelectedLocationCategoryId = ViewBag.SelectedLocationCategoryId as int?, SelectedZoneId = Model.ZoneId > 0 ? Model.ZoneId : (int?)null,
-                        SelectedZoneLabel = selectedZone == null ? null : Loc.LocalizedName(selectedZone.Name, selectedZone.NameAr) }' />
-                    <span asp-validation-for="ZoneId" class="text-danger small"></span>
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="Manufacturer" class="form-label small">@Loc.T("Manufacturer")</label>
-                    <input asp-for="Manufacturer" class="form-control" />
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="Model" class="form-label small">@Loc.T("Model")</label>
-                    <input asp-for="Model" class="form-control" />
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="SerialNumber" class="form-label small">@Loc.T("Serial Number")</label>
-                    <input asp-for="SerialNumber" class="form-control" />
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="Sku" class="form-label small">@Loc.T("SKU")</label>
-                    <input asp-for="Sku" class="form-control" placeholder="@Loc.T("Manufacturer part/catalog number")" />
+                @* Zone picker inlined (rather than the shared _ZoneCombobox partial) so both halves
+                   carry a real <label>: the partial renders its category <select> with only a
+                   placeholder option, which read as an unlabelled second dropdown next to "Zone".
+                   The data-zc-* hooks are identical, so site.js's initZonePickers() drives it. *@
+                <div class="col-12 zone-combobox" data-zone-combobox>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="assetZoneCategory" class="form-label">@Loc.T("Zone Category")</label>
+                            <select id="assetZoneCategory" class="form-select" data-zc-category>
+                                <option value="">—</option>
+                                @foreach (var c in (List<LocationCategory>)ViewBag.LocationCategories)
+                                {
+                                    <option value="@c.Id" selected="@(selectedZoneCategoryId == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+                                }
+                            </select>
+                            <div class="help-text">@Loc.T("Pick a category first to narrow the zone search.")</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="assetZoneSearch" class="form-label required">@Loc.T("Zone")</label>
+                            <div class="position-relative">
+                                <input type="hidden" name="ZoneId" value="@(Model.ZoneId > 0 ? Model.ZoneId : (int?)null)" data-zc-value />
+                                <input type="text" id="assetZoneSearch" class="form-control" autocomplete="off"
+                                       placeholder="@Loc.T("Search zones…")" value="@selectedZoneLabel" data-zc-search />
+                                <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1055;max-height:260px;overflow:auto" data-zc-results data-nomatch="@Loc.T("No matches")"></div>
+                            </div>
+                            <span asp-validation-for="ZoneId" class="text-danger small"></span>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="PurchaseDate" class="form-label small">@Loc.T("Purchase Date")</label>
+                    <label asp-for="Manufacturer" class="form-label">@Loc.T("Manufacturer")</label>
+                    <input asp-for="Manufacturer" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Model" class="form-label">@Loc.T("Model")</label>
+                    <input asp-for="Model" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SerialNumber" class="form-label">@Loc.T("Serial Number")</label>
+                    <input asp-for="SerialNumber" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Sku" class="form-label">@Loc.T("SKU")</label>
+                    <input asp-for="Sku" class="form-control" />
+                    <div class="help-text">@Loc.T("Manufacturer part/catalog number")</div>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="PurchaseDate" class="form-label">@Loc.T("Purchase Date")</label>
                     <input asp-for="PurchaseDate" type="date" class="form-control" />
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="WarrantyExpiry" class="form-label small">@Loc.T("Warranty Expiry")</label>
+                    <label asp-for="WarrantyExpiry" class="form-label">@Loc.T("Warranty Expiry")</label>
                     <input asp-for="WarrantyExpiry" type="date" class="form-control" />
                 </div>
                 <div class="col-12">
-                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
+                    <label asp-for="Notes" class="form-label">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
                 </div>
                 <div class="col-12">
-                    <div class="form-text"><i class="bi bi-info-circle me-1"></i>@Loc.T("Vendor is determined automatically from this asset's linked Contracts — link it to a contract to set its vendor.")</div>
+                    <div class="help-text"><i class="bi bi-info-circle me-1"></i>@Loc.T("Vendor is determined automatically from this asset's linked Contracts — link it to a contract to set its vendor.")</div>
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
                 <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

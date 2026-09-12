@@ -1,10 +1,10 @@
-@using Microsoft.AspNetCore.Authorization
+﻿@using Microsoft.AspNetCore.Authorization
 @model List<AssetCategory>
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Asset Categories");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetCategoryManage)).Succeeded;
-    var subtitle = canManage ? Loc.T("Add categories and subcategories, then edit or manage their actions below") : Loc.T("Browse the asset category and subcategory taxonomy");
+    var subtitle = canManage ? Loc.T("Add categories and subcategories, then edit or manage their actions below.") : Loc.T("Browse the asset category and subcategory taxonomy.");
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Categories"),Subtitle=subtitle})" />
 
@@ -13,24 +13,29 @@
     {
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0">
-                    <span class="fw-semibold">@c.Name @(!string.IsNullOrWhiteSpace(c.NameAr) ? $"({c.NameAr})" : "")</span>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center border-0 gap-2">
+                    <span class="fw-semibold"><i class="bi bi-folder me-2"></i>@c.Name @(!string.IsNullOrWhiteSpace(c.NameAr) ? $"({c.NameAr})" : "")</span>
                     @if (canManage)
                     {
-                        <div>
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
-                                    data-modal-edit="categoryEditModal"
-                                    data-id="@c.Id" data-name="@c.Name" data-name-ar="@c.NameAr" data-parent-category-id="">
-                                @Loc.T("Edit")
-                            </button>
-                            <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@c.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
+                        <div class="dropdown row-actions">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
+                                            data-modal-edit="categoryEditModal"
+                                            data-id="@c.Id" data-name="@c.Name" data-name-ar="@c.NameAr" data-parent-category-id="">
+                                        <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                    </button>
+                                </li>
+                                <li><a class="dropdown-item" asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@c.Id"><i class="bi bi-list-check me-2"></i>@Loc.T("Manage Actions")</a></li>
+                            </ul>
                         </div>
                     }
                 </div>
                 <div class="list-group list-group-flush">
                     @if (c.Subcategories.Count == 0)
                     {
-                        <div class="list-group-item text-muted small text-center py-2">@Loc.T("No records found")</div>
+                        <div class="list-group-item text-muted small text-center py-2">@Loc.T("No subcategories yet")</div>
                     }
                     @foreach (var sub in c.Subcategories.OrderBy(s => s.Name))
                     {
@@ -38,13 +43,18 @@
                             <span class="small">↳ @sub.Name @(!string.IsNullOrWhiteSpace(sub.NameAr) ? $"({sub.NameAr})" : "")</span>
                             @if (canManage)
                             {
-                                <div>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
-                                            data-modal-edit="categoryEditModal"
-                                            data-id="@sub.Id" data-name="@sub.Name" data-name-ar="@sub.NameAr" data-parent-category-id="@c.Id">
-                                        @Loc.T("Edit")
-                                    </button>
-                                    <a asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@sub.Id" class="btn btn-sm btn-outline-secondary">@Loc.T("Manage Actions")</a>
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#categoryEditModal"
+                                                    data-modal-edit="categoryEditModal"
+                                                    data-id="@sub.Id" data-name="@sub.Name" data-name-ar="@sub.NameAr" data-parent-category-id="@c.Id">
+                                                <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                            </button>
+                                        </li>
+                                        <li><a class="dropdown-item" asp-controller="AssetActionTypes" asp-action="Index" asp-route-categoryId="@sub.Id"><i class="bi bi-list-check me-2"></i>@Loc.T("Manage Actions")</a></li>
+                                    </ul>
                                 </div>
                             }
                         </div>
@@ -63,7 +73,7 @@
                                 <input type="text" name="NameAr" class="form-control form-control-sm" placeholder="@Loc.T("Name (Arabic)")" dir="rtl" />
                             </div>
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">+ @Loc.T("Subcategory")</button>
+                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Subcategory")</button>
                             </div>
                         </form>
                     </div>
@@ -76,7 +86,7 @@
     {
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white fw-semibold border-0">@Loc.T("New Category")</div>
+                <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-plus-circle me-2"></i>@Loc.T("New Category")</div>
                 <div class="card-body">
                     <form method="post" asp-action="Create" class="row g-2">
                         @Html.AntiForgeryToken()
@@ -87,7 +97,7 @@
                             <input type="text" name="NameAr" class="form-control form-control-sm" placeholder="@Loc.T("Name (Arabic)")" dir="rtl" />
                         </div>
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">+ @Loc.T("New Category")</button>
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-plus-lg me-1"></i>@Loc.T("Add")</button>
                         </div>
                     </form>
                 </div>

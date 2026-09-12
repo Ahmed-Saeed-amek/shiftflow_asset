@@ -1,13 +1,13 @@
-@model List<WorkOrderBlockReason>
+﻿@model List<WorkOrderBlockReason>
 @{
     ViewData["Title"] = Loc.T("Block Reasons");
     string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#reasonModal' data-modal-create='reasonModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Reason") + "</button>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Block Reasons"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Block Reasons"),Subtitle=Loc.T("Why a work order can be put on hold."),ActionsHtml=actionsHtml})" />
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 table-card-stack">
             <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
@@ -17,14 +17,21 @@
                 @foreach (var r in Model)
                 {
                     <tr>
-                        <td>@r.Name</td>
-                        <td><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reasonModal"
-                                    data-modal-edit="reasonModal"
-                                    data-id="@r.Id" data-name="@r.Name" data-name-ar="@r.NameAr" data-is-active="@(r.IsActive ? "true" : "false")">
-                                @Loc.T("Edit")
-                            </button>
+                        <td data-label="@Loc.T("Name")" class="fw-semibold">@r.Name</td>
+                        <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="text-end">
+                            <div class="dropdown row-actions">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#reasonModal"
+                                                data-modal-edit="reasonModal"
+                                                data-id="@r.Id" data-name="@r.Name" data-name-ar="@r.NameAr" data-is-active="@(r.IsActive ? "true" : "false")">
+                                            <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
                         </td>
                     </tr>
                 }
@@ -47,11 +54,11 @@
                     <div id="reasonModalError" class="alert alert-danger small" role="alert" hidden></div>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Name")</label>
+                            <label class="form-label required" for="reasonName">@Loc.T("Name")</label>
                             <input name="Name" id="reasonName" class="form-control" required />
                         </div>
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                            <label class="form-label" for="reasonNameAr">@Loc.T("Name (Arabic)")</label>
                             <input name="NameAr" id="reasonNameAr" class="form-control" dir="rtl" />
                         </div>
                         <div class="col-12">

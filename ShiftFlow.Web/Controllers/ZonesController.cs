@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
@@ -34,11 +34,21 @@ public class ZonesController : Controller
         _scope.GetScopedAssetsAsync(_um.GetUserId(User)!);
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int page = 1, string? q = null, int? locationCategoryId = null)
     {
         if (page < 1) page = 1;
         var scopedAssets = await ScopedAssetsAsync();
-        var query = _db.Zones.AsNoTracking()
+        var baseQuery = _db.Zones.AsNoTracking().AsQueryable();
+        if (locationCategoryId is > 0)
+            baseQuery = baseQuery.Where(z => z.LocationCategoryId == locationCategoryId);
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim();
+            baseQuery = baseQuery.Where(z => z.Name.Contains(term)
+                                          || (z.NameAr != null && z.NameAr.Contains(term))
+                                          || (z.Address != null && z.Address.Contains(term)));
+        }
+        var query = baseQuery
             .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name);
 
         var totalCount = await query.CountAsync();
@@ -63,6 +73,9 @@ public class ZonesController : Controller
             Zones = zones,
             TotalCount = totalCount,
             Pagination = new PaginationModel { Page = page, TotalPages = totalPages },
+            Q = q,
+            LocationCategoryId = locationCategoryId,
+            LocationCategories = await _lookups.LocationCategoriesAsync(),
         });
     }
 

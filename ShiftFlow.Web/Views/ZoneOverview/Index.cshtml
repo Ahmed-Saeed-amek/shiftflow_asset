@@ -15,64 +15,59 @@
 
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Zone Overview"),Subtitle=Loc.T("Latest orders by zone")})" />
 
-<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-    <span class="small text-muted fw-semibold me-1">@Loc.T("Location Category")</span>
-    @* Same unwrapping btn-group issue documented on Orders/Create.cshtml — an unbounded number
-       of location categories (site-dependent) don't fit a narrow phone and a btn-group doesn't
-       wrap its buttons, so without this it drags the whole page into horizontal scroll. *@
-    <div class="overflow-x-auto">
-        <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <button type="button" class="btn btn-primary" data-filter-category="">@Loc.T("All")</button>
-            @foreach (var c in categories)
-            {
-                <button type="button" class="btn btn-outline-secondary" data-filter-category="@c.Name">@Loc.LocalizedName(c.Name, c.NameAr)</button>
-            }
-        </div>
-    </div>
-    <span class="small text-muted fw-semibold ms-2 me-1">@Loc.T("Status")</span>
-    <div class="overflow-x-auto">
-        <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <button type="button" class="btn btn-primary" data-filter-status="">@Loc.T("All")</button>
-            <button type="button" class="btn btn-outline-secondary" data-filter-status="Defective">@Loc.T("Defective")</button>
-            <button type="button" class="btn btn-outline-secondary" data-filter-status="Maintenance">@Loc.T("Maintenance")</button>
-            <button type="button" class="btn btn-outline-secondary" data-filter-status="OK">@Loc.T("OK")</button>
-        </div>
-    </div>
-</div>
+@* Filtering here is client-side (it also drives the map), so the bar never submits — but it uses
+   the same .filter-bar shell as every server-filtered list so the two read identically. Two
+   selects replace the previous two wrapping button groups, which needed their own horizontal
+   scrollers once a site had more than a handful of zone categories. *@
+<form class="filter-bar" id="zoneOverviewFilters" onsubmit="return false;">
+    <select class="form-select form-select-sm" id="filterCategory" aria-label="@Loc.T("Zone Category")">
+        <option value="">@Loc.T("Zone Category")</option>
+        @foreach (var c in categories)
+        {
+            <option value="@c.Name">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+        }
+    </select>
+    <select class="form-select form-select-sm" id="filterStatus" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("Status")</option>
+        <option value="Defective">@Loc.T("Defective")</option>
+        <option value="Maintenance">@Loc.T("Maintenance")</option>
+        <option value="OK">@Loc.T("OK")</option>
+    </select>
+    <a href="#" id="filterClear" class="btn btn-link btn-sm d-none">@Loc.T("Clear")</a>
+    <span class="filter-bar__count text-muted small" id="zoneCount">@Model.Count @Loc.T("records")</span>
+</form>
 
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm">
             <div class="table-responsive" style="max-height:600px;overflow-y:auto">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 table-card-stack">
                     <thead class="table-light">
                         <tr>
-                            <th>@Loc.T("Location Category")</th>
                             <th>@Loc.T("Zone")</th>
+                            <th>@Loc.T("Zone Category")</th>
                             <th>@Loc.T("Dispatched Orders")</th>
-                            <th class="d-none d-md-table-cell">@Loc.T("Last Visited")</th>
-                            <th></th>
+                            <th>@Loc.T("Last Visited")</th>
                         </tr>
                     </thead>
                     <tbody id="zoneTableBody">
                         @if (Model.Count == 0)
                         {
-                            <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                            <tr><td colspan="4" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                         }
                         @foreach (var z in Model)
                         {
                             var rowStatus = RowStatus(z.Id);
                             var rowClass = rowStatus == "Defective" ? "table-danger" : rowStatus == "Maintenance" ? "table-warning" : "";
-                            <tr class="cursor-pointer @rowClass" data-zone-row data-category="@z.LocationCategory?.Name" data-status="@rowStatus"
-                                onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
-                                <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
-                                <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
-                                <td>@dispatchedByZone.GetValueOrDefault(z.Id, 0)</td>
-                                <td class="small text-muted d-none d-md-table-cell">@(lastVisitedByZone.TryGetValue(z.Id, out var lastVisited) ? Loc.TDate(lastVisited.ToString("dd/MM/yyyy")) : "—")</td>
-                                <td class="text-end"><a asp-action="Details" asp-route-id="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
+                            <tr class="row-link @rowClass" data-zone-row data-category="@z.LocationCategory?.Name" data-status="@rowStatus"
+                                data-href="@Url.Action("Details", new { id = z.Id })">
+                                <td data-label="@Loc.T("Zone")"><a asp-action="Details" asp-route-id="@z.Id" class="fw-semibold text-decoration-none">@Loc.LocalizedName(z.Name, z.NameAr)</a></td>
+                                <td data-label="@Loc.T("Zone Category")" class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
+                                <td data-label="@Loc.T("Dispatched Orders")">@dispatchedByZone.GetValueOrDefault(z.Id, 0)</td>
+                                <td data-label="@Loc.T("Last Visited")" class="small text-muted">@(lastVisitedByZone.TryGetValue(z.Id, out var lastVisited) ? Loc.TDate(lastVisited.ToString("dd/MM/yyyy")) : "—")</td>
                             </tr>
                         }
-                        <tr id="zoneNoMatchRow" class="d-none"><td colspan="5" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
+                        <tr id="zoneNoMatchRow" class="d-none"><td colspan="4" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -81,7 +76,7 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <span class="fw-semibold"><i class="bi bi-map me-1 text-primary"></i>@Loc.T("Asset Map")</span>
+                <span class="fw-semibold"><i class="bi bi-map me-2 text-primary"></i>@Loc.T("Asset Map")</span>
                 <div class="d-flex align-items-center gap-3 small text-muted">
                     <span><span class="d-inline-block rounded-circle me-1 legend-dot" data-token="--destructive"></span>@Loc.T("Defective")</span>
                     <span><span class="d-inline-block rounded-circle me-1 legend-dot" data-token="--warning"></span>@Loc.T("Maintenance")</span>
@@ -103,13 +98,18 @@
     document.querySelectorAll('.legend-dot').forEach(el => { el.style.background = themeColor(el.dataset.token); });
 (function () {
     let mapHandle = null;
-    let activeCategory = '';
-    let activeStatus = '';
 
+    const categorySel = document.getElementById('filterCategory');
+    const statusSel = document.getElementById('filterStatus');
+    const clearLink = document.getElementById('filterClear');
+    const countEl = document.getElementById('zoneCount');
+    const countSuffix = countEl.textContent.replace(/^\s*\d+\s*/, '');
     const rows = () => document.querySelectorAll('[data-zone-row]');
     const noMatchRow = document.getElementById('zoneNoMatchRow');
 
     function applyFilters() {
+        const activeCategory = categorySel.value;
+        const activeStatus = statusSel.value;
         let visibleCount = 0;
         rows().forEach(r => {
             const matches = (!activeCategory || r.dataset.category === activeCategory)
@@ -118,6 +118,8 @@
             if (matches) visibleCount++;
         });
         noMatchRow.classList.toggle('d-none', visibleCount > 0);
+        countEl.textContent = visibleCount + ' ' + countSuffix;
+        clearLink.classList.toggle('d-none', !activeCategory && !activeStatus);
 
         if (mapHandle) {
             mapHandle.setFilter({
@@ -127,17 +129,13 @@
         }
     }
 
-    function wireGroup(selector, onSelect) {
-        const buttons = document.querySelectorAll(selector);
-        buttons.forEach(btn => btn.addEventListener('click', () => {
-            buttons.forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary'); });
-            btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary');
-            onSelect(btn);
-        }));
-    }
-
-    wireGroup('[data-filter-category]', btn => { activeCategory = btn.dataset.filterCategory; applyFilters(); });
-    wireGroup('[data-filter-status]', btn => { activeStatus = btn.dataset.filterStatus; applyFilters(); });
+    categorySel.addEventListener('change', applyFilters);
+    statusSel.addEventListener('change', applyFilters);
+    clearLink.addEventListener('click', e => {
+        e.preventDefault();
+        categorySel.value = ''; statusSel.value = '';
+        applyFilters();
+    });
 
     initZoneOverviewAssetMap('assetOverviewMap', '@Url.Action("AssetMap")', '@Url.Action("Details", "Assets", new { id = "__ID__" })')
         .then(handle => { mapHandle = handle; });

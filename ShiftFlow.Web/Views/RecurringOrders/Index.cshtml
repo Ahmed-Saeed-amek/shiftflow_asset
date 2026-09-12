@@ -1,39 +1,76 @@
-@model List<RecurringOrder>
+@model RecurringOrderIndexViewModel
 @using ShiftFlow.Domain.Entities
+@using Microsoft.AspNetCore.Html
 @{
     ViewData["Title"] = Loc.T("Recurring Orders");
-    string actionsHtml = "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Schedule") + "</a>";
-}
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Recurring Orders"),Subtitle=Loc.T("Auto-generates one order per linked asset on a repeating cadence — any active order type, including vendor-routed ones."),ActionsHtml=actionsHtml})" />
+    var hasFilter = !string.IsNullOrEmpty(Model.Q) || Model.OrderTypeId != null || !string.IsNullOrEmpty(Model.Status);
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Order Type")</th><th>@Loc.T("Assets")</th><th class="d-none d-md-table-cell">@Loc.T("Assign To")</th><th class="d-none d-lg-table-cell">@Loc.T("Cadence")</th><th class="d-none d-lg-table-cell">@Loc.T("Start Date")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
-            <tbody>
-                @if (Model.Count == 0)
-                {
-                    <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var r in Model)
-                {
-                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Edit", new { id = r.Id })'">
-                        <td><a asp-action="Edit" asp-route-id="@r.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</a></td>
-                        <td class="small">@r.AssetLinks.Count</td>
-                        <td class="small d-none d-md-table-cell">
-                            @(r.AssignedToUser?.FullName ?? (r.AssignedToGroup != null ? Loc.T("Group") + ": " + r.AssignedToGroup.Name : "—"))
-                            @if (r.Vendor != null)
-                            {
-                                <span class="text-muted"> · @r.Vendor.Name</span>
-                            }
-                        </td>
-                        <td class="small d-none d-lg-table-cell">@Loc.T(r.Cadence)</td>
-                        <td class="small d-none d-lg-table-cell">@Loc.TDate(r.StartDate.ToString("dd/MM/yyyy"))@(r.EndDate.HasValue ? " – " + Loc.TDate(r.EndDate.Value.ToString("dd/MM/yyyy")) : "")</td>
-                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
-                        <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    Func<object?, IHtmlContent> newSchedule = @<a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New Schedule")</a>;
+    var actions = new HtmlContentBuilder();
+    actions.AppendHtml(newSchedule(null));
+}
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = Loc.T("Recurring Orders"),
+    Subtitle = Loc.T("Auto-generates one order per linked asset on a repeating cadence — any active order type, including vendor-routed ones."),
+    Actions = actions }' />
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search")" aria-label="@Loc.T("Search")" />
+    <select name="orderTypeId" class="form-select form-select-sm" aria-label="@Loc.T("Order Type")">
+        <option value="">@Loc.T("Order Type")</option>
+        @foreach (var t in Model.OrderTypes)
+        {
+            <option value="@t.Id" selected="@(Model.OrderTypeId == t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+        }
+    </select>
+    <select name="status" class="form-select form-select-sm" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("Status")</option>
+        <option value="Active" selected="@(Model.Status == "Active")">@Loc.T("Active")</option>
+        <option value="Inactive" selected="@(Model.Status == "Inactive")">@Loc.T("Inactive")</option>
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
+</form>
+
+@if (Model.Schedules.Count == 0)
+{
+    <partial name="_EmptyState" model='new EmptyStateModel {
+        Icon = "bi-arrow-repeat",
+        Title = hasFilter ? Loc.T("No schedules match these filters") : Loc.T("No recurring schedules yet"),
+        Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : Loc.T("Set up a schedule to generate orders automatically."),
+        ActionUrl = hasFilter ? null : Url.Action("Create"),
+        ActionLabel = hasFilter ? null : Loc.T("New Schedule") }' />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("Order Type")</th><th>@Loc.T("Assets")</th><th>@Loc.T("Assign To")</th><th>@Loc.T("Cadence")</th><th>@Loc.T("Start Date")</th><th>@Loc.T("Status")</th></tr></thead>
+                <tbody>
+                    @foreach (var r in Model.Schedules)
+                    {
+                        <tr class="row-link" data-href="@Url.Action("Edit", new { id = r.Id })">
+                            <td data-label="@Loc.T("Order Type")"><a asp-action="Edit" asp-route-id="@r.Id" class="fw-semibold text-decoration-none">@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</a></td>
+                            <td data-label="@Loc.T("Assets")" class="small">@r.AssetLinks.Count</td>
+                            <td data-label="@Loc.T("Assign To")" class="small">
+                                @(r.AssignedToUser?.FullName ?? (r.AssignedToGroup != null ? Loc.T("Group") + ": " + r.AssignedToGroup.Name : "—"))
+                                @if (r.Vendor != null)
+                                {
+                                    <span class="text-muted"> · @r.Vendor.Name</span>
+                                }
+                            </td>
+                            <td data-label="@Loc.T("Cadence")" class="small">@Loc.T(r.Cadence)</td>
+                            <td data-label="@Loc.T("Start Date")" data-hide-mobile class="small">@Loc.TDate(r.StartDate.ToString("dd/MM/yyyy"))@(r.EndDate.HasValue ? " – " + Loc.TDate(r.EndDate.Value.ToString("dd/MM/yyyy")) : "")</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+}

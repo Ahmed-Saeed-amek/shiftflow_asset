@@ -1,42 +1,89 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model ContractIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Contracts");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractManage)).Succeeded;
     var canView = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractView)).Succeeded;
-    string actionsHtml = "";
-    if (canView)
-        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
-                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
-    if (canManage)
-        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Contract") + "</a>";
-}
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Contracts"),ActionsHtml=actionsHtml})" />
+    var hasFilter = !string.IsNullOrEmpty(Model.Q) || Model.VendorId != null
+                    || !string.IsNullOrEmpty(Model.ContractType) || !string.IsNullOrEmpty(Model.Status);
 
-<div class="text-muted small mb-2">@Model.TotalCount @Loc.T("records")</div>
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Contract Number")</th><th class="d-none d-sm-table-cell">@Loc.T("Vendor")</th><th class="d-none d-lg-table-cell">@Loc.T("Contract Type")</th><th class="d-none d-xl-table-cell">@Loc.T("Assets")</th><th>@Loc.T("Status")</th><th class="text-end"></th></tr></thead>
-            <tbody>
-                @if (Model.Contracts.Count == 0)
-                {
-                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var c in Model.Contracts)
-                {
-                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = c.Id })'">
-                        <td class="small font-monospace"><a asp-action="Details" asp-route-id="@c.Id" class="text-decoration-none" onclick="event.stopPropagation()">@c.ContractNumber</a></td>
-                        <td class="d-none d-sm-table-cell">@c.VendorName</td>
-                        <td class="d-none d-lg-table-cell"><partial name="_StatusBadge" model="@c.ContractType" /></td>
-                        <td class="d-none d-xl-table-cell">@c.AssetCount</td>
-                        <td><partial name="_StatusBadge" model="@c.StatusLabel" /></td>
-                        <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    var actions = new HtmlContentBuilder();
+    if (canView)
+    {
+        actions.AppendHtml(await Html.PartialAsync("_ExportButtons",
+            new ExportButtonsModel { ExcelUrl = Url.Action("ExportExcel"), PdfUrl = Url.Action("ExportPdf") }));
+    }
+    if (canManage)
+    {
+        Func<object?, IHtmlContent> newContract = @<a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New Contract")</a>;
+        actions.AppendHtml(newContract(null));
+    }
+}
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = Loc.T("Contracts"),
+    Subtitle = Loc.T("Warranty, service and maintenance agreements and the assets they cover."),
+    Actions = actions }' />
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search")" aria-label="@Loc.T("Search")" />
+    <select name="vendorId" class="form-select form-select-sm" aria-label="@Loc.T("Vendor")">
+        <option value="">@Loc.T("Vendor")</option>
+        @foreach (var v in Model.Vendors)
+        {
+            <option value="@v.Id" selected="@(Model.VendorId == v.Id)">@v.Name</option>
+        }
+    </select>
+    <select name="contractType" class="form-select form-select-sm" aria-label="@Loc.T("Contract Type")">
+        <option value="">@Loc.T("Contract Type")</option>
+        @foreach (var t in Contract.ContractTypes)
+        {
+            <option value="@t" selected="@(Model.ContractType == t)">@Loc.T(t)</option>
+        }
+    </select>
+    <select name="status" class="form-select form-select-sm" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("Status")</option>
+        <option value="Active" selected="@(Model.Status == "Active")">@Loc.T("Active")</option>
+        <option value="Expired" selected="@(Model.Status == "Expired")">@Loc.T("Expired")</option>
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
+</form>
+
+@if (Model.Contracts.Count == 0)
+{
+    <partial name="_EmptyState" model='new EmptyStateModel {
+        Icon = "bi-file-earmark-text",
+        Title = hasFilter ? Loc.T("No contracts match these filters") : Loc.T("No contracts yet"),
+        Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : Loc.T("Record a contract to link it to the assets it covers."),
+        ActionUrl = (!hasFilter && canManage) ? Url.Action("Create") : null,
+        ActionLabel = (!hasFilter && canManage) ? Loc.T("New Contract") : null }' />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("Contract Number")</th><th>@Loc.T("Vendor")</th><th>@Loc.T("Contract Type")</th><th>@Loc.T("Assets")</th><th>@Loc.T("Status")</th></tr></thead>
+                <tbody>
+                    @foreach (var c in Model.Contracts)
+                    {
+                        <tr class="row-link" data-href="@Url.Action("Details", new { id = c.Id })">
+                            <td data-label="@Loc.T("Contract Number")"><a asp-action="Details" asp-route-id="@c.Id" class="fw-semibold text-decoration-none">@c.ContractNumber</a></td>
+                            <td data-label="@Loc.T("Vendor")">@c.VendorName</td>
+                            <td data-label="@Loc.T("Contract Type")"><partial name="_StatusBadge" model="@c.ContractType" /></td>
+                            <td data-label="@Loc.T("Assets")" data-hide-mobile>@c.AssetCount</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@c.StatusLabel" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-<partial name="_Pagination" model="Model.Pagination" />
+    <partial name="_Pagination" model="Model.Pagination" />
+}

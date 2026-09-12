@@ -1,12 +1,22 @@
-@using Microsoft.AspNetCore.Authorization
+﻿@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model Contract
 @inject IAuthorizationService AuthZ
 @{
-    ViewData["Title"] = Model.ContractNumber ?? Loc.T("Contracts");
+    var title = Model.ContractNumber ?? Loc.T("Contracts");
+    ViewData["Title"] = title;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.ContractManage)).Succeeded;
-    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
+    // This controller exposes no Delete, so the header is a single primary action with no
+    // "More" menu to hang anything else off.
+    Func<object?, IHtmlContent> editBtn = @<a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>@Loc.T("Edit")</a>;
+    var actions = new HtmlContentBuilder();
+    if (canManage) { actions.AppendHtml(editBtn(null)); }
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.ContractNumber ?? Loc.T("Contracts"),Subtitle=Model.Vendor?.Name,ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = title,
+    Subtitle = Model.Vendor?.Name,
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Contracts"), Url.Action("Index")), (title, null) },
+    Actions = actions }' />
 
 <div class="row g-3">
     <div class="col-lg-4">
@@ -29,7 +39,7 @@
         </div>
 
         <div class="card border-0 shadow-sm mt-3">
-            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-paperclip me-1"></i>@Loc.T("Attachments")</div>
+            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-paperclip me-2"></i>@Loc.T("Attachments")</div>
             <div class="card-body">
                 @if (Model.Attachments.Count == 0)
                 {
@@ -68,21 +78,21 @@
     </div>
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Linked Assets")</div>
+            <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-box me-2"></i>@Loc.T("Linked Assets")</div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 table-card-stack">
                     <thead><tr><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Name")</th><th>@Loc.T("Status")</th></tr></thead>
                     <tbody>
                         @if (Model.AssetLinks.Count == 0)
                         {
-                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                            <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No assets linked yet.")</td></tr>
                         }
                         @foreach (var link in Model.AssetLinks)
                         {
-                            <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", "Assets", new { id = link.AssetId })'">
-                                <td class="small font-monospace">@link.Asset?.AssetTag</td>
-                                <td>@link.Asset?.Name</td>
-                                <td><partial name="_StatusBadge" model="@link.Asset?.Status" /></td>
+                            <tr class="row-link" data-href="@Url.Action("Details", "Assets", new { id = link.AssetId })">
+                                <td data-label="@Loc.T("Asset Tag")" class="small fw-semibold">@link.Asset?.AssetTag</td>
+                                <td data-label="@Loc.T("Name")">@link.Asset?.Name</td>
+                                <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@link.Asset?.Status" /></td>
                             </tr>
                         }
                     </tbody>
@@ -94,21 +104,21 @@
         {
             var schedule = (List<PmScheduleRow>)(ViewBag.PmSchedule ?? new List<PmScheduleRow>());
             <div class="card border-0 shadow-sm mt-3">
-                <div class="card-header bg-white fw-semibold border-0">@Loc.T("PM Schedule")</div>
+                <div class="card-header bg-white fw-semibold border-0"><i class="bi bi-calendar-check me-2"></i>@Loc.T("PM Schedule")</div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
                         <thead><tr><th>@Loc.T("Due Date")</th><th>@Loc.T("Asset")</th><th>@Loc.T("Status")</th></tr></thead>
                         <tbody>
                             @if (schedule.Count == 0)
                             {
-                                <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
+                                <tr><td colspan="3" class="text-center text-muted py-4">@Loc.T("No scheduled visits yet.")</td></tr>
                             }
                             @foreach (var row in schedule)
                             {
                                 <tr>
-                                    <td class="small">@row.DueDate.ToString("yyyy-MM-dd")</td>
-                                    <td class="small">@row.AssetLabel</td>
-                                    <td>
+                                    <td data-label="@Loc.T("Due Date")" class="small">@Loc.TDate(row.DueDate.ToString("dd/MM/yyyy"))</td>
+                                    <td data-label="@Loc.T("Asset")" class="small">@row.AssetLabel</td>
+                                    <td data-label="@Loc.T("Status")">
                                         @if (row.WorkOrderId != null)
                                         {
                                             <span class="badge border bg-success-subtle text-success-emphasis border-success-subtle">@Loc.T("Generated")</span>

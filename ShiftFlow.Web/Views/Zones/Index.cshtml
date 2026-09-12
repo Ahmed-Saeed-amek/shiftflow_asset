@@ -1,56 +1,88 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model ZoneIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
-    ViewData["Title"] = Loc.T("Asset Locations");
+    ViewData["Title"] = Loc.T("Zones");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
-    string actionsHtml = "<div class=\"btn-group me-2\"><button type=\"button\" class=\"btn btn-outline-secondary btn-sm active\" id=\"listViewBtn\">" + Loc.T("List View") + "</button><button type=\"button\" class=\"btn btn-outline-secondary btn-sm\" id=\"mapViewBtn\">" + Loc.T("Map View") + "</button></div>";
-    if (canManage)
-        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Zone") + "</a>";
+    var hasFilter = Model.LocationCategoryId != null || !string.IsNullOrEmpty(Model.Q);
+
+    Func<object?, IHtmlContent> viewToggle =
+        @<div class="btn-group" role="group" aria-label="@Loc.T("View")">
+            <button type="button" class="btn btn-outline-secondary btn-sm active" id="listViewBtn">@Loc.T("List View")</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="mapViewBtn">@Loc.T("Map View")</button>
+        </div>;
+    Func<object?, IHtmlContent> newZone = @<a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>@Loc.T("New Zone")</a>;
+
+    var actions = new HtmlContentBuilder();
+    actions.AppendHtml(viewToggle(null));
+    if (canManage) { actions.AppendHtml(newZone(null)); }
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
 
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Locations"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model='new PageHeaderWithActions {
+    Title = Loc.T("Zones"),
+    Subtitle = Loc.T("Every zone assets can be placed in, grouped by zone category."),
+    Actions = actions }' />
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search")" aria-label="@Loc.T("Search")" />
+    <select name="locationCategoryId" class="form-select form-select-sm" aria-label="@Loc.T("Zone Category")">
+        <option value="">@Loc.T("Zone Category")</option>
+        @foreach (var c in Model.LocationCategories)
+        {
+            <option value="@c.Id" selected="@(Model.LocationCategoryId == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
+</form>
 
 <div id="listView">
-    <div class="card border-0 shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead><tr><th>@Loc.T("Location Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th><th></th></tr></thead>
-                <tbody>
-                    @if (Model.Zones.Count == 0)
-                    {
-                        <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                    }
-                    @foreach (var z in Model.Zones)
-                    {
-                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
-                            <td class="small text-muted">@(z.LocationCategoryName is { } cat ? Loc.LocalizedName(cat, z.LocationCategoryNameAr) : null)</td>
-                            <td><a asp-action="Details" asp-route-id="@z.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@Loc.LocalizedName(z.Name, z.NameAr)</a></td>
-                            <td>
-                                @if (z.Latitude.HasValue)
-                                {
-                                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-geo-alt"></i></span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">@Loc.T("No coordinates set")</span>
-                                }
-                            </td>
-                            <td>@z.AssetCount</td>
-                            <td onclick="event.stopPropagation()">
-                                @if (canManage)
-                                {
-                                    <a asp-action="Edit" asp-route-id="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("Edit")</a>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    @if (Model.Zones.Count == 0)
+    {
+        <partial name="_EmptyState" model='new EmptyStateModel {
+            Icon = "bi-geo-alt",
+            Title = hasFilter ? Loc.T("No zones match these filters") : Loc.T("No zones yet"),
+            Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : Loc.T("Create a zone so assets have somewhere to live."),
+            ActionUrl = (!hasFilter && canManage) ? Url.Action("Create") : null,
+            ActionLabel = (!hasFilter && canManage) ? Loc.T("New Zone") : null }' />
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 table-card-stack">
+                    <thead><tr><th>@Loc.T("Zone")</th><th>@Loc.T("Zone Category")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th></tr></thead>
+                    <tbody>
+                        @foreach (var z in Model.Zones)
+                        {
+                            <tr class="row-link" data-href="@Url.Action("Details", new { id = z.Id })">
+                                <td data-label="@Loc.T("Zone")"><a asp-action="Details" asp-route-id="@z.Id" class="fw-semibold text-decoration-none">@Loc.LocalizedName(z.Name, z.NameAr)</a></td>
+                                <td data-label="@Loc.T("Zone Category")" class="small text-muted">@(z.LocationCategoryName is { } cat ? Loc.LocalizedName(cat, z.LocationCategoryNameAr) : null)</td>
+                                <td data-label="@Loc.T("Coordinates")">
+                                    @if (z.Latitude.HasValue)
+                                    {
+                                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-geo-alt"></i></span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">@Loc.T("No coordinates set")</span>
+                                    }
+                                </td>
+                                <td data-label="@Loc.T("Assets")">@z.AssetCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
-    <partial name="_Pagination" model="Model.Pagination" />
+        <partial name="_Pagination" model="Model.Pagination" />
+    }
 </div>
 
 <div id="mapView" class="card border-0 shadow-sm d-none">

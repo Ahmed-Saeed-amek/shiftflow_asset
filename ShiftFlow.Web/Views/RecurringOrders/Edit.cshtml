@@ -1,4 +1,6 @@
-@model RecurringOrderViewModel
+﻿@model RecurringOrderViewModel
 @{ ViewData["Title"] = Loc.T("Edit Schedule"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Edit Schedule")})" />
+<partial name="_PageHeader" model='new PageHeaderModel {
+    Title = Loc.T("Edit Schedule"),
+    Breadcrumbs = new List<(string Label, string? Url)> { (Loc.T("Recurring Orders"), Url.Action("Index")), (Loc.T("Edit Schedule"), null) } }' />
 <partial name="_Form" model="Model" />

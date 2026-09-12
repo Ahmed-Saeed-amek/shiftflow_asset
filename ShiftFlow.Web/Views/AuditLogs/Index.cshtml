@@ -1,91 +1,102 @@
 @model AuditLogIndexViewModel
-@{ ViewData["Title"] = Loc.T("Audit Logs"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Audit Logs"),Subtitle=Model.TotalCount + " " + Loc.T("recorded actions")})" />
+@{
+    ViewData["Title"] = Loc.T("Audit Logs");
+    var hasFilter = Model.From != null || Model.To != null || !string.IsNullOrEmpty(Model.EntityType)
+                    || !string.IsNullOrEmpty(Model.Action) || !string.IsNullOrEmpty(Model.UserId);
+}
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Audit Logs"),Subtitle=Loc.T("Who changed what, and when.")})" />
 
-<form method="get" class="row g-2 mb-3 align-items-end">
-    <div class="col-6 col-md-2">
-        <label for="fromFilter" class="form-label small">@Loc.T("From")</label>
+@* Same .filter-bar shell as every other list; the two date fields keep visible inline labels
+   because "From"/"To" cannot be carried by a date input's placeholder. *@
+<form method="get" class="filter-bar">
+    <label class="d-inline-flex align-items-center gap-1 small text-muted mb-0" for="fromFilter">
+        @Loc.T("From")
         <input id="fromFilter" type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
-    </div>
-    <div class="col-6 col-md-2">
-        <label for="toFilter" class="form-label small">@Loc.T("To")</label>
+    </label>
+    <label class="d-inline-flex align-items-center gap-1 small text-muted mb-0" for="toFilter">
+        @Loc.T("To")
         <input id="toFilter" type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
-    </div>
-    <div class="col-6 col-md-2">
-        <label for="entityTypeFilter" class="form-label small">@Loc.T("Entity")</label>
-        <select id="entityTypeFilter" name="entityType" class="form-select form-select-sm w-100 w-sm-auto">
-            <option value="">@Loc.T("All")</option>
-            @foreach (var t in Model.EntityTypes)
-            {
-                <option value="@t" selected="@(Model.EntityType == t)">@Loc.T(t)</option>
-            }
-        </select>
-    </div>
-    <div class="col-6 col-md-2">
-        <label for="actionFilter" class="form-label small">@Loc.T("Action")</label>
-        <select id="actionFilter" name="auditAction" class="form-select form-select-sm w-100 w-sm-auto">
-            <option value="">@Loc.T("All")</option>
-            @foreach (var a in Model.Actions)
-            {
-                <option value="@a" selected="@(Model.Action == a)">@a.Replace('_', ' ')</option>
-            }
-        </select>
-    </div>
-    <div class="col-6 col-md-2">
-        <label for="userFilter" class="form-label small">@Loc.T("User")</label>
-        <select id="userFilter" name="userId" class="form-select form-select-sm w-100 w-sm-auto">
-            <option value="">@Loc.T("All")</option>
-            @foreach (var u in Model.Users)
-            {
-                <option value="@u.Id" selected="@(Model.UserId == u.Id)">@u.Name</option>
-            }
-        </select>
-    </div>
-    <div class="col-6 col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-sm btn-outline-secondary flex-grow-1">@Loc.T("Filter")</button>
-        <a href="@Url.Action("Index")" class="btn btn-sm btn-link">@Loc.T("Clear")</a>
-    </div>
+    </label>
+    <select id="entityTypeFilter" name="entityType" class="form-select form-select-sm" aria-label="@Loc.T("Entity")">
+        <option value="">@Loc.T("Entity")</option>
+        @foreach (var t in Model.EntityTypes)
+        {
+            <option value="@t" selected="@(Model.EntityType == t)">@Loc.T(t)</option>
+        }
+    </select>
+    <select id="actionFilter" name="auditAction" class="form-select form-select-sm" aria-label="@Loc.T("Action")">
+        <option value="">@Loc.T("Action")</option>
+        @foreach (var a in Model.Actions)
+        {
+            <option value="@a" selected="@(Model.Action == a)">@a.Replace('_', ' ')</option>
+        }
+    </select>
+    <select id="userFilter" name="userId" class="form-select form-select-sm" aria-label="@Loc.T("User")">
+        <option value="">@Loc.T("User")</option>
+        @foreach (var u in Model.Users)
+        {
+            <option value="@u.Id" selected="@(Model.UserId == u.Id)">@u.Name</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@Model.TotalCount @Loc.T("records")</span>
 </form>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th class="d-none d-sm-table-cell">@Loc.T("Date")</th><th class="d-none d-md-table-cell">@Loc.T("Action")</th><th class="d-none d-lg-table-cell">@Loc.T("Entity")</th><th>@Loc.T("User")</th><th>@Loc.T("Change")</th></tr></thead>
-            <tbody>
-                @if (Model.Logs.Count == 0)
-                {
-                    <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var l in Model.Logs)
-                {
-                    <tr>
-                        <td class="small text-muted d-none d-sm-table-cell">@l.CreatedDate.ToString("dd/MM/yyyy HH:mm")</td>
-                        <td class="d-none d-md-table-cell"><span class="badge bg-secondary-subtle text-secondary-emphasis">@l.Action.Replace('_', ' ')</span></td>
-                        <td class="small d-none d-lg-table-cell">@l.EntityType</td>
-                        <td class="small">@(l.User?.FullName ?? l.UserName ?? l.UserId)</td>
-                        <td class="small text-muted text-truncate audit-change">
-                            @{
-                                var hasChange = !string.IsNullOrWhiteSpace(l.OldValue) || !string.IsNullOrWhiteSpace(l.NewValue);
-                            }
-                            @if (hasChange)
-                            {
-                                @(l.OldValue ?? "—")<text> → </text>@(l.NewValue ?? "—")
-                                @if (!string.IsNullOrWhiteSpace(l.Details))
+@if (Model.Logs.Count == 0)
+{
+    <partial name="_EmptyState" model='new EmptyStateModel {
+        Icon = "bi-journal-text",
+        Title = hasFilter ? Loc.T("No entries match these filters") : Loc.T("No recorded actions yet"),
+        Text = hasFilter ? Loc.T("Try clearing a filter or widening your search.") : null }' />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead><tr><th>@Loc.T("Date")</th><th>@Loc.T("Action")</th><th>@Loc.T("Entity")</th><th>@Loc.T("User")</th><th>@Loc.T("Change")</th></tr></thead>
+                <tbody>
+                    @foreach (var l in Model.Logs)
+                    {
+                        <tr>
+                            <td data-label="@Loc.T("Date")" class="small text-muted text-nowrap">@Loc.TDate(l.CreatedDate.ToString("dd/MM/yyyy HH:mm"))</td>
+                            <td data-label="@Loc.T("Action")"><span class="badge bg-secondary-subtle text-secondary-emphasis">@l.Action.Replace('_', ' ')</span></td>
+                            <td data-label="@Loc.T("Entity")" class="small">
+                                @Loc.T(l.EntityType)
+                                @if (!string.IsNullOrWhiteSpace(l.EntityId))
                                 {
-                                    <text> (@l.Details)</text>
+                                    <span class="text-muted">#@l.EntityId</span>
                                 }
-                            }
-                            else
-                            {
-                                @(l.Details ?? "—")
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                            </td>
+                            <td data-label="@Loc.T("User")" class="small">@(l.User?.FullName ?? l.UserName ?? l.UserId)</td>
+                            <td data-label="@Loc.T("Change")" class="small text-muted text-truncate audit-change">
+                                @{
+                                    var hasChange = !string.IsNullOrWhiteSpace(l.OldValue) || !string.IsNullOrWhiteSpace(l.NewValue);
+                                }
+                                @if (hasChange)
+                                {
+                                    @(l.OldValue ?? "—")<text> → </text>@(l.NewValue ?? "—")
+                                    @if (!string.IsNullOrWhiteSpace(l.Details))
+                                    {
+                                        <text> (@l.Details)</text>
+                                    }
+                                }
+                                else
+                                {
+                                    @(l.Details ?? "—")
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-<partial name="_Pagination" model="Model.Pagination" />
+    <partial name="_Pagination" model="Model.Pagination" />
+}
 
 <style>.audit-change{max-width:320px}</style>

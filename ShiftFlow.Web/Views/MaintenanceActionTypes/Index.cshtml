@@ -1,14 +1,14 @@
-@model List<MaintenanceActionType>
+﻿@model List<MaintenanceActionType>
 @{
     ViewData["Title"] = Loc.T("Maintenance Action Types");
     var categories = (List<AssetCategory>)ViewBag.Categories;
     string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#actionTypeModal' data-modal-create='actionTypeModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</button>";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),Subtitle=Loc.T("Optionally scope an action to a category or subcategory — unscoped actions apply everywhere"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),Subtitle=Loc.T("Optionally scope an action to a category or subcategory — unscoped actions apply everywhere."),ActionsHtml=actionsHtml})" />
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 table-card-stack">
             <thead><tr><th>@Loc.T("Name")</th><th>@Loc.T("Category")</th><th>@Loc.T("Status")</th><th></th></tr></thead>
             <tbody>
                 @if (Model.Count == 0)
@@ -18,8 +18,8 @@
                 @foreach (var m in Model)
                 {
                     <tr>
-                        <td>@Loc.LocalizedName(m.Name, m.NameAr)</td>
-                        <td>
+                        <td data-label="@Loc.T("Name")" class="fw-semibold">@Loc.LocalizedName(m.Name, m.NameAr)</td>
+                        <td data-label="@Loc.T("Category")">
                             @if (m.Category != null)
                             {
                                 <span class="small">@Loc.LocalizedName(m.Category.Name, m.Category.NameAr)</span>
@@ -29,14 +29,21 @@
                                 <span class="small text-muted">@Loc.T("All Categories")</span>
                             }
                         </td>
-                        <td><partial name="_StatusBadge" model="@(m.IsActive ? "Active" : "Inactive")" /></td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeModal"
-                                    data-modal-edit="actionTypeModal"
-                                    data-id="@m.Id" data-name="@m.Name" data-name-ar="@m.NameAr"
-                                    data-is-active="@(m.IsActive ? "true" : "false")" data-category-id="@m.CategoryId">
-                                @Loc.T("Edit")
-                            </button>
+                        <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(m.IsActive ? "Active" : "Inactive")" /></td>
+                        <td class="text-end">
+                            <div class="dropdown row-actions">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@Loc.T("Actions")"><i class="bi bi-three-dots"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#actionTypeModal"
+                                                data-modal-edit="actionTypeModal"
+                                                data-id="@m.Id" data-name="@m.Name" data-name-ar="@m.NameAr"
+                                                data-is-active="@(m.IsActive ? "true" : "false")" data-category-id="@m.CategoryId">
+                                            <i class="bi bi-pencil me-2"></i>@Loc.T("Edit")
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
                         </td>
                     </tr>
                 }
