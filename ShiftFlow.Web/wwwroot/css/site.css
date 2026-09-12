@@ -747,3 +747,202 @@ main:focus { outline: none; }
   outline-offset: 2px;
   border-radius: var(--radius);
 }
+
+/* ===========================================================================
+   Shared UI conventions (see NOTES-shared.md for copy-pasteable snippets).
+   Everything below is the vocabulary feature views build from — breadcrumbs,
+   header actions, filter bars, clickable rows, mobile cards, kebab menus,
+   forms and empty states. Add to this block rather than re-inventing a
+   one-off in a feature view.
+   =========================================================================== */
+
+/* --- Breadcrumbs (_PageHeader) -------------------------------------------
+   Detail/create/edit pages carry a breadcrumb instead of a Back button. The
+   divider is set as a token so it mirrors under RTL — a literal "/" in the
+   markup would point the wrong way in Arabic. */
+.breadcrumb { --bs-breadcrumb-divider: '/'; margin-bottom: 0; }
+html[dir="rtl"] .breadcrumb { --bs-breadcrumb-divider: '\'; }
+.breadcrumb-item, .breadcrumb-item a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+.breadcrumb-item a:hover { color: hsl(var(--primary)); text-decoration: underline; }
+.breadcrumb-item.active { color: hsl(var(--muted-foreground)); }
+
+/* --- Page header actions --------------------------------------------------
+   Convention: at most one .btn-primary, up to two .btn-outline-* secondaries,
+   everything else (destructive included) inside the _HeaderMoreMenu dropdown.
+   On phones the cluster becomes a full-width stack so the primary action is a
+   comfortable tap target instead of a cramped inline button. */
+.page-header__actions { align-items: center; }
+@media (max-width: 575.98px) {
+  .page-header__actions { width: 100%; }
+  .page-header__actions > .btn,
+  .page-header__actions > form,
+  .page-header__actions > form > .btn,
+  .page-header__actions > .dropdown { width: 100%; }
+  .page-header__actions > .dropdown > .btn { width: 100%; }
+}
+
+/* --- Filter bar -----------------------------------------------------------
+   <form method="get" class="filter-bar"> — one search box, any number of
+   dropdowns, a single "Filter" submit, an optional "Clear" link and a record
+   count pinned to the far end. No auto-submitting selects: one deliberate
+   Filter press, which also keeps the back button meaningful. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: end;
+}
+.filter-bar .form-control,
+.filter-bar .form-select { flex: 0 1 180px; }
+.filter-bar .filter-bar__search,
+.filter-bar input[type="search"] { flex: 1 1 220px; }
+.filter-bar__count {
+  margin-inline-start: auto;
+  align-self: center;
+  color: hsl(var(--muted-foreground));
+  font-size: .875rem;
+  white-space: nowrap;
+}
+@media (max-width: 575.98px) {
+  .filter-bar > * { flex: 1 1 100% !important; width: 100%; }
+  .filter-bar .filter-bar__count { margin-inline-start: 0; text-align: start; }
+}
+
+/* --- Clickable rows -------------------------------------------------------
+   <tr class="row-link" data-href="…"> — navigation is handled by one delegated
+   listener in site.js (no per-view inline onclick). The primary column still
+   carries a real <a>, which is what keyboard/screen-reader users follow; the
+   row itself is a mouse/touch convenience. */
+.row-link { cursor: pointer; }
+.row-link:hover > * { background-color: hsl(var(--primary) / .05); }
+.row-link:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+
+/* --- Kebab row actions ----------------------------------------------------
+   <div class="dropdown row-actions"> + a btn-sm btn-outline-secondary holding
+   bi-three-dots, with an aria-label on the toggle. Used on admin lists; normal
+   lists have no per-row buttons at all (the row is the link). */
+.row-actions .dropdown-toggle::after { display: none; }
+.row-actions .dropdown-item i { width: 1.1rem; }
+/* A dropdown opened from inside a scroll container gets clipped by the
+   container's overflow — .table-responsive:has(.table-card-stack) already
+   drops the clipping for stacked tables; do the same for any table that
+   actually contains a row kebab, regardless of stacking. */
+.table-responsive:has(.row-actions) { overflow: visible; }
+
+/* --- Mobile cards ---------------------------------------------------------
+   Polish on top of the .table-card-stack breakpoint above: a stacked row has
+   to read as a card, not as a list of label/value pairs of equal weight. */
+@media (max-width: 767.98px) {
+  .table-card-stack tr {
+    background: hsl(var(--card));
+    box-shadow: var(--card-shadow);
+    position: relative;
+  }
+  /* Label above the value rather than beside it — long values (asset names,
+     zone paths) otherwise squeeze into a sliver next to their caption. */
+  .table-card-stack td {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: .125rem;
+    text-align: start;
+    min-height: 44px;
+    padding-inline-end: 3rem;
+  }
+  .table-card-stack td::before { text-align: start; }
+  /* The identifier cell is the card's title: bigger, bolder, no caption. */
+  .table-card-stack td:first-child {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    padding-top: .75rem;
+  }
+  .table-card-stack td:first-child::before { display: none; }
+  /* Status chips read as a right-aligned pill on their own line. */
+  .table-card-stack td .badge { align-self: flex-end; }
+  /* The action cell is pinned to the card's top-inline-end corner instead of
+     taking a whole row of its own at the bottom. */
+  .table-card-stack td:has(> .row-actions),
+  .table-card-stack td.row-actions-cell {
+    position: absolute;
+    top: .5rem;
+    inset-inline-end: .5rem;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    border-top: none;
+  }
+  .table-card-stack td:has(> .row-actions)::before,
+  .table-card-stack td.row-actions-cell::before { display: none; }
+  /* An empty cell renders as a caption with nothing under it — hide it. */
+  .table-card-stack td:empty { display: none; }
+  /* Columns that only earn their place on a wide screen. */
+  .table-card-stack td[data-hide-mobile],
+  .table-card-stack th[data-hide-mobile] { display: none; }
+}
+
+/* --- Forms ----------------------------------------------------------------
+   .form-grid is Bootstrap's `row g-3` (fields are col-12 col-md-6, full-width
+   textareas col-12) — declared as a class so the convention is greppable and
+   so the label/actions rules below have something to hang off. */
+.form-grid { --bs-gutter-x: 1rem; }
+label.form-label.required::after { content: " *"; color: hsl(var(--destructive)); }
+.help-text { font-size: .875em; color: hsl(var(--muted-foreground)); margin-top: .25rem; }
+/* Save (primary) + Cancel (outline), start-aligned. On phones it becomes a
+   sticky bar so Save is always reachable on a long form. */
+.form-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; }
+@media (max-width: 575.98px) {
+  .form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: -1rem;
+    padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom));
+    background: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+  }
+  .form-actions > .btn { flex: 1 1 0; }
+}
+
+/* --- Empty state (_EmptyState) -------------------------------------------- */
+.empty-state__icon { font-size: 2rem; color: hsl(var(--muted-foreground)); line-height: 1; }
+
+/* --- Identifiers ----------------------------------------------------------
+   Order numbers, asset tags and contract numbers are normal sans-serif
+   semibold links — never a monospace "code" treatment. */
+.identifier { font-weight: 600; text-decoration: none; }
+.identifier:hover { text-decoration: underline; }
+
+/* --- Quick links (MyHome) -------------------------------------------------
+   Four equal tiles on desktop, a stacked tappable list on phones — the field
+   user on a phone and the manager on a laptop get the same four destinations
+   in the shape that suits each. */
+.quick-links { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+.quick-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 88px;
+  padding: .75rem;
+  text-align: center;
+  text-decoration: none;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  font-size: .875rem;
+  font-weight: 500;
+}
+.quick-link i { font-size: 1.35rem; color: hsl(var(--primary)); }
+.quick-link:hover { background: hsl(var(--primary) / .06); border-color: hsl(var(--primary) / .35); color: hsl(var(--foreground)); }
+@media (max-width: 575.98px) {
+  .quick-links { grid-template-columns: 1fr; gap: .5rem; }
+  .quick-link {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: start;
+    min-height: 48px;
+    gap: .75rem;
+  }
+}
