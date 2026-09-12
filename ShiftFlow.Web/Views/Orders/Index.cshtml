@@ -1,5 +1,6 @@
 @model List<ShiftFlow.Web.ViewModels.OrderListRow>
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
 @using ShiftFlow.Web.ViewModels
@@ -15,138 +16,128 @@
     var canManageMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderManage)).Succeeded;
     var canExportInspection = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderExport)).Succeeded;
     var canExportMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderExport)).Succeeded;
-    string actionsHtml = "";
-    // InspectionOrders/MaintenanceOrders each still have a working ExportExcel action, but no list
-    // page of their own any more — without a link here their Export permissions have no entry point.
-    if (canExportInspection)
-        actionsHtml += "<a href='" + Url.Action("ExportExcel", "InspectionOrders") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Inspection Orders") + "</a> ";
-    if (canExportMaintenance)
-        actionsHtml += "<a href='" + Url.Action("ExportExcel", "MaintenanceOrders") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Maintenance Orders") + "</a> ";
-    if (canManageInspection || canManageMaintenance)
-        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order") + "</a>";
+    var canExport = canExportInspection || canExportMaintenance;
+    var anyFilter = !string.IsNullOrWhiteSpace(search) || !string.IsNullOrWhiteSpace(status) || orderTypeId.HasValue || overdue;
 
-    // Picks readable text (near-black or white) for an arbitrary hex badge background — the
-    // 20-color auto-assigned palette (OrderTypeColors) spans both light and dark hues, so a
-    // single hardcoded text color would be unreadable on roughly half of them.
-    string ReadableTextColor(string hex)
-    {
-        hex = hex.TrimStart('#');
-        if (hex.Length != 6) return "#fff";
-        var r = Convert.ToInt32(hex[..2], 16);
-        var g = Convert.ToInt32(hex[2..4], 16);
-        var b = Convert.ToInt32(hex[4..6], 16);
-        var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.6 ? "#1a1a1a" : "#fff";
-    }
+    // One "Export" dropdown instead of two competing outline buttons — the two exports are the
+    // same action against two different order kinds, not two different actions.
+    Func<object?, IHtmlContent> headerActions = @<text>
+        @if (canExport)
+        {
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-download me-1"></i>@Loc.T("Export")
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    @if (canExportInspection)
+                    {
+                        <li><a class="dropdown-item" href="@Url.Action("ExportExcel", "InspectionOrders")"><i class="bi bi-file-earmark-excel me-2"></i>@Loc.T("Excel: inspection orders")</a></li>
+                    }
+                    @if (canExportMaintenance)
+                    {
+                        <li><a class="dropdown-item" href="@Url.Action("ExportExcel", "MaintenanceOrders")"><i class="bi bi-file-earmark-excel me-2"></i>@Loc.T("Excel: maintenance orders")</a></li>
+                    }
+                </ul>
+            </div>
+        }
+        @if (canManageInspection || canManageMaintenance)
+        {
+            <a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New Order")</a>
+        }
+    </text>;
 
-    // Every filter chip carries the whole current filter set — switching type or status used to
-    // silently drop the search text and the overdue flag.
-    Dictionary<string, string?> Filters(string? newStatus = null, int? newOrderTypeId = null,
-        bool clearStatus = false, bool clearType = false, bool clearOverdue = false)
-    {
-        var d = new Dictionary<string, string?>();
-        var s = clearStatus ? null : newStatus ?? status;
-        var t = clearType ? (int?)null : newOrderTypeId ?? orderTypeId;
-        if (!string.IsNullOrEmpty(s)) d["status"] = s;
-        if (t.HasValue) d["orderTypeId"] = t.Value.ToString();
-        if (!string.IsNullOrWhiteSpace(search)) d["search"] = search;
-        if (overdue && !clearOverdue) d["overdue"] = "true";
-        return d;
-    }
-    // "PendingApproval" was rendered raw here — spaced and localized like every other label.
-    // _StatusBadge keys off the unspaced token, so the badge colour is resolved here instead of
-    // handing the partial a label it wouldn't recognise.
-    string StatusLabel(string s) => Loc.T(StatusDisplay.Label(s));
-    string StatusBadgeClass(string s) => s switch
-    {
-        "Done" => "bg-success-subtle text-success-emphasis border-success-subtle",
-        "Open" => "bg-danger-subtle text-danger-emphasis border-danger-subtle",
-        "InProgress" => "bg-info-subtle text-info-emphasis border-info-subtle",
-        "PendingApproval" => "bg-warning-subtle text-warning-emphasis border-warning-subtle",
-        _ => "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle",
-    };
+    // The overdue banner's "Clear" drops only the overdue flag — every other filter survives.
+    var overdueClearRoute = new Dictionary<string, string?>();
+    if (!string.IsNullOrEmpty(status)) overdueClearRoute["status"] = status;
+    if (orderTypeId.HasValue) overdueClearRoute["orderTypeId"] = orderTypeId.Value.ToString();
+    if (!string.IsNullOrWhiteSpace(search)) overdueClearRoute["search"] = search;
+
+    // Category colours match the Dashboard's Inspection/Work Order badges (soft blue / soft teal)
+    // instead of the per-type auto-assigned hex, so a category reads the same everywhere.
+    string CategoryBadgeClass(string c) => c == "Inspection"
+        ? "bg-primary-subtle text-primary-emphasis border-primary-subtle"
+        : "bg-info-subtle text-info-emphasis border-info-subtle";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),ActionsHtml=actionsHtml})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),Actions=headerActions(null)})" />
 
 @if (overdue)
 {
     <div class="alert alert-warning small d-flex justify-content-between align-items-center">
         <span><i class="bi bi-alarm me-1"></i>@Loc.T("Showing overdue inspection orders only")</span>
-        @* Clearing the overdue banner keeps whatever type/status/search filter is also applied. *@
-        <a asp-action="Index" asp-all-route-data="@Filters(clearOverdue: true)" class="text-decoration-none">@Loc.T("Clear")</a>
+        <a asp-action="Index" asp-all-route-data="@overdueClearRoute" class="text-decoration-none">@Loc.T("Clear")</a>
     </div>
 }
 
-<div class="d-flex gap-2 mb-3 flex-wrap">
-    <div class="overflow-x-auto">
-        <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <a class="btn @(orderTypeId == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(clearType: true)">@Loc.T("All")</a>
-            @foreach (var t in activeOrderTypes)
-            {
-                var isActive = orderTypeId == t.Id;
-                // Every chip carries its type's color, even unselected — otherwise there's no way
-                // to visually pattern-match a chip to its row badges below. Selected = solid fill;
-                // unselected = colored outline/text on a plain background.
-                <a class="btn" style="@(isActive ? $"background-color:{t.Color};color:{ReadableTextColor(t.Color)};border-color:{t.Color}" : $"color:{t.Color};border-color:{t.Color}")"
-                   asp-action="Index" asp-all-route-data="@Filters(newOrderTypeId: t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</a>
-            }
-        </div>
-    </div>
-    @* A btn-group doesn't wrap its buttons, so the status labels would drag the whole page into
-       horizontal scroll on a narrow phone without this scroll container. *@
-    <div class="overflow-x-auto">
-        <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(clearStatus: true)">@Loc.T("All Statuses")</a>
-            @foreach (var s in InspectionOrder.Statuses)
-            {
-                <a class="btn @(status == s ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(newStatus: s)">@StatusLabel(s)</a>
-            }
-        </div>
-    </div>
-    <form method="get" class="d-flex gap-2">
-        <input type="hidden" name="orderTypeId" value="@orderTypeId" />
-        <input type="hidden" name="status" value="@status" />
-        <input type="hidden" name="overdue" value="@(overdue ? "true" : "false")" />
-        <label for="orderSearch" class="visually-hidden">@Loc.T("Search")</label>
-        <input type="text" id="orderSearch" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:220px" />
-        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
-    </form>
-    <div class="ms-auto text-muted small align-self-center">@ViewBag.TotalCount @Loc.T("records")</div>
-</div>
+@* One filter bar for the whole list: the two chip rows (type + status) were the same two filters
+   twice over and neither fit a phone without its own horizontal scroller. *@
+<form method="get" class="filter-bar d-flex flex-wrap align-items-center gap-2 mb-3">
+    @if (overdue)
+    {
+        <input type="hidden" name="overdue" value="true" />
+    }
+    <label for="orderSearch" class="visually-hidden">@Loc.T("Search")</label>
+    <input type="text" id="orderSearch" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:200px" />
+
+    <label for="orderTypeFilter" class="visually-hidden">@Loc.T("Type")</label>
+    <select id="orderTypeFilter" name="orderTypeId" class="form-select form-select-sm w-auto">
+        <option value="">@Loc.T("All Types")</option>
+        @foreach (var t in activeOrderTypes)
+        {
+            <option value="@t.Id" selected="@(orderTypeId == t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</option>
+        }
+    </select>
+
+    <label for="orderStatusFilter" class="visually-hidden">@Loc.T("Status")</label>
+    <select id="orderStatusFilter" name="status" class="form-select form-select-sm w-auto">
+        <option value="">@Loc.T("All Statuses")</option>
+        @foreach (var s in InspectionOrder.Statuses)
+        {
+            <option value="@s" selected="@(status == s)">@Loc.T(StatusDisplay.Label(s))</option>
+        }
+    </select>
+
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (anyFilter)
+    {
+        <a class="btn btn-link btn-sm" href="@Url.Action("Index")">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small ms-auto">@ViewBag.TotalCount @Loc.T("records")</span>
+</form>
 
 <div class="card border-0 shadow-sm">
     @if (Model.Count == 0)
     {
-        <div class="card-body text-center text-muted py-5">
-            <i class="bi bi-clipboard-check fs-1 d-block mb-2 opacity-25"></i>
-            @Loc.T("No orders found.")
-        </div>
+        <partial name="_EmptyState" model="@(new EmptyStateModel{
+            Icon = "bi-clipboard-check",
+            Title = anyFilter ? Loc.T("No orders match these filters") : Loc.T("No orders yet"),
+            Text = anyFilter ? Loc.T("Try a different search or clear the filters.") : Loc.T("Inspection surveys and direct-fix maintenance orders will show up here."),
+            ActionUrl = (canManageInspection || canManageMaintenance) && !anyFilter ? Url.Action("Create") : null,
+            ActionLabel = Loc.T("New Order") })" />
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
                 <thead class="table-light">
                     <tr>
-                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th class="d-none d-sm-table-cell">@Loc.T("Asset")</th>
+                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th>@Loc.T("Asset")</th>
                         <th>@Loc.T("Assigned To")</th><th>@Loc.T("Status")</th>
-                        <th class="d-none d-md-table-cell">@Loc.T("Due Date")</th><th class="d-none d-xl-table-cell">@Loc.T("Created")</th><th></th>
+                        <th>@Loc.T("Due Date")</th><th>@Loc.T("Created")</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var o in Model)
                     {
                         var detailsController = o.Category == "Inspection" ? "InspectionOrders" : "MaintenanceOrders";
-                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", detailsController, new { id = o.Id })'">
-                            <td><span class="badge" style="background-color:@o.OrderTypeColor;color:@ReadableTextColor(o.OrderTypeColor)">@o.OrderTypeLabel</span></td>
+                        <tr class="row-link" data-href="@Url.Action("Details", detailsController, new { id = o.Id })">
+                            <td data-label="@Loc.T("Category")"><span class="badge border @CategoryBadgeClass(o.Category)">@o.OrderTypeLabel</span></td>
                             @* A real link as well as the row click — keyboard and new-tab users need an anchor. *@
-                            <td class="fw-semibold"><a asp-action="Details" asp-controller="@detailsController" asp-route-id="@o.Id" class="text-decoration-none">@o.OrderNumber</a></td>
-                            <td class="small d-none d-sm-table-cell">@(o.AssetLabel ?? "—")</td>
-                            <td>@(o.AssignedToLabel ?? "—")</td>
-                            <td><span class="badge border @StatusBadgeClass(o.Status)">@StatusLabel(o.Status)</span></td>
-                            <td class="d-none d-md-table-cell">@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>
-                            <td class="d-none d-xl-table-cell">@o.CreatedAt.ToString("dd/MM/yyyy")</td>
-                            <td class="text-end"><a asp-action="Details" asp-controller="@detailsController" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
+                            <td data-label="@Loc.T("Order #")"><a asp-action="Details" asp-controller="@detailsController" asp-route-id="@o.Id" class="fw-semibold text-decoration-none">@o.OrderNumber</a></td>
+                            <td class="small" data-label="@Loc.T("Asset")">@(o.AssetLabel ?? "—")</td>
+                            <td data-label="@Loc.T("Assigned To")">@(o.AssignedToLabel ?? "—")</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@StatusDisplay.Label(o.Status)" /></td>
+                            <td data-label="@Loc.T("Due Date")">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
+                            <td data-label="@Loc.T("Created")" data-hide-mobile>@Loc.TDate(o.CreatedAt.ToString("dd/MM/yyyy"))</td>
                         </tr>
                     }
                 </tbody>

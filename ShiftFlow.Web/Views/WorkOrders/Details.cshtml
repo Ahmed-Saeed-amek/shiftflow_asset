@@ -23,7 +23,16 @@
     var hasSpecs = Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku));
 }
 
-<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+@* Breadcrumb instead of a Back button: it says where this page sits, not just where the last
+   click came from, and it survives an arrival from search or a direct link. *@
+<nav aria-label="@Loc.T("Breadcrumb")" class="mb-2">
+    <ol class="breadcrumb small mb-0">
+        <li class="breadcrumb-item"><a asp-action="Index" class="text-decoration-none">@Loc.T("Work Orders")</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.WorkOrderNumber</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-3">
     <div>
         <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
             <h1 class="fs-3 fw-bold font-heading mb-0">@Model.WorkOrderNumber</h1>
@@ -31,12 +40,6 @@
             <partial name="_StatusBadge" model="@Model.Priority" />
         </div>
         <div class="text-muted small d-flex align-items-center flex-wrap column-gap-3 row-gap-1">
-            @if (Model.Asset != null)
-            {
-                <a asp-controller="Assets" asp-action="Details" asp-route-id="@Model.AssetId" class="text-decoration-none">
-                    <i class="bi bi-hdd-stack me-1"></i>@Model.Asset.AssetTag
-                </a>
-            }
             @if (Model.Asset?.Zone is { } zone)
             {
                 <span><i class="bi bi-geo-alt me-1"></i>@Loc.LocalizedName(zone.Name, zone.NameAr)</span>
@@ -44,9 +47,42 @@
             <span><i class="bi bi-calendar3 me-1"></i>@Loc.TDate(Model.CreatedDate.ToString("dd/MM/yyyy"))</span>
         </div>
     </div>
-    <a asp-action="Index" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
-        <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back to Work Orders")
-    </a>
+    @* Every stage action on this page is a form (Accept, Send to Vendor, Report Fix…), so the
+       header carries no primary button — only the one plain link out to the asset, plus the rare,
+       destructive Force Close tucked behind More. *@
+    <div class="d-flex flex-wrap gap-2 align-self-start align-self-lg-auto flex-shrink-0">
+        @if (Model.Asset != null)
+        {
+            <a asp-controller="Assets" asp-action="Details" asp-route-id="@Model.AssetId" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-hdd-stack me-1"></i>@Model.Asset.AssetTag
+            </a>
+        }
+        @if (canManage && Model.Stage != "Closed")
+        {
+            <div class="dropdown d-inline-block">
+                @* auto-close="outside" keeps the menu open while the reason is typed. *@
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    @Loc.T("More")
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="min-width:19rem">
+                    <li><h6 class="dropdown-header">@Loc.T("Force Close")</h6></li>
+                    <li><div class="px-3 small text-muted">@Loc.T("Closes this work order immediately without waiting for a vendor or employee reply.")</div></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" asp-action="ForceClose" asp-route-id="@Model.Id" class="px-3 pb-2">
+                            @Html.AntiForgeryToken()
+                            <label for="forceCloseReason" class="visually-hidden">@Loc.T("Force-close reason")</label>
+                            <input type="text" id="forceCloseReason" name="reason" class="form-control form-control-sm mb-2" placeholder="@Loc.T("Force-close reason")" required />
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100"
+                                    data-confirm="@Loc.T("Close this work order immediately without waiting for a vendor or employee reply?")">
+                                <i class="bi bi-x-octagon me-1"></i>@Loc.T("Force Close")
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        }
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-3">
@@ -55,8 +91,11 @@
     </div>
 </div>
 
+@* Order on a phone: status banner/action card first, then the reference sidebar
+   (overview -> specs -> notes), then history last. On lg+ the original two-column layout is
+   restored by the -lg- order classes, with history under the action column. *@
 <div class="row g-3">
-    <div class="col-lg-4">
+    <div class="col-lg-4 order-2 order-lg-1">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
                 <i class="bi bi-info-circle text-primary"></i>@Loc.T("Overview")
@@ -95,20 +134,24 @@
                         <partial name="_EmployeePicker" model='new EmployeePickerModel {
                             Name = "employeeUserId", SelectedId = Model.AssignedToUserId, SelectedLabel = Model.AssignedToUser?.FullName,
                             Placeholder = Loc.T("Search by name or email…"), CssClass = "form-control-sm" }' />
+                        <div class="small text-muted mt-1 d-none" data-autosave-status>@Loc.T("Saving…")</div>
                     </form>
                 }
 
                 @if (canEditPriority)
                 {
-                    <form method="post" asp-action="UpdatePriority" asp-route-id="@Model.Id" class="mt-2 pt-2 border-top d-flex align-items-center gap-2">
+                    <form method="post" asp-action="UpdatePriority" asp-route-id="@Model.Id" class="mt-2 pt-2 border-top" data-autosave-form>
                         @Html.AntiForgeryToken()
-                        <label class="form-label small text-muted mb-0 flex-shrink-0">@Loc.T("Priority")</label>
-                        <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <div class="d-flex align-items-center gap-2">
+                        <label for="woPrioritySelect" class="form-label small text-muted mb-0 flex-shrink-0">@Loc.T("Priority")</label>
+                        <select id="woPrioritySelect" name="priority" class="form-select form-select-sm" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
                             @foreach (var p in WorkOrder.Priorities)
                             {
                                 <option value="@p" selected="@(Model.Priority==p)">@Loc.T(p)</option>
                             }
                         </select>
+                        </div>
+                        <div class="small text-muted mt-1 d-none" data-autosave-status>@Loc.T("Saving…")</div>
                     </form>
                 }
             </div>
@@ -132,11 +175,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.Sku))
                         {
-                            <dt class="col-5 text-muted fw-normal">@Loc.T("SKU")</dt><dd class="col-7 text-end mb-0 font-monospace">@Model.Asset.Sku</dd>
+                            <dt class="col-5 text-muted fw-normal">@Loc.T("SKU")</dt><dd class="col-7 text-end mb-0">@Model.Asset.Sku</dd>
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.SerialNumber))
                         {
-                            <dt class="col-5 text-muted fw-normal">@Loc.T("Serial Number")</dt><dd class="col-7 text-end mb-0 font-monospace">@Model.Asset.SerialNumber</dd>
+                            <dt class="col-5 text-muted fw-normal">@Loc.T("Serial Number")</dt><dd class="col-7 text-end mb-0">@Model.Asset.SerialNumber</dd>
                         }
                     </dl>
                 </div>
@@ -179,7 +222,7 @@
         }
     </div>
 
-    <div class="col-lg-8">
+    <div class="col-lg-8 order-1 order-lg-2">
         @if (isDraft && canManage)
         {
             <div class="card border-0 shadow-sm mb-3 border-start border-4 border-primary">
@@ -411,6 +454,9 @@
             </div>
         }
 
+    </div>
+
+    <div class="col-lg-8 offset-lg-4 order-3">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
                 <i class="bi bi-clock-history text-primary"></i>@Loc.T("Stage History")
@@ -433,29 +479,6 @@
                 </div>
             </div>
         </div>
-
-        @if (canManage && Model.Stage != "Closed")
-        {
-            <div class="text-end">
-                <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#forceCloseCollapse">
-                    <i class="bi bi-x-octagon me-1"></i>@Loc.T("Force Close")
-                </button>
-                <div class="collapse mt-2" id="forceCloseCollapse">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-start">
-                            <p class="small text-muted mb-2">@Loc.T("Closes this work order immediately without waiting for a vendor or employee reply.")</p>
-                            <form method="post" asp-action="ForceClose" asp-route-id="@Model.Id"
-                                  onsubmit="return confirm('@Loc.T("Close this work order immediately without waiting for a vendor or employee reply?")')"
-                                  class="d-flex gap-2">
-                                @Html.AntiForgeryToken()
-                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Force-close reason")" required />
-                                <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Force Close")</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
     </div>
 </div>
 
@@ -513,6 +536,20 @@
     // result is actually clicked, never while the search box is just being typed into, so this
     // can't mid-type false-trigger a save.
     document.querySelectorAll('[data-autosave-form] [data-ep-value]').forEach(function (hidden) {
-        hidden.addEventListener('change', function () { hidden.closest('form').submit(); });
+        hidden.addEventListener('change', function () {
+            var form = hidden.closest('form');
+            if (form.requestSubmit) form.requestSubmit(); else form.submit();
+        });
+    });
+
+    // An auto-saving control that just sits there while the page reloads reads as "nothing
+    // happened". Show "Saving…" the moment the form is submitted; the reload then raises the
+    // Success/Error toast the controller already sets (TempData -> _Toast), so saved AND failed
+    // both end in visible feedback.
+    document.querySelectorAll('[data-autosave-form]').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            var status = form.querySelector('[data-autosave-status]');
+            if (status) status.classList.remove('d-none');
+        });
     });
 </script>

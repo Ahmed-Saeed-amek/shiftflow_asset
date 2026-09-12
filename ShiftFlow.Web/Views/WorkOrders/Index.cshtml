@@ -1,87 +1,110 @@
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Html
 @model List<WorkOrder>
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Work Orders");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
     var canExport = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.WorkOrderExport)).Succeeded;
-    string actionsHtml = "";
-    if (canExport)
-        actionsHtml += "<a href='" + Url.Action("ExportExcel") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a> "
-                     + "<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-danger btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("PDF") + "</a> ";
-    if (canManage)
-        actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Work Order") + "</a>";
-}
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Work Orders"),ActionsHtml=actionsHtml})" />
+    var q = (string?)ViewBag.Q;
+    var stage = (string?)ViewBag.Stage;
+    var priority = (string?)ViewBag.Priority;
+    var anyFilter = !string.IsNullOrWhiteSpace(q) || !string.IsNullOrWhiteSpace(stage) || !string.IsNullOrWhiteSpace(priority);
 
-<form method="get" class="row g-2 mb-3 align-items-center">
-    <div class="col-auto">
-        <input type="text" name="q" value="@ViewBag.Q" class="form-control form-control-sm" placeholder="@Loc.T("Search by order # or asset tag…")" style="min-width:220px" />
-    </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Search")</button>
-    </div>
-    <div class="col-auto">
-        <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Stage")</option>
-            @foreach (var s in WorkOrder.AllDisplayStages)
-            {
-                <option value="@s" selected="@(ViewBag.Stage==s)">@Loc.T(s)</option>
-            }
-        </select>
-    </div>
-    <div class="col-auto">
-        <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="">@Loc.T("Priority")</option>
-            @foreach (var p in WorkOrder.Priorities)
-            {
-                <option value="@p" selected="@(ViewBag.Priority==p)">@Loc.T(p)</option>
-            }
-        </select>
-    </div>
-    @if (!string.IsNullOrWhiteSpace((string)ViewBag.Q) || !string.IsNullOrWhiteSpace((string)ViewBag.Stage) || !string.IsNullOrWhiteSpace((string)ViewBag.Priority))
+    // Rendered up front because a templated delegate can't await — the header template below just
+    // drops the already-rendered buttons in.
+    var exportButtons = canExport
+        ? await Html.PartialAsync("_ExportButtons", new ExportButtonsModel { ExcelUrl = Url.Action("ExportExcel"), PdfUrl = Url.Action("ExportPdf") })
+        : null;
+    Func<object?, IHtmlContent> headerActions = @<text>
+        @exportButtons
+        @if (canManage)
+        {
+            <a href="@Url.Action("Create")" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>@Loc.T("New Work Order")</a>
+        }
+    </text>;
+}
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{Title=Loc.T("Work Orders"),Subtitle=Loc.T("Vendor and in-house repair jobs, from report to close"),Actions=headerActions(null)})" />
+
+<form method="get" class="filter-bar d-flex flex-wrap align-items-center gap-2 mb-3">
+    <label for="woSearch" class="visually-hidden">@Loc.T("Search")</label>
+    <input type="text" id="woSearch" name="q" value="@q" class="form-control form-control-sm" placeholder="@Loc.T("Search by order # or asset tag…")" style="min-width:200px" />
+
+    <label for="woStage" class="visually-hidden">@Loc.T("Stage")</label>
+    <select id="woStage" name="stage" class="form-select form-select-sm w-auto">
+        <option value="">@Loc.T("All Stages")</option>
+        @foreach (var s in WorkOrder.AllDisplayStages)
+        {
+            <option value="@s" selected="@(stage == s)">@Loc.T(s)</option>
+        }
+    </select>
+
+    <label for="woPriority" class="visually-hidden">@Loc.T("Priority")</label>
+    <select id="woPriority" name="priority" class="form-select form-select-sm w-auto">
+        <option value="">@Loc.T("All Priorities")</option>
+        @foreach (var p in WorkOrder.Priorities)
+        {
+            <option value="@p" selected="@(priority == p)">@Loc.T(p)</option>
+        }
+    </select>
+
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (anyFilter)
     {
-        <div class="col-auto"><a asp-action="Index" class="btn btn-sm btn-outline-secondary">@Loc.T("Clear")</a></div>
+        <a class="btn btn-link btn-sm" href="@Url.Action("Index")">@Loc.T("Clear")</a>
     }
-    <div class="col-auto ms-auto text-muted small">@ViewBag.TotalCount @Loc.T("records")</div>
+    <span class="filter-bar__count text-muted small ms-auto">@ViewBag.TotalCount @Loc.T("records")</span>
 </form>
 
 <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th class="d-none d-lg-table-cell">@Loc.T("Type")</th><th class="d-none d-sm-table-cell">@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th class="d-none d-lg-table-cell">@Loc.T("Vendor")</th><th class="d-none d-xl-table-cell">@Loc.T("Assigned Employee")</th></tr></thead>
-            <tbody>
-                @if (Model.Count == 0)
-                {
-                    <tr><td colspan="7" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var w in Model)
-                {
-                    <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = w.Id })'">
-                        @* A real link, not row-click only: keyboard users, middle-click and
-                           "open in new tab" all need an actual anchor. *@
-                        <td class="small font-monospace"><a asp-action="Details" asp-route-id="@w.Id" class="text-decoration-none">@w.WorkOrderNumber</a></td>
-                        <td class="small">@w.Asset?.AssetTag</td>
-                        <td class="d-none d-lg-table-cell">
-                            @if (w.SourceContractId != null)
-                            {
-                                <span class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle" title="@Loc.T("Auto-generated from this contract's Preventive Maintenance schedule.")">
-                                    <i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance")
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="text-muted small">@Loc.T("Manual")</span>
-                            }
-                        </td>
-                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@w.Priority" /></td>
-                        <td><partial name="_StatusBadge" model="@w.Stage" /></td>
-                        <td class="small d-none d-lg-table-cell">@w.Vendor?.Name</td>
-                        <td class="small d-none d-xl-table-cell">@w.AssignedToUser?.FullName</td>
+    @if (Model.Count == 0)
+    {
+        <partial name="_EmptyState" model="@(new EmptyStateModel{
+            Icon = "bi-tools",
+            Title = anyFilter ? Loc.T("No work orders match these filters") : Loc.T("No work orders yet"),
+            Text = anyFilter ? Loc.T("Try a different search or clear the filters.") : Loc.T("Work orders raised from a defect or a vendor job will show up here."),
+            ActionUrl = canManage && !anyFilter ? Url.Action("Create") : null,
+            ActionLabel = Loc.T("New Work Order") })" />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead class="table-light">
+                    <tr>
+                        <th>@Loc.T("Work Order Number")</th><th>@Loc.T("Asset Tag")</th><th>@Loc.T("Type")</th>
+                        <th>@Loc.T("Priority")</th><th>@Loc.T("Stage")</th><th>@Loc.T("Vendor")</th><th>@Loc.T("Assigned Employee")</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach (var w in Model)
+                    {
+                        <tr class="row-link" data-href="@Url.Action("Details", new { id = w.Id })">
+                            @* A real link, not row-click only: keyboard users, middle-click and
+                               "open in new tab" all need an actual anchor. *@
+                            <td data-label="@Loc.T("Work Order Number")"><a asp-action="Details" asp-route-id="@w.Id" class="fw-semibold text-decoration-none">@w.WorkOrderNumber</a></td>
+                            <td class="small" data-label="@Loc.T("Asset Tag")">@w.Asset?.AssetTag</td>
+                            <td data-label="@Loc.T("Type")" data-hide-mobile>
+                                @if (w.SourceContractId != null)
+                                {
+                                    <span class="badge border bg-dark-subtle text-dark-emphasis border-dark-subtle" title="@Loc.T("Auto-generated from this contract's Preventive Maintenance schedule.")">
+                                        <i class="bi bi-arrow-repeat me-1"></i>@Loc.T("Preventive Maintenance")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">@Loc.T("Manual")</span>
+                                }
+                            </td>
+                            <td data-label="@Loc.T("Priority")"><partial name="_StatusBadge" model="@w.Priority" /></td>
+                            <td data-label="@Loc.T("Stage")"><partial name="_StatusBadge" model="@w.Stage" /></td>
+                            <td class="small" data-label="@Loc.T("Vendor")">@w.Vendor?.Name</td>
+                            <td class="small" data-label="@Loc.T("Assigned Employee")">@w.AssignedToUser?.FullName</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
 <partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />

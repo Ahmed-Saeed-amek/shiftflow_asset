@@ -16,42 +16,129 @@
     var hasSpecs = Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku));
 }
 
-<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+@* Breadcrumb instead of the Back button: Orders is the combined list this order lives on, and
+   a crumb trail still makes sense when the page was reached from a link or search. *@
+<nav aria-label="@Loc.T("Breadcrumb")" class="mb-2">
+    <ol class="breadcrumb small mb-0">
+        <li class="breadcrumb-item">
+            @if (canViewOrderList)
+            {
+                <a asp-controller="Orders" asp-action="Index" class="text-decoration-none">@Loc.T("Orders")</a>
+            }
+            else
+            {
+                <a asp-controller="Users" asp-action="MyOrders" class="text-decoration-none">@Loc.T("My Orders")</a>
+            }
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.OrderNumber</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-3">
     <div>
         <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
             <h1 class="fs-3 fw-bold font-heading mb-0">@Model.OrderNumber</h1>
-            <partial name="_StatusBadge" model="@Model.Status" />
+            <partial name="_StatusBadge" model="@StatusDisplay.Label(Model.Status)" />
         </div>
         <div class="text-muted small d-flex align-items-center flex-wrap column-gap-3 row-gap-1">
-            @if (Model.Asset != null)
-            {
-                <a asp-controller="Assets" asp-action="Details" asp-route-id="@Model.AssetId" class="text-decoration-none">
-                    <i class="bi bi-hdd-stack me-1"></i>@Model.Asset.AssetTag
-                </a>
-            }
             @if (Model.Asset?.Zone is { } zone)
             {
                 <span><i class="bi bi-geo-alt me-1"></i>@Loc.LocalizedName(zone.Name, zone.NameAr)</span>
             }
-            <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedDate.ToString("dd/MM/yyyy")</span>
+            <span><i class="bi bi-calendar3 me-1"></i>@Loc.TDate(Model.CreatedDate.ToString("dd/MM/yyyy"))</span>
         </div>
     </div>
-    @if (canViewOrderList)
-    {
-        <a asp-controller="Orders" asp-action="Index" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
-            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
-        </a>
-    }
-    else
-    {
-        <a asp-controller="Users" asp-action="MyOrders" class="btn btn-sm btn-outline-secondary align-self-start align-self-lg-auto flex-shrink-0">
-            <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back")
-        </a>
-    }
+    @* Approve/Report Fix stay in their own cards below — both are forms, not links, so the header
+       carries no primary button; the rare and destructive ones live behind More. *@
+    <div class="d-flex flex-wrap gap-2 align-self-start align-self-lg-auto flex-shrink-0">
+        @if (Model.Asset != null)
+        {
+            <a asp-controller="Assets" asp-action="Details" asp-route-id="@Model.AssetId" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-hdd-stack me-1"></i>@Model.Asset.AssetTag
+            </a>
+        }
+        @if (Model.Status is "Open" or "PendingApproval" && isManager)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#reassignPanel" aria-controls="reassignPanel">
+                <i class="bi bi-person-gear me-1"></i>@Loc.T("Reassign")
+            </button>
+        }
+        @if (isManager && (canCancel || Model.Status == "PendingApproval"))
+        {
+            <div class="dropdown d-inline-block">
+                @* auto-close="outside" keeps the menu open while a reason is typed. *@
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    @Loc.T("More")
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="min-width:19rem">
+                    @if (Model.Status == "PendingApproval")
+                    {
+                        <li><h6 class="dropdown-header">@Loc.T("Return to Open")</h6></li>
+                        <li><div class="px-3 small text-muted">@Loc.T("Sends this order back to the assignee to redo. The reported cost and parts are cleared and the parts return to stock.")</div></li>
+                        <li>
+                            <form method="post" asp-action="RejectApproval" asp-route-id="@Model.Id" class="px-3 pb-2 pt-2">
+                                @Html.AntiForgeryToken()
+                                <label for="returnReason" class="visually-hidden">@Loc.T("Reason (optional)")</label>
+                                <input type="text" id="returnReason" name="reason" class="form-control form-control-sm mb-2" placeholder="@Loc.T("Reason (optional)")" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary w-100" data-confirm="@Loc.T("Send this order back to the assignee to redo?")">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>@Loc.T("Return to Open")
+                                </button>
+                            </form>
+                        </li>
+                    }
+                    @if (canCancel)
+                    {
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">@Loc.T("Cancel Maintenance Order")</h6></li>
+                        <li>
+                            <form method="post" asp-action="Cancel" asp-route-id="@Model.Id" class="px-3 pb-2">
+                                @Html.AntiForgeryToken()
+                                <label for="cancelReason" class="visually-hidden">@Loc.T("Reason (optional)")</label>
+                                <input type="text" id="cancelReason" name="reason" class="form-control form-control-sm mb-2" placeholder="@Loc.T("Reason (optional)")" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100" data-confirm="@Loc.T("Cancel this maintenance order?")">
+                                    <i class="bi bi-x-octagon me-1"></i>@Loc.T("Cancel Maintenance Order")
+                                </button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
 </div>
 
+@if (Model.Status is "Open" or "PendingApproval" && isManager)
+{
+    <div class="collapse mb-3" id="reassignPanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                <i class="bi bi-person-gear text-primary"></i>@Loc.T("Reassign")
+            </div>
+            <div class="card-body">
+                <div class="form-text mb-2">@Loc.T("Use this if the current assignee's account has been deactivated and the order needs to move to someone else.")</div>
+                <form method="post" asp-action="Reassign" asp-route-id="@Model.Id" class="d-flex gap-2 flex-wrap">
+                    @Html.AntiForgeryToken()
+                    <div style="min-width:220px" class="flex-grow-1">
+                        <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
+                    </div>
+                    <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px" aria-label="@Loc.T("— or select a group —")">
+                        <option value="">@Loc.T("— or select a group —")</option>
+                        @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">@Loc.T("Reassign")</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@* On a phone the action card (Report Fix / Approve) comes before the reference sidebar;
+   the -lg- order classes restore the original two-column layout from lg up. *@
 <div class="row g-3">
-    <div class="col-lg-4">
+    <div class="col-lg-4 order-2 order-lg-1">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
                 <i class="bi bi-info-circle text-primary"></i>@Loc.T("Overview")
@@ -65,7 +152,7 @@
                     @if (Model.DueDate.HasValue)
                     {
                         <dt class="col-5 text-muted fw-normal">@Loc.T("Due Date")</dt>
-                        <dd class="col-7 text-end mb-0">@Model.DueDate.Value.ToString("dd/MM/yyyy")</dd>
+                        <dd class="col-7 text-end mb-0">@Loc.TDate(Model.DueDate.Value.ToString("dd/MM/yyyy"))</dd>
                     }
                 </dl>
                 @if (!string.IsNullOrWhiteSpace(Model.Description))
@@ -96,11 +183,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.Sku))
                         {
-                            <dt class="col-5 text-muted fw-normal">@Loc.T("SKU")</dt><dd class="col-7 text-end mb-0 font-monospace">@Model.Asset.Sku</dd>
+                            <dt class="col-5 text-muted fw-normal">@Loc.T("SKU")</dt><dd class="col-7 text-end mb-0">@Model.Asset.Sku</dd>
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.SerialNumber))
                         {
-                            <dt class="col-5 text-muted fw-normal">@Loc.T("Serial Number")</dt><dd class="col-7 text-end mb-0 font-monospace">@Model.Asset.SerialNumber</dd>
+                            <dt class="col-5 text-muted fw-normal">@Loc.T("Serial Number")</dt><dd class="col-7 text-end mb-0">@Model.Asset.SerialNumber</dd>
                         }
                     </dl>
                 </div>
@@ -108,7 +195,7 @@
         }
     </div>
 
-    <div class="col-lg-8">
+    <div class="col-lg-8 order-1 order-lg-2">
         @if (canReportFix)
         {
             <div class="card border-0 shadow-sm mb-3 border-start border-4 border-primary">
@@ -157,22 +244,6 @@
                                 <i class="bi bi-check2-circle me-1"></i>@Loc.T("Approve")
                             </button>
                         </form>
-                        @* The way back out of PendingApproval - clears the reported cost/parts
-                           (returning their stock) and reopens the order for the assignee. *@
-                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#returnToOpenCollapse">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i>@Loc.T("Return to Open")
-                        </button>
-                    </div>
-                </div>
-                <div class="collapse" id="returnToOpenCollapse">
-                    <div class="card-body border-top">
-                        <div class="form-text mb-2">@Loc.T("Sends this order back to the assignee to redo. The reported cost and parts are cleared and the parts return to stock.")</div>
-                        <form method="post" asp-action="RejectApproval" asp-route-id="@Model.Id" class="d-flex gap-2">
-                            @Html.AntiForgeryToken()
-                            <label for="returnReason" class="visually-hidden">@Loc.T("Reason")</label>
-                            <input type="text" id="returnReason" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
-                            <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">@Loc.T("Return to Open")</button>
-                        </form>
                     </div>
                 </div>
             </div>
@@ -194,7 +265,7 @@
                 <div class="card-body">
                     <dl class="row small mb-0 gy-2">
                         <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Fix Cost")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.Cost</dd>
-                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.CompletedDate?.ToString("dd/MM/yyyy")</dd>
+                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Loc.TDate(Model.CompletedDate?.ToString("dd/MM/yyyy") ?? "")</dd>
                     </dl>
                     @if (!string.IsNullOrWhiteSpace(Model.FixDescription))
                     {
@@ -224,58 +295,6 @@
             </div>
         }
 
-        @if (Model.Status is "Open" or "PendingApproval" && isManager)
-        {
-            <div class="text-end mb-2">
-                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#reassignCollapse">
-                    <i class="bi bi-person-gear me-1"></i>@Loc.T("Reassign")
-                </button>
-                <div class="collapse mt-2" id="reassignCollapse">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-start">
-                            <div class="form-text mb-2">@Loc.T("Use this if the current assignee's account has been deactivated and the order needs to move to someone else.")</div>
-                            <form method="post" asp-action="Reassign" asp-route-id="@Model.Id" class="d-flex gap-2 flex-wrap">
-                                @Html.AntiForgeryToken()
-                                <div style="min-width:220px" class="flex-grow-1">
-                                    <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
-                                </div>
-                                <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px">
-                                    <option value="">@Loc.T("— or select a group —")</option>
-                                    @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
-                                    {
-                                        <option value="@t.Id">@t.Name</option>
-                                    }
-                                </select>
-                                <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">@Loc.T("Reassign")</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
-
-        @if (canCancel && isManager)
-        {
-            <div class="text-end">
-                <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#cancelCollapse">
-                    <i class="bi bi-x-octagon me-1"></i>@Loc.T("Cancel Maintenance Order")
-                </button>
-                <div class="collapse mt-2" id="cancelCollapse">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body text-start">
-                            <form method="post" asp-action="Cancel" asp-route-id="@Model.Id"
-                                  onsubmit="return confirm('@Loc.T("Cancel this maintenance order?")')"
-                                  class="d-flex gap-2">
-                                @Html.AntiForgeryToken()
-                                <label for="cancelReason" class="visually-hidden">@Loc.T("Reason")</label>
-                                <input type="text" id="cancelReason" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
-                                <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Cancel Maintenance Order")</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
     </div>
 </div>
 
