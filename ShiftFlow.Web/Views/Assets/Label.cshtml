@@ -41,7 +41,7 @@
             <img class="qr" src="@Url.Action("QrCode", new { id = Model.Id })" alt="QR" />
             <img class="barcode" src="@Url.Action("Barcode", new { id = Model.Id })" alt="Barcode" />
         </div>
-        <div class="meta">@Model.Category?.Name — @(Model.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null)</div>
+        <div class="meta">@(Model.Category is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null) — @(Model.Zone is { } zn ? Loc.LocalizedName(zn.Name, zn.NameAr) : null)</div>
     </div>
 </body>
 </html>

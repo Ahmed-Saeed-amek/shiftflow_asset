@@ -131,7 +131,7 @@
             <div class="col-md-8">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-white fw-semibold border-0">@Loc.T("Monthly Cost Trend")</div>
-                    <div class="card-body"><div class="chart-wrap"><canvas id="costTrendChart"></canvas></div></div>
+                    <div class="card-body"><div class="chart-wrap"><canvas id="costTrendChart" aria-label="@Loc.T("Monthly Cost Trend")" role="img"></canvas></div></div>
                 </div>
             </div>
         </div>
@@ -139,6 +139,8 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="~/js/theme-colors.js" asp-append-version="true"></script>
     <script>
         const costMonths = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(costByMonth.Select(m => $"{m.Year}-{m.Month:D2}")));
         const costValues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(costByMonth.Select(m => m.Cost)));
@@ -146,7 +148,7 @@
             type: 'line',
             data: {
                 labels: costMonths,
-                datasets: [{ data: costValues, borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,.15)', fill: true, tension: 0.3 }]
+                datasets: [{ data: costValues, borderColor: themeColor('--chart-2'), backgroundColor: themeColor('--chart-2').replace('hsl(', 'hsla(').replace(')', ', .15)'), fill: true, tension: 0.3 }]
             },
             options: {
                 maintainAspectRatio: false,

@@ -277,6 +277,16 @@ public class SparePartIndexViewModel
     public PaginationModel Pagination { get; set; } = new();
 }
 
+/// <summary>A spare part's Details page. IsLowStock shares the one low-stock definition with
+/// SparePartRow instead of the view re-deriving it.</summary>
+public class SparePartDetailsViewModel
+{
+    public SparePart Part { get; set; } = null!;
+    public List<AssetChip> LinkedAssets { get; set; } = [];
+    public List<SparePartUsageRow> RecentUsage { get; set; } = [];
+    public bool IsLowStock => Part.ReorderThreshold != null && Part.StockQuantity <= Part.ReorderThreshold;
+}
+
 /// <summary>One row of a spare part's recent-usage history on its Details page, combining
 /// WorkOrderParts and MaintenanceOrderParts into one common shape.</summary>
 public class SparePartUsageRow

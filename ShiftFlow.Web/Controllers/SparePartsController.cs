@@ -6,6 +6,7 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -16,62 +17,93 @@ public class SparePartsController : Controller
     private readonly ApplicationDbContext _db;
     private readonly ISparePartService _service;
     private readonly IAssetScopeService _scopeService;
+    private readonly ILookupCache _lookups;
     private readonly UserManager<ApplicationUser> _userManager;
-    public SparePartsController(ApplicationDbContext db, ISparePartService service, IAssetScopeService scopeService, UserManager<ApplicationUser> userManager)
+    public SparePartsController(ApplicationDbContext db, ISparePartService service, IAssetScopeService scopeService, ILookupCache lookups, UserManager<ApplicationUser> userManager)
     {
-        _db = db; _service = service; _scopeService = scopeService; _userManager = userManager;
+        _db = db; _service = service; _scopeService = scopeService; _lookups = lookups; _userManager = userManager;
     }
 
-    /// <summary>Every part linked ONLY to assets outside the caller's own asset scope (see
-    /// AssetScopeService) is excluded — same "can't see a part tied to an asset you can't see"
-    /// rule the catalog's whole point (parts fit specific assets) implies. A user with no scope
-    /// (the common case) sees everything, since ApplyScopeAsync is then a no-op.</summary>
+    private const int PageSize = 25;
+
+    /// <summary>Scope rule for the parts catalog, in full: a user with no asset scope sees every
+    /// part (the previous filter also hid parts with no asset links at all, contradicting its own
+    /// "no scope sees everything" comment); a scoped user sees a part linked to at least one asset
+    /// inside their scope, or one with no asset links — an unlinked generic consumable belongs to
+    /// nobody's zone, so hiding it just makes the catalog incomplete with nothing gained.</summary>
     private async Task<IQueryable<SparePart>> ScopedPartsAsync(IQueryable<SparePart> query, string userId)
     {
-        var scopedAssetIds = (await _scopeService.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).Select(a => a.Id);
-        return query.Where(p => p.AssetLinks.Any(l => scopedAssetIds.Contains(l.AssetId)));
+        if (!await _scopeService.HasScopeAsync(userId)) return query;
+        var scopedAssets = await _scopeService.GetScopedAssetsAsync(userId);
+        return query.Where(p => !p.AssetLinks.Any() || p.AssetLinks.Any(l => scopedAssets.Any(a => a.Id == l.AssetId)));
     }
 
     [Authorize(Policy = PermissionCatalog.SparePartView)]
-    public async Task<IActionResult> Index(bool? lowStockOnly)
+    public async Task<IActionResult> Index(bool? lowStockOnly, string? q, int page = 1)
     {
+        if (page < 1) page = 1;
+        q = SearchQuery.Cap(q);
         var userId = _userManager.GetUserId(User)!;
-        var query = await ScopedPartsAsync(_db.SpareParts.AsQueryable(), userId);
+        var query = await ScopedPartsAsync(_db.SpareParts.AsNoTracking(), userId);
         if (lowStockOnly == true)
             query = query.Where(p => p.ReorderThreshold != null && p.StockQuantity <= p.ReorderThreshold);
-        var parts = await query.OrderBy(p => p.Name).ToListAsync();
-        ViewBag.LowStockOnly = lowStockOnly == true;
-        return View(parts);
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(p => p.Name.Contains(q) || (p.Sku != null && p.Sku.Contains(q)));
+
+        var ordered = query.OrderBy(p => p.Name);
+        var totalCount = await ordered.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+
+        var parts = await ordered.Skip((page - 1) * PageSize).Take(PageSize)
+            .Select(p => new SparePartRow
+            {
+                Id = p.Id, Name = p.Name, NameAr = p.NameAr, Sku = p.Sku, UnitCost = p.UnitCost,
+                StockQuantity = p.StockQuantity, ReorderThreshold = p.ReorderThreshold, IsActive = p.IsActive,
+                LinkedAssetCount = p.AssetLinks.Count,
+            })
+            .ToListAsync();
+
+        return View(new SparePartIndexViewModel
+        {
+            Parts = parts, LowStockOnly = lowStockOnly == true, Q = q, TotalCount = totalCount,
+            Pagination = new PaginationModel { Page = page, TotalPages = totalPages },
+        });
     }
 
     [Authorize(Policy = PermissionCatalog.SparePartView)]
     public async Task<IActionResult> Details(int id)
     {
         var userId = _userManager.GetUserId(User)!;
-        var part = await (await ScopedPartsAsync(_db.SpareParts.AsQueryable(), userId))
-            .Include(p => p.AssetLinks).ThenInclude(l => l.Asset)
+        var part = await (await ScopedPartsAsync(_db.SpareParts.AsNoTracking(), userId))
             .FirstOrDefaultAsync(p => p.Id == id);
         if (part == null) return NotFound();
+        // Only the links the caller may see — the raw AssetLinks collection names every asset the
+        // part fits, in or out of scope.
+        var linkedAssets = await InScopeAssetChipsAsync(id, userId);
 
         // Recent usage across both fix-report entities, most recent first — lets whoever manages
         // the catalog see at a glance what this part has actually been consumed by.
-        var woUsage = await _db.WorkOrderParts.Include(p => p.WorkOrder)
+        var woUsage = await _db.WorkOrderParts.AsNoTracking()
             .Where(p => p.SparePartId == id)
             .Select(p => new SparePartUsageRow
             {
                 WorkOrderNumber = p.WorkOrder!.WorkOrderNumber, Quantity = p.Quantity,
                 UsedDate = p.WorkOrder.ClosedDate ?? p.WorkOrder.CreatedDate,
             }).ToListAsync();
-        var moUsage = await _db.MaintenanceOrderParts.Include(p => p.MaintenanceOrder)
+        var moUsage = await _db.MaintenanceOrderParts.AsNoTracking()
             .Where(p => p.SparePartId == id)
             .Select(p => new SparePartUsageRow
             {
                 WorkOrderNumber = p.MaintenanceOrder!.OrderNumber, Quantity = p.Quantity,
                 UsedDate = p.MaintenanceOrder.ClosedDate ?? p.MaintenanceOrder.CreatedDate,
             }).ToListAsync();
-        ViewBag.RecentUsage = woUsage.Concat(moUsage).OrderByDescending(u => u.UsedDate).Take(20).ToList();
-
-        return View(part);
+        return View(new SparePartDetailsViewModel
+        {
+            Part = part,
+            LinkedAssets = linkedAssets,
+            RecentUsage = woUsage.Concat(moUsage).OrderByDescending(u => u.UsedDate).Take(20).ToList(),
+        });
     }
 
     [Authorize(Policy = PermissionCatalog.SparePartManage)]
@@ -109,10 +141,14 @@ public class SparePartsController : Controller
     [Authorize(Policy = PermissionCatalog.SparePartManage)]
     public async Task<IActionResult> Edit(int id)
     {
-        var part = await _db.SpareParts.Include(p => p.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(p => p.Id == id);
+        var userId = _userManager.GetUserId(User)!;
+        // Edit was reachable for an out-of-scope part even though Details 404s on it, and its chip
+        // list named every linked asset regardless of scope.
+        var part = await (await ScopedPartsAsync(_db.SpareParts.AsNoTracking(), userId))
+            .Include(p => p.AssetLinks)
+            .FirstOrDefaultAsync(p => p.Id == id);
         if (part == null) return NotFound();
-        ViewBag.SelectedAssetChips = part.AssetLinks
-            .Select(l => new AssetChip { Id = l.AssetId, Label = l.Asset!.AssetTag + " — " + l.Asset.Name }).ToList();
+        ViewBag.SelectedAssetChips = await InScopeAssetChipsAsync(id, userId);
         await PopulateLookupsAsync();
         return View(new SparePartViewModel
         {
@@ -127,6 +163,7 @@ public class SparePartsController : Controller
     {
         if (!ModelState.IsValid) { ViewBag.SelectedAssetChips = await BuildChipsAsync(vm.AssetIds); await PopulateLookupsAsync(); return View(vm); }
         var userId = _userManager.GetUserId(User)!;
+        if (!await (await ScopedPartsAsync(_db.SpareParts.AsNoTracking(), userId)).AnyAsync(p => p.Id == vm.Id)) return NotFound();
         try
         {
             await _service.UpdateAsync(new SparePart
@@ -150,6 +187,7 @@ public class SparePartsController : Controller
     public async Task<IActionResult> AdjustStock(int id, int newQuantity, string? reason)
     {
         var userId = _userManager.GetUserId(User)!;
+        if (!await (await ScopedPartsAsync(_db.SpareParts.AsNoTracking(), userId)).AnyAsync(p => p.Id == id)) return NotFound();
         try { await _service.AdjustStockAsync(id, newQuantity, reason, userId); TempData["Success"] = "Stock updated."; }
         catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
         return RedirectToAction(nameof(Details), new { id });
@@ -163,15 +201,24 @@ public class SparePartsController : Controller
         Json((await _service.GetCompatiblePartsAsync(assetId))
             .Select(p => new { id = p.Id, name = p.Name }));
 
+    /// <summary>The assets a part is linked to, narrowed to the caller's own asset scope.</summary>
+    private async Task<List<AssetChip>> InScopeAssetChipsAsync(int sparePartId, string userId) =>
+        await (await _scopeService.GetScopedAssetsAsync(userId))
+            .Where(a => a.SparePartLinks.Any(l => l.SparePartId == sparePartId))
+            .OrderBy(a => a.AssetTag)
+            .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name })
+            .ToListAsync();
+
     private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)
     {
         if (assetIds == null || assetIds.Count == 0) return [];
-        return await _db.Assets.Where(a => assetIds.Contains(a.Id))
+        var userId = _userManager.GetUserId(User)!;
+        return await (await _scopeService.GetScopedAssetsAsync(userId)).Where(a => assetIds.Contains(a.Id))
             .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name }).ToListAsync();
     }
 
     private async Task PopulateLookupsAsync()
     {
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = await _lookups.TopLevelCategoriesAsync();
     }
 }

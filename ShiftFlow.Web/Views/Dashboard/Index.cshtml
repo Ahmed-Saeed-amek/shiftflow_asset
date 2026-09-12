@@ -1,9 +1,10 @@
-@model ShiftFlow.Application.Services.DashboardKpis
+@model ShiftFlow.Web.ViewModels.DashboardViewModel
 @using ShiftFlow.Domain.Entities
 @{
     ViewData["Title"] = Loc.T("Executive Dashboard");
-    var recentOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.RecentOrders;
-    var overdueOrders = (List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>)ViewBag.OverdueOrders;
+    var kpis = Model.Kpis;
+    var recentOrders = Model.RecentOrders;
+    var overdueOrders = Model.OverdueOrders;
 
     // The raw InspectionOrder.Status enum value has no space ("InProgress") — fine for a status
     // badge (which shares this app-wide with a dedicated "InProgress" style), but the chart's own
@@ -21,18 +22,18 @@
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Executive Dashboard"),Subtitle=Loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait"),ActionsHtml="<a href='" + Url.Action("ExportPdf") + "' class='btn btn-outline-primary btn-sm'><i class=\"bi bi-file-earmark-pdf me-1\"></i>" + Loc.T("Export PDF") + "</a>"})" />
 
 <div class="row g-3 mb-4">
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=Model.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=((int)ViewBag.OverdueOrderCount).ToString(),Icon="bi-alarm",Color="red"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Groups"),Value=Model.ActiveGroups.ToString(),Icon="bi-people",Color="violet"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{Model.DefectiveAssets}/{Model.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=Model.OpenWorkOrders.ToString(),Subtitle=Model.CriticalOpenWorkOrders>0?$"{Model.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" /></div>
-    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Low Stock Parts"),Value=Model.LowStockPartsCount.ToString(),Icon="bi-boxes",Color="amber"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Inspection Orders"),Value=kpis.OpenInspectionOrders.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue Orders"),Value=Model.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Active Groups"),Value=kpis.ActiveGroups.ToString(),Icon="bi-people",Color="violet"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective Assets"),Value=$"{kpis.DefectiveAssets}/{kpis.TotalAssets}",Icon="bi-box-seam",Color="red"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open Work Orders"),Value=kpis.OpenWorkOrders.ToString(),Subtitle=kpis.CriticalOpenWorkOrders>0?$"{kpis.CriticalOpenWorkOrders} {Loc.T("critical")}":null,Icon="bi-tools",Color="orange"})" /></div>
+    <div class="col-6 col-md-4"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Low Stock Parts"),Value=kpis.LowStockPartsCount.ToString(),Icon="bi-boxes",Color="amber"})" /></div>
 </div>
 
 <div class="row g-3 mb-4">
     <div class="col-12 col-md-6">
         <div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold border-0">@Loc.T("Inspection Orders by Status")</div>
-            <div class="card-body"><div class="chart-wrap"><canvas id="orderStatusChart"></canvas></div></div></div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="orderStatusChart" aria-label="@Loc.T("Inspection Orders by Status")" role="img"></canvas></div></div></div>
     </div>
     <div class="col-12 col-md-6">
         <div class="card border-0 shadow-sm h-100">
@@ -97,8 +98,17 @@
 </div>
 
 @section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="~/js/theme-colors.js" asp-append-version="true"></script>
 <script>
-    const statusColors = { Open: '#fbbf24', InProgress: '#38bdf8', Done: '#34d399' };
+    // Chart colours come from the site.css design tokens, not hard-coded hex.
+    const statusColors = {
+        Open: themeColor('--warning'),
+        InProgress: themeColor('--chart-1'),
+        Done: themeColor('--success'),
+    };
+    const fallbackColor = themeColor('--muted-foreground');
+    const labelColor = themeColor('--foreground');
 
     const valueLabelPlugin = {
         id: 'valueLabel',
@@ -109,7 +119,7 @@
                 if (!value) return;
                 const pos = bar.tooltipPosition();
                 ctx.save();
-                ctx.fillStyle = '#374151';
+                ctx.fillStyle = labelColor;
                 ctx.font = "600 11px 'Inter Tight', sans-serif";
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -119,14 +129,14 @@
         }
     };
 
-    const orderLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusLabels));
-    const orderDisplayLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(((string[])ViewBag.OrderStatusLabels).Select(s => Loc.T(SpacedStatus(s)))));
-    const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OrderStatusData));
+    const orderLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OrderStatusLabels));
+    const orderDisplayLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OrderStatusLabels.Select(s => Loc.T(SpacedStatus(s)))));
+    const orderData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OrderStatusData));
     new Chart(document.getElementById('orderStatusChart'), {
         type: 'bar',
         data: {
             labels: orderDisplayLabels,
-            datasets: [{ data: orderData, backgroundColor: orderLabels.map(l => statusColors[l] || '#94a3b8'), borderRadius: 4 }]
+            datasets: [{ data: orderData, backgroundColor: orderLabels.map(l => statusColors[l] || fallbackColor), borderRadius: 4 }]
         },
         options: {
             maintainAspectRatio: false,

@@ -1,24 +1,69 @@
-@model List<AuditLog>
+@model AuditLogIndexViewModel
 @{ ViewData["Title"] = Loc.T("Audit Logs"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Audit Logs"),Subtitle=Loc.T("Last 50 system actions")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Audit Logs"),Subtitle=Model.TotalCount + " " + Loc.T("recorded actions")})" />
+
+<form method="get" class="row g-2 mb-3 align-items-end">
+    <div class="col-6 col-md-2">
+        <label for="fromFilter" class="form-label small">@Loc.T("From")</label>
+        <input id="fromFilter" type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="toFilter" class="form-label small">@Loc.T("To")</label>
+        <input id="toFilter" type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="entityTypeFilter" class="form-label small">@Loc.T("Entity")</label>
+        <select id="entityTypeFilter" name="entityType" class="form-select form-select-sm w-100 w-sm-auto">
+            <option value="">@Loc.T("All")</option>
+            @foreach (var t in Model.EntityTypes)
+            {
+                <option value="@t" selected="@(Model.EntityType == t)">@Loc.T(t)</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="actionFilter" class="form-label small">@Loc.T("Action")</label>
+        <select id="actionFilter" name="action" class="form-select form-select-sm w-100 w-sm-auto">
+            <option value="">@Loc.T("All")</option>
+            @foreach (var a in Model.Actions)
+            {
+                <option value="@a" selected="@(Model.Action == a)">@a.Replace('_', ' ')</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="userFilter" class="form-label small">@Loc.T("User")</label>
+        <select id="userFilter" name="userId" class="form-select form-select-sm w-100 w-sm-auto">
+            <option value="">@Loc.T("All")</option>
+            @foreach (var u in Model.Users)
+            {
+                <option value="@u.Id" selected="@(Model.UserId == u.Id)">@u.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-outline-secondary flex-grow-1">@Loc.T("Filter")</button>
+        <a href="@Url.Action("Index")" class="btn btn-sm btn-link">@Loc.T("Clear")</a>
+    </div>
+</form>
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead><tr><th class="d-none d-sm-table-cell">@Loc.T("Date")</th><th class="d-none d-md-table-cell">@Loc.T("Action")</th><th class="d-none d-lg-table-cell">@Loc.T("Entity")</th><th>@Loc.T("User")</th><th>@Loc.T("Change")</th></tr></thead>
             <tbody>
-                @if (Model.Count == 0)
+                @if (Model.Logs.Count == 0)
                 {
                     <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                 }
-                @foreach (var l in Model)
+                @foreach (var l in Model.Logs)
                 {
                     <tr>
                         <td class="small text-muted d-none d-sm-table-cell">@l.CreatedDate.ToString("dd/MM/yyyy HH:mm")</td>
                         <td class="d-none d-md-table-cell"><span class="badge bg-secondary-subtle text-secondary-emphasis">@l.Action.Replace('_', ' ')</span></td>
                         <td class="small d-none d-lg-table-cell">@l.EntityType</td>
                         <td class="small">@(l.User?.FullName ?? l.UserName ?? l.UserId)</td>
-                        <td class="small text-muted text-truncate" style="max-width:320px">
+                        <td class="small text-muted text-truncate audit-change">
                             @{
                                 var hasChange = !string.IsNullOrWhiteSpace(l.OldValue) || !string.IsNullOrWhiteSpace(l.NewValue);
                             }
@@ -41,3 +86,6 @@
         </table>
     </div>
 </div>
+<partial name="_Pagination" model="Model.Pagination" />
+
+<style>.audit-change{max-width:320px}</style>

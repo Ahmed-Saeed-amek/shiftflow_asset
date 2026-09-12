@@ -7,21 +7,21 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Asset Tag")</label>
+                    <label asp-for="AssetTag" class="form-label small">@Loc.T("Asset Tag")</label>
                     <input asp-for="AssetTag" class="form-control" />
                     <span asp-validation-for="AssetTag" class="text-danger small"></span>
                 </div>
                 <div class="col-md-8">
-                    <label class="form-label small">@Loc.T("Name")</label>
+                    <label asp-for="Name" class="form-label small">@Loc.T("Name")</label>
                     <input asp-for="Name" class="form-control" />
                     <span asp-validation-for="Name" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Name (Arabic)")</label>
+                    <label asp-for="NameAr" class="form-label small">@Loc.T("Name (Arabic)")</label>
                     <input asp-for="NameAr" class="form-control" dir="rtl" />
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Status")</label>
+                    <label asp-for="Status" class="form-label small">@Loc.T("Status")</label>
                     <select asp-for="Status" class="form-select">
                         @foreach (var s in Asset.Statuses)
                         {
@@ -30,7 +30,7 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small">@Loc.T("Category")</label>
+                    <label for="categoryParentSelect" class="form-label small">@Loc.T("Category")</label>
                     <select id="categoryParentSelect" class="form-select">
                         <option value="">—</option>
                         @foreach (var c in (List<AssetCategory>)ViewBag.Categories)
@@ -40,7 +40,7 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small">@Loc.T("Subcategory")</label>
+                    <label for="categorySubSelect" class="form-label small">@Loc.T("Subcategory")</label>
                     <select id="categorySubSelect" class="form-select" disabled>
                         <option value="">@Loc.T("None")</option>
                     </select>
@@ -48,7 +48,7 @@
                     <span asp-validation-for="CategoryId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-8">
-                    <label class="form-label small">@Loc.T("Zone")</label>
+                    <label asp-for="ZoneId" class="form-label small">@Loc.T("Zone")</label>
                     @{
                         var selectedZone = ViewBag.SelectedZone as Zone;
                     }
@@ -59,31 +59,31 @@
                     <span asp-validation-for="ZoneId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Manufacturer")</label>
+                    <label asp-for="Manufacturer" class="form-label small">@Loc.T("Manufacturer")</label>
                     <input asp-for="Manufacturer" class="form-control" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Model")</label>
+                    <label asp-for="Model" class="form-label small">@Loc.T("Model")</label>
                     <input asp-for="Model" class="form-control" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Serial Number")</label>
+                    <label asp-for="SerialNumber" class="form-label small">@Loc.T("Serial Number")</label>
                     <input asp-for="SerialNumber" class="form-control" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("SKU")</label>
+                    <label asp-for="Sku" class="form-label small">@Loc.T("SKU")</label>
                     <input asp-for="Sku" class="form-control" placeholder="@Loc.T("Manufacturer part/catalog number")" />
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Purchase Date")</label>
+                    <label asp-for="PurchaseDate" class="form-label small">@Loc.T("Purchase Date")</label>
                     <input asp-for="PurchaseDate" type="date" class="form-control" />
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Warranty Expiry")</label>
+                    <label asp-for="WarrantyExpiry" class="form-label small">@Loc.T("Warranty Expiry")</label>
                     <input asp-for="WarrantyExpiry" type="date" class="form-control" />
                 </div>
                 <div class="col-12">
-                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
                 </div>
                 <div class="col-12">
@@ -115,6 +115,7 @@
     }
 
     // Category → Subcategory (subcategory optional — CategoryId hidden field falls back to the parent when none is chosen)
+    const loadFailedLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Couldn't load subcategories")));
     const catParentSel = document.getElementById('categoryParentSelect');
     const catSubSel = document.getElementById('categorySubSelect');
     const catIdHidden = document.getElementById('categoryIdHidden');
@@ -126,9 +127,18 @@
 
     async function loadSubcategories(parentId, preselectSubId) {
         if (!parentId) { fillSelect(catSubSel, [], null); updateCategoryHidden(); return; }
-        const subs = await (await fetch(`/AssetCategories/ByParent?parentId=${parentId}`)).json();
-        fillSelect(catSubSel, subs, preselectSubId);
-        catSubSel.querySelector('option[value=""]').textContent = noneLabel;
+        try {
+            const r = await fetch(`/AssetCategories/ByParent?parentId=${parentId}`);
+            if (!r.ok) throw new Error(r.status);
+            const subs = await r.json();
+            fillSelect(catSubSel, subs, preselectSubId);
+            catSubSel.querySelector('option[value=""]').textContent = noneLabel;
+        } catch {
+            // The parent category alone is still a valid selection, so keep the form usable and
+            // say why the subcategory list is empty instead of failing silently.
+            fillSelect(catSubSel, [], null);
+            catSubSel.querySelector('option[value=""]').textContent = loadFailedLabel;
+        }
         updateCategoryHidden();
     }
 
