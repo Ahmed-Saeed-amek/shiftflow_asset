@@ -40,8 +40,10 @@
             title="@Loc.T("Stop speaking")" aria-label="@Loc.T("Stop speaking")">
         <i class="bi bi-stop-fill" aria-hidden="true"></i>
     </button>
+    @* Short placeholder: the long one wrapped to a clipped second line in the 420px drawer.
+       The full sentence stays as the accessible name. *@
     <textarea id="aiInput" rows="1" maxlength="500"
-              placeholder="@Loc.T("Ask me anything about inspection orders...")"
+              placeholder="@Loc.T("Ask me anything…")"
               aria-label="@Loc.T("Ask me anything about inspection orders...")"></textarea>
     <button type="button" class="btn-send" id="btnSend" title="@Loc.T("Send")" aria-label="@Loc.T("Send")">
         <i class="bi bi-send-fill" aria-hidden="true"></i>

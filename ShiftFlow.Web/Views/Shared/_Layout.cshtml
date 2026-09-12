@@ -60,10 +60,16 @@
     //     ViewData["AiContext"] = new { entityType = "WorkOrder", entityId = Model.Id, title = Model.WorkOrderNumber };
     // (see NOTES-ai-frontend.md); everything else falls back to a best-effort guess from the
     // route + page title, which is enough for "what am I looking at" style questions.
-    object aiContext;
+    object? aiContext;
     if (ViewData["AiContext"] is { } explicitAiContext)
     {
         aiContext = explicitAiContext;
+    }
+    else if (onAiAssistantPage)
+    {
+        // "Viewing AI Assistant" is a meaningless self-reference — the assistant page is not a
+        // record you can ask about, so it contributes no context at all.
+        aiContext = null;
     }
     else
     {
@@ -199,7 +205,10 @@
         @* What the user is looking at right now, read by ai-assistant.js and sent as `context`
            with every query. Razor HTML-encodes the JSON into the attribute; the browser decodes
            it back before JSON.parse sees it. *@
-        <meta name="ai-context" content="@JsonSerializer.Serialize(aiContext)" />
+        @if (aiContext is not null)
+        {
+            <meta name="ai-context" content="@JsonSerializer.Serialize(aiContext)" />
+        }
         <link rel="stylesheet" href="~/css/ai-assistant.css" asp-append-version="true" />
     }
 </head>

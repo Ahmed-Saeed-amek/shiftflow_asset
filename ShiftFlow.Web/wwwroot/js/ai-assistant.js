@@ -591,6 +591,12 @@
     /* ---------------------------------------------------------------- rendering */
 
     function render() {
+        // Rebuilding the log throws away whatever was focused inside it (the Confirm button
+        // that was just pressed, a Retry button), which drops focus to <body> — and once focus
+        // leaves the offcanvas, Escape no longer reaches it and the drawer can't be closed from
+        // the keyboard. Hand focus back to the composer in that case.
+        const hadFocusInside = el.messages.contains(document.activeElement);
+
         [...el.messages.children].forEach(c => { if (c !== el.typing) c.remove(); });
 
         if (!turns.length) {
@@ -600,6 +606,7 @@
         }
         renderChips();
         scrollBottom();
+        if (hadFocusInside) el.input.focus();
     }
 
     function renderTurn(turn) {
@@ -934,6 +941,10 @@
                 ok.disabled = true;
                 no.disabled = true;
                 saveTurns();
+                // Disabling the button the user just pressed drops focus to <body> without
+                // firing a focusin, so the offcanvas focus trap never notices and Escape stops
+                // closing the drawer. Put focus somewhere real before that can happen.
+                el.input.focus();
             };
 
             ok.addEventListener('click', () => {
