@@ -12,10 +12,12 @@ public sealed class PermissionAuthorizationHandler
     : AuthorizationHandler<PermissionRequirement>
 {
     private readonly IServiceProvider _services;
+    private readonly IHttpContextAccessor _http;
 
-    public PermissionAuthorizationHandler(IServiceProvider services)
+    public PermissionAuthorizationHandler(IServiceProvider services, IHttpContextAccessor http)
     {
         _services = services;
+        _http = http;
     }
 
     protected override async Task HandleRequirementAsync(
@@ -38,11 +40,24 @@ public sealed class PermissionAuthorizationHandler
             return;
         }
 
-        // Resolve scoped service within a fresh scope to avoid captive-dependency problems
-        using var scope = _services.CreateScope();
-        var permissionService = scope.ServiceProvider.GetRequiredService<IPermissionService>();
+        // Prefer the current request's own scope: this handler is a singleton, so creating a
+        // fresh scope per check spun up a second DbContext (and a second change tracker) for
+        // every [Authorize(Policy=...)] hit. Fall back to a scope of our own when there is no
+        // request (background/hosted-service callers).
+        var requestServices = _http.HttpContext?.RequestServices;
+        if (requestServices is not null)
+        {
+            var permissionService = requestServices.GetRequiredService<IPermissionService>();
+            if (await permissionService.HasPermissionAsync(userId, requirement.Permission))
+                context.Succeed(requirement);
+            else
+                context.Fail();
+            return;
+        }
 
-        if (await permissionService.HasPermissionAsync(userId, requirement.Permission))
+        using var scope = _services.CreateScope();
+        var scopedPermissionService = scope.ServiceProvider.GetRequiredService<IPermissionService>();
+        if (await scopedPermissionService.HasPermissionAsync(userId, requirement.Permission))
             context.Succeed(requirement);
         else
             context.Fail();
