@@ -103,9 +103,12 @@ public class ContractService : IContractService
         // if this throws (bad FK, DB constraint), nothing here is persisted; a new asset is never
         // created unless the contract it's being linked to is created too.
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Create", "Contract", contract.Id.ToString(), userId, newValue: contract.ContractNumber);
+        // One save for the contract audit row plus one row per brand-new asset, instead of a
+        // round trip each.
+        AuditBatch.Add(_db, "Create", "Contract", contract.Id.ToString(), userId, newValue: contract.ContractNumber);
         foreach (var asset in newAssetEntities)
-            await _audit.LogAsync("Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {contract.ContractNumber})");
+            AuditBatch.Add(_db, "Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {contract.ContractNumber})");
+        await _db.SaveChangesAsync();
         return contract;
     }
 
@@ -142,9 +145,10 @@ public class ContractService : IContractService
         // Single SaveChangesAsync — a new asset is never created unless this contract update
         // itself succeeds, same guarantee as CreateAsync above.
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Update", "Contract", existing.Id.ToString(), userId, newValue: existing.ContractNumber);
+        AuditBatch.Add(_db, "Update", "Contract", existing.Id.ToString(), userId, newValue: existing.ContractNumber);
         foreach (var asset in newAssetEntities)
-            await _audit.LogAsync("Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {existing.ContractNumber})");
+            AuditBatch.Add(_db, "Create", "Asset", asset.Id.ToString(), userId, newValue: $"{asset.AssetTag} (via Contract {existing.ContractNumber})");
+        await _db.SaveChangesAsync();
     }
 
     public async Task<Vendor?> GetDerivedVendorAsync(int assetId)
@@ -231,7 +235,7 @@ public class ContractService : IContractService
     public async Task<byte[]> ExportToExcelAsync()
     {
         var contracts = await GetExportRowsAsync();
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        ShiftFlow.Web.Services.ExcelHelper.EnsureLicense();
         using var pkg = new ExcelPackage();
         var ws = pkg.Workbook.Worksheets.Add("Contracts");
         string[] headers = ["Contract Number", "Vendor", "Type", "Start Date", "End Date", "Cost", "Assets"];

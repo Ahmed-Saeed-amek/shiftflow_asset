@@ -121,6 +121,85 @@ public class ContractViewModel : IValidatableObject
     }
 }
 
+/// <summary>Everything the executive dashboard renders, typed — replaces the ViewBag casts the
+/// view used to do for each widget.</summary>
+public class DashboardViewModel
+{
+    public DashboardKpis Kpis { get; set; } = new();
+    public IReadOnlyList<string> OrderStatusLabels { get; set; } = [];
+    public IReadOnlyList<int> OrderStatusData { get; set; } = [];
+    public List<MyWorkOrderRow> RecentOrders { get; set; } = [];
+    public List<MyWorkOrderRow> OverdueOrders { get; set; } = [];
+    public int OverdueOrderCount { get; set; }
+}
+
+/// <summary>One row of the Assets list, plus everything the list's filter bar needs — replaces the
+/// ten ViewBag reads Assets/Index.cshtml used to do.</summary>
+public class AssetIndexViewModel
+{
+    public List<Asset> Assets { get; set; } = [];
+    public List<AssetCategory> Categories { get; set; } = [];
+    public List<Zone> Zones { get; set; } = [];
+    public List<LocationCategory> LocationCategories { get; set; } = [];
+    public IReadOnlyList<string> Statuses { get; set; } = Asset.Statuses;
+    public string? Status { get; set; }
+    public int? CategoryId { get; set; }
+    public int? ZoneId { get; set; }
+    public int? LocationCategoryId { get; set; }
+    public string? Q { get; set; }
+    public bool AssignedToMe { get; set; }
+    public bool IsScoped { get; set; }
+    public bool ZoneLocked { get; set; }
+    public bool LocationCategoryLocked { get; set; }
+    public int TotalCount { get; set; }
+    public PaginationModel Pagination { get; set; } = new();
+}
+
+/// <summary>One row of the asset-locations list — the asset count is a projected COUNT, not a
+/// loaded Assets collection.</summary>
+public class ZoneRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    public string? LocationCategoryName { get; set; }
+    public string? LocationCategoryNameAr { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int AssetCount { get; set; }
+}
+
+public class ZoneIndexViewModel
+{
+    public List<ZoneRow> Zones { get; set; } = [];
+    public int TotalCount { get; set; }
+    public PaginationModel Pagination { get; set; } = new();
+}
+
+/// <summary>Zone details with its in-scope assets passed alongside, rather than Included on the
+/// entity (the asset list is scope-filtered, the zone itself isn't).</summary>
+public class ZoneDetailsViewModel
+{
+    public Zone Zone { get; set; } = null!;
+    public List<Asset> Assets { get; set; } = [];
+}
+
+/// <summary>Filters + one page of audit-log rows.</summary>
+public class AuditLogIndexViewModel
+{
+    public List<AuditLog> Logs { get; set; } = [];
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
+    public string? EntityType { get; set; }
+    public string? UserId { get; set; }
+    public string? Action { get; set; }
+    public List<string> EntityTypes { get; set; } = [];
+    public List<string> Actions { get; set; } = [];
+    public List<(string Id, string Name)> Users { get; set; } = [];
+    public int TotalCount { get; set; }
+    public PaginationModel Pagination { get; set; } = new();
+}
+
 public class AssetChip
 {
     public int Id { get; set; }
@@ -171,6 +250,31 @@ public class SparePartPickerModel
     public int AssetId { get; set; }
     /// <summary>DOM id for the rows container — must be unique per form on a page (e.g. "employeeFixPartsList").</summary>
     public string ContainerId { get; set; } = string.Empty;
+}
+
+/// <summary>One row of the spare-parts catalog list. IsLowStock is the single definition of the
+/// low-stock rule the Index and Details views both used to re-derive inline.</summary>
+public class SparePartRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? NameAr { get; set; }
+    public string? Sku { get; set; }
+    public decimal? UnitCost { get; set; }
+    public int StockQuantity { get; set; }
+    public int? ReorderThreshold { get; set; }
+    public bool IsActive { get; set; }
+    public int LinkedAssetCount { get; set; }
+    public bool IsLowStock => ReorderThreshold != null && StockQuantity <= ReorderThreshold;
+}
+
+public class SparePartIndexViewModel
+{
+    public List<SparePartRow> Parts { get; set; } = [];
+    public bool LowStockOnly { get; set; }
+    public string? Q { get; set; }
+    public int TotalCount { get; set; }
+    public PaginationModel Pagination { get; set; } = new();
 }
 
 /// <summary>One row of a spare part's recent-usage history on its Details page, combining
@@ -316,24 +420,27 @@ public class AssetViewModel : IValidatableObject
     public int Id { get; set; }
     [Required, MaxLength(50)] public string AssetTag { get; set; } = string.Empty;
     [Required, MaxLength(200)] public string Name { get; set; } = string.Empty;
-    public string? NameAr { get; set; }
+    [MaxLength(200)] public string? NameAr { get; set; }
     public int CategoryId { get; set; }
     public int ZoneId { get; set; }
-    public string? Model { get; set; }
-    public string? SerialNumber { get; set; }
-    public string? Manufacturer { get; set; }
-    public string? Sku { get; set; }
-    [Required] public string Status { get; set; } = "Working";
+    [MaxLength(100)] public string? Model { get; set; }
+    [MaxLength(100)] public string? SerialNumber { get; set; }
+    [MaxLength(200)] public string? Manufacturer { get; set; }
+    [MaxLength(100)] public string? Sku { get; set; }
+    [Required, MaxLength(20)] public string Status { get; set; } = "Working";
     public string? AssignedToUserId { get; set; }
     public DateTime? PurchaseDate { get; set; }
     public DateTime? WarrantyExpiry { get; set; }
-    public string? Notes { get; set; }
+    [MaxLength(2000)] public string? Notes { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var t = ValidationHelper.Localizer(validationContext);
         foreach (var r in ValidationHelper.CheckSelected(CategoryId, nameof(CategoryId), "Category", t)) yield return r;
         foreach (var r in ValidationHelper.CheckSelected(ZoneId, nameof(ZoneId), "Zone", t)) yield return r;
+        // Status is posted from a <select>; a tampered value otherwise saves a status nothing renders.
+        if (!Asset.Statuses.Contains(Status))
+            yield return new ValidationResult(t("Selected status is not valid."), [nameof(Status)]);
         // AssetTag gets printed on a Code128 barcode label (AssetCodeGenerator.GenerateBarcodePng)
         // — Code128 can only represent printable ASCII. A tag with Arabic/CJK/other non-Latin1
         // characters previously saved fine but silently corrupted every such character to '?' in
@@ -345,16 +452,23 @@ public class AssetViewModel : IValidatableObject
     }
 }
 
-public class VendorViewModel
+public class VendorViewModel : IValidatableObject
 {
     public int Id { get; set; }
     [Required, MaxLength(200)] public string Name { get; set; } = string.Empty;
-    public string? NameAr { get; set; }
-    public string? ContactName { get; set; }
-    public string? Phone { get; set; }
-    [EmailAddress] public string? Email { get; set; }
-    public string? Specialization { get; set; }
-    [Required] public string Status { get; set; } = "Active";
+    [MaxLength(200)] public string? NameAr { get; set; }
+    [MaxLength(200)] public string? ContactName { get; set; }
+    [MaxLength(30)] public string? Phone { get; set; }
+    [EmailAddress, MaxLength(256)] public string? Email { get; set; }
+    [MaxLength(200)] public string? Specialization { get; set; }
+    [Required, MaxLength(20)] public string Status { get; set; } = "Active";
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var t = ValidationHelper.Localizer(validationContext);
+        if (!Vendor.Statuses.Contains(Status))
+            yield return new ValidationResult(t("Selected status is not valid."), [nameof(Status)]);
+    }
 }
 
 public class WorkOrderViewModel : IValidatableObject

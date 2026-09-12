@@ -1,5 +1,5 @@
 @using Microsoft.AspNetCore.Authorization
-@model List<Zone>
+@model ZoneIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Asset Locations");
@@ -9,8 +9,6 @@
         actionsHtml += "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Zone") + "</a>";
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="~/js/zone-map.js" asp-append-version="true"></script>
 
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Asset Locations"),ActionsHtml=actionsHtml})" />
 
@@ -20,15 +18,15 @@
             <table class="table table-hover align-middle mb-0">
                 <thead><tr><th>@Loc.T("Location Category")</th><th>@Loc.T("Zone")</th><th>@Loc.T("Coordinates")</th><th>@Loc.T("Assets")</th><th></th></tr></thead>
                 <tbody>
-                    @if (Model.Count == 0)
+                    @if (Model.Zones.Count == 0)
                     {
                         <tr><td colspan="5" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                     }
-                    @foreach (var z in Model)
+                    @foreach (var z in Model.Zones)
                     {
                         <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
-                            <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
-                            <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
+                            <td class="small text-muted">@(z.LocationCategoryName is { } cat ? Loc.LocalizedName(cat, z.LocationCategoryNameAr) : null)</td>
+                            <td><a asp-action="Details" asp-route-id="@z.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@Loc.LocalizedName(z.Name, z.NameAr)</a></td>
                             <td>
                                 @if (z.Latitude.HasValue)
                                 {
@@ -39,7 +37,7 @@
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">@Loc.T("No coordinates set")</span>
                                 }
                             </td>
-                            <td>@z.Assets.Count</td>
+                            <td>@z.AssetCount</td>
                             <td onclick="event.stopPropagation()">
                                 @if (canManage)
                                 {
@@ -52,12 +50,16 @@
             </table>
         </div>
     </div>
+    <partial name="_Pagination" model="Model.Pagination" />
 </div>
 
 <div id="mapView" class="card border-0 shadow-sm d-none">
     <div id="zonesOverviewMap" style="height:600px;border-radius:2px"></div>
 </div>
 
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
 <script>
 (function () {
     const listView = document.getElementById('listView');
@@ -80,3 +82,4 @@
     });
 })();
 </script>
+}

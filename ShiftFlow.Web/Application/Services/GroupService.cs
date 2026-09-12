@@ -152,11 +152,16 @@ public class GroupService : IGroupService
         _db.GroupMembers.RemoveRange(toRemove);
         foreach (var id in toAddIds)
             _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = id, AddedAt = DateTime.UtcNow });
-        await _db.SaveChangesAsync();
 
+        // One name lookup for every affected member, and one SaveChanges for the membership change
+        // plus all its audit rows — this used to be a query and a save per added/removed member.
+        var affectedIds = toRemove.Select(m => m.UserId).Concat(toAddIds).Distinct().ToList();
+        var names = await _db.Users.Where(u => affectedIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName);
         foreach (var m in toRemove)
-            await _audit.LogAsync("RemoveMember", "Group", groupId.ToString(), actingUserId, oldValue: await NameOfAsync(m.UserId));
+            AuditBatch.Add(_db, "RemoveMember", "Group", groupId.ToString(), actingUserId, oldValue: names.GetValueOrDefault(m.UserId));
         foreach (var id in toAddIds)
-            await _audit.LogAsync("AddMember", "Group", groupId.ToString(), actingUserId, newValue: await NameOfAsync(id));
+            AuditBatch.Add(_db, "AddMember", "Group", groupId.ToString(), actingUserId, newValue: names.GetValueOrDefault(id));
+        await _db.SaveChangesAsync();
     }
 }

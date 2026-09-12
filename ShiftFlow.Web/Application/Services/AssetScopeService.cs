@@ -6,8 +6,7 @@ namespace ShiftFlow.Application.Services;
 
 /// <summary>Applies a user's effective asset scope (Zone/LocationCategory/Category — each
 /// independently optional, combined with AND when more than one is set) wherever assets need to be
-/// filtered or checked for a given user. The single source of truth for scope enforcement — was
-/// previously duplicated between AssetsController and AssetRepairGuidanceService.
+/// filtered or checked for a given user. The single source of truth for scope enforcement.
 /// A user's own UserAssetScope, if they have one, always wins. With no individual scope, the scope
 /// of the single Group they belong to (if any, and if it has one) applies instead — belonging to
 /// zero or more-than-one scoped group falls back to unrestricted, same as having no scope at all,
@@ -15,6 +14,9 @@ namespace ShiftFlow.Application.Services;
 public interface IAssetScopeService
 {
     Task<IQueryable<Asset>> ApplyScopeAsync(IQueryable<Asset> query, string userId);
+    /// <summary>The scoped Assets set as a composable IQueryable — use it as a correlated subquery
+    /// (<c>scoped.Any(a =&gt; a.Id == x.AssetId)</c>) instead of materialising ids into a List.</summary>
+    Task<IQueryable<Asset>> GetScopedAssetsAsync(string userId);
     Task<bool> IsInScopeAsync(Asset asset, string userId);
     Task<bool> HasScopeAsync(string userId);
     /// <summary>The resolved scope's own Zone/LocationCategory/Category ids (same resolution as
@@ -31,14 +33,26 @@ public readonly record struct EffectiveScope(int? ZoneId, int? LocationCategoryI
 public class AssetScopeService : IAssetScopeService
 {
     private readonly ApplicationDbContext _db;
+    // Scope resolution costs 1-3 queries and is asked for 2-3 times per request (KPIs, list, widgets).
+    // The service is scoped to the request, so memoizing per userId here is request-lifetime only.
+    private readonly Dictionary<string, EffectiveScope?> _resolved = new();
+
     public AssetScopeService(ApplicationDbContext db) { _db = db; }
 
     public async Task<EffectiveScope?> GetEffectiveScopeAsync(string userId)
     {
+        if (_resolved.TryGetValue(userId, out var memoized)) return memoized;
+        var scope = await ResolveAsync(userId);
+        _resolved[userId] = scope;
+        return scope;
+    }
+
+    private async Task<EffectiveScope?> ResolveAsync(string userId)
+    {
         var own = await _db.UserAssetScopes.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == userId);
         if (own != null) return new EffectiveScope(own.ZoneId, own.LocationCategoryId, own.CategoryId);
 
-        var groupIds = await _db.GroupMembers.Where(m => m.UserId == userId).Select(m => m.GroupId).ToListAsync();
+        var groupIds = await _db.GroupMembers.AsNoTracking().Where(m => m.UserId == userId).Select(m => m.GroupId).ToListAsync();
         if (groupIds.Count == 0) return null;
         var groupScopes = await _db.GroupAssetScopes.AsNoTracking().Where(s => groupIds.Contains(s.GroupId)).ToListAsync();
         // Belonging to more than one scoped group has no unambiguous "most restrictive" or "most
@@ -50,6 +64,14 @@ public class AssetScopeService : IAssetScopeService
     public async Task<IQueryable<Asset>> ApplyScopeAsync(IQueryable<Asset> query, string userId)
     {
         var scope = await GetEffectiveScopeAsync(userId);
+        return Apply(query, scope);
+    }
+
+    public Task<IQueryable<Asset>> GetScopedAssetsAsync(string userId) =>
+        ApplyScopeAsync(_db.Assets.AsNoTracking(), userId);
+
+    private static IQueryable<Asset> Apply(IQueryable<Asset> query, EffectiveScope? scope)
+    {
         if (scope == null) return query;
         if (scope.Value.ZoneId.HasValue) query = query.Where(a => a.ZoneId == scope.Value.ZoneId);
         if (scope.Value.LocationCategoryId.HasValue) query = query.Where(a => a.Zone!.LocationCategoryId == scope.Value.LocationCategoryId);

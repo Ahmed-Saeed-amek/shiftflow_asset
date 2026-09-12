@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 
 namespace ShiftFlow.Application.Services;
@@ -19,19 +20,17 @@ public class DashboardService : IDashboardService
 
     public async Task<DashboardKpis> GetKpisAsync(string? userId = null, string? userRole = null)
     {
-        // UserAssetScope-restricted users otherwise saw org-wide counts that didn't match what they
-        // could actually drill into from the same dashboard (Details/Index already enforce scope —
-        // rounds 11-13). Cache key must be per-user once scoped, not per-role, since scope is a
-        // per-user setting, not a role-wide one.
+        // Cache key is per-user once scoped (scope is a per-user setting, not a role-wide one) so a
+        // restricted user never reads another user's org-wide counts out of the cache.
         var hasScope = userId != null && await _scope.HasScopeAsync(userId);
         var cacheKey = hasScope ? $"dashboard_kpis:user:{userId}" : $"dashboard_kpis:{userRole ?? "all"}";
         if (_cache.TryGetValue(cacheKey, out DashboardKpis? cached) && cached != null)
             return cached;
 
         var today = DateTime.UtcNow.Date;
-        List<int>? scopedAssetIds = hasScope
-            ? await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId!)).Select(a => a.Id).ToListAsync()
-            : null;
+        // Kept as a composable IQueryable and used as a correlated EXISTS subquery below, rather than
+        // materialising every scoped asset id into memory for a Contains(...) parameter list.
+        IQueryable<Asset>? scopedAssets = hasScope ? await _scope.GetScopedAssetsAsync(userId!) : null;
 
         // Sequential — a scoped DbContext cannot run these counts concurrently.
         // Field-worker roles only — this card previously counted every active user account
@@ -42,19 +41,21 @@ public class DashboardService : IDashboardService
             .CountAsync(u => u.IsActive && _db.UserRoles.Any(ur => ur.UserId == u.Id && _db.Roles.Any(r => r.Id == ur.RoleId && fieldWorkerRoles.Contains(r.Name))));
 
         var inspectionQuery = _db.InspectionOrders.AsNoTracking().Where(o => o.Status != "Done" && o.Status != "Cancelled");
-        if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        // Any() guard: All(...) is vacuously true for an order with no run items, which let an empty
+        // order through the scope filter entirely.
+        if (scopedAssets != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.Any() && o.InspectionRun.Items.All(i => scopedAssets.Any(a => a.Id == i.AssetId)));
         var openInspectionOrders = await inspectionQuery.CountAsync();
         var inspectionOrdersOverdue = await inspectionQuery.CountAsync(o => o.DueDate != null && o.DueDate < today);
 
         var activeGroups = await _db.Groups.AsNoTracking().CountAsync(t => t.IsActive);
 
         var assetQuery = _db.Assets.AsNoTracking().AsQueryable();
-        if (scopedAssetIds != null) assetQuery = assetQuery.Where(a => scopedAssetIds.Contains(a.Id));
+        if (scopedAssets != null) assetQuery = assetQuery.Where(a => scopedAssets.Any(s => s.Id == a.Id));
         var totalAssets = await assetQuery.CountAsync();
         var defectiveAssets = await assetQuery.CountAsync(a => a.Status == "Defective");
 
         var workOrderQuery = _db.WorkOrders.AsNoTracking().Where(w => w.Stage != "Closed");
-        if (scopedAssetIds != null) workOrderQuery = workOrderQuery.Where(w => scopedAssetIds.Contains(w.AssetId));
+        if (scopedAssets != null) workOrderQuery = workOrderQuery.Where(w => scopedAssets.Any(a => a.Id == w.AssetId));
         var openWorkOrders = await workOrderQuery.CountAsync();
         var criticalOpenWorkOrders = await workOrderQuery.CountAsync(w => w.Priority == "Critical");
 

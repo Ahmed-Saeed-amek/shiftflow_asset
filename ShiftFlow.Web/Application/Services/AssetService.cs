@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
+using ShiftFlow.Web.Services;
 using iText.Kernel.Pdf;
 using iText.Layout;
 using iText.Layout.Element;
@@ -20,10 +21,8 @@ public class AssetService : IAssetService
     public AssetService(ApplicationDbContext db, IAuditService audit, IContractService contractService, IAssetScopeService scopeService, ILanguageService loc)
     { _db = db; _audit = audit; _contractService = contractService; _scopeService = scopeService; _loc = loc; }
 
-    // The Edit/Create form's assignee dropdown already excludes deactivated users, but that's
-    // UI-only — a direct POST with a stale/tampered id otherwise saves an Asset "assigned" to
-    // someone who no longer has any access, unlike MaintenanceOrderService/WorkOrderService, which
-    // both explicitly validate the target user exists (and here, is still active) before saving.
+    // The form's assignee dropdown excludes deactivated users, but a direct POST with a stale or
+    // tampered id would otherwise save an Asset assigned to someone with no access.
     private async Task EnsureAssigneeIsActiveAsync(string? assignedToUserId)
     {
         if (assignedToUserId is null) return;
@@ -31,11 +30,7 @@ public class AssetService : IAssetService
             throw new InvalidOperationException("Selected employee not found or is inactive.");
     }
 
-    // CategoryId/ZoneId are populated from dropdowns the same way AssignedToUserId is, and were
-    // just as unchecked: a direct POST with a stale/tampered id sailed past this service straight
-    // into SaveChangesAsync, where it hit the FK constraint and surfaced as an unhandled 500 with a
-    // raw SqlException (confirmed live) instead of the friendly validation error every other
-    // tampered-FK path in this controller already gets.
+    // Stale/tampered CategoryId/ZoneId would otherwise hit the FK constraint as an unhandled 500.
     private async Task EnsureCategoryAndZoneExistAsync(int categoryId, int zoneId)
     {
         if (!await _db.AssetCategories.AnyAsync(c => c.Id == categoryId))
@@ -56,11 +51,8 @@ public class AssetService : IAssetService
         return asset;
     }
 
-    // Every editable field is saved, but the audit entry used to hard-code Status alone as
-    // old/new — an edit that reassigned the asset to a different zone, category, or employee
-    // without also touching Status produced a byte-identical old/new pair, silently dropping the
-    // one piece of context (who/where it moved from and to) the audit trail exists to capture
-    // (confirmed live: a Zone-only change logged "Maintenance" -> "Maintenance").
+    // Full snapshot so the audit trail captures which zone/category/assignee the asset moved
+    // between, not just Status.
     private async Task<string> SnapshotAsync(Asset a)
     {
         var zoneName = await _db.Zones.Where(z => z.Id == a.ZoneId).Select(z => z.Name).FirstOrDefaultAsync();
@@ -77,11 +69,6 @@ public class AssetService : IAssetService
         await EnsureAssigneeIsActiveAsync(asset.AssignedToUserId);
         var existing = await _db.Assets.FindAsync(asset.Id) ?? throw new InvalidOperationException("Asset not found.");
         var oldValue = await SnapshotAsync(existing);
-        // AssetTag used to be missing from this list entirely — the Edit form (shared _Form.cshtml
-        // with Create) lets the user type a new tag and it passes validation, but nothing here ever
-        // wrote it back, so a changed tag was silently discarded even though the save reported
-        // success (confirmed live: POST with a new AssetTag returned success but the DB row was
-        // unchanged). The controller now duplicate-checks AssetTag on Edit the same way Create does.
         existing.AssetTag = asset.AssetTag; existing.Name = asset.Name; existing.NameAr = asset.NameAr; existing.CategoryId = asset.CategoryId;
         existing.ZoneId = asset.ZoneId; existing.Model = asset.Model; existing.SerialNumber = asset.SerialNumber;
         existing.Manufacturer = asset.Manufacturer; existing.Sku = asset.Sku; existing.Status = asset.Status; existing.AssignedToUserId = asset.AssignedToUserId;
@@ -92,9 +79,34 @@ public class AssetService : IAssetService
         await _audit.LogAsync("Update", "Asset", existing.Id.ToString(), userId, oldValue: oldValue, newValue: newValue);
     }
 
+    /// <summary>Everything that references an Asset, checked before the delete so the caller gets a
+    /// readable "what is blocking this" message instead of a raw FK violation from SaveChanges.</summary>
+    private async Task EnsureNoDependenciesAsync(int id)
+    {
+        var blockers = new List<string>();
+        var workOrders = await _db.WorkOrders.CountAsync(w => w.AssetId == id);
+        if (workOrders > 0) blockers.Add($"{workOrders} {_loc.T("work order(s)")}");
+        var maintenanceOrders = await _db.MaintenanceOrders.CountAsync(m => m.AssetId == id);
+        if (maintenanceOrders > 0) blockers.Add($"{maintenanceOrders} {_loc.T("maintenance order(s)")}");
+        var inspections = await _db.InspectionRunAssets.CountAsync(i => i.AssetId == id);
+        if (inspections > 0) blockers.Add($"{inspections} {_loc.T("inspection record(s)")}");
+        var contracts = await _db.ContractAssets.CountAsync(c => c.AssetId == id);
+        if (contracts > 0) blockers.Add($"{contracts} {_loc.T("contract(s)")}");
+        var spareParts = await _db.SparePartAssets.CountAsync(sp => sp.AssetId == id);
+        if (spareParts > 0) blockers.Add($"{spareParts} {_loc.T("spare part link(s)")}");
+        var recurring = await _db.RecurringOrderAssets.CountAsync(r => r.AssetId == id);
+        if (recurring > 0) blockers.Add($"{recurring} {_loc.T("recurring order schedule(s)")}");
+
+        if (blockers.Count > 0)
+            throw new InvalidOperationException(
+                _loc.T("This asset can't be deleted because it is still referenced by:") + " " + string.Join(", ", blockers) + ". "
+                + _loc.T("Set its status to Retired instead."));
+    }
+
     public async Task DeleteAsync(int id, string userId)
     {
         var asset = await _db.Assets.FindAsync(id) ?? throw new InvalidOperationException("Asset not found.");
+        await EnsureNoDependenciesAsync(id);
         _db.Assets.Remove(asset);
         await _db.SaveChangesAsync();
         await _audit.LogAsync("Delete", "Asset", id.ToString(), userId, oldValue: asset.AssetTag);
@@ -103,7 +115,7 @@ public class AssetService : IAssetService
     private async Task<List<Asset>> GetExportRowsAsync(string userId)
     {
         var query = await _scopeService.ApplyScopeAsync(
-            _db.Assets.Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory),
+            _db.Assets.AsNoTracking().Include(a => a.Category).Include(a => a.Zone).ThenInclude(z => z!.LocationCategory),
             userId);
         return await query.OrderBy(a => a.AssetTag).ToListAsync();
     }
@@ -127,7 +139,7 @@ public class AssetService : IAssetService
     {
         var assets = await GetExportRowsAsync(userId);
         var vendors = await _contractService.GetDerivedVendorsAsync(assets.Select(a => a.Id));
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        ExcelHelper.EnsureLicense();
         using var pkg = new ExcelPackage();
         var ws = pkg.Workbook.Worksheets.Add("Assets");
         string[] headers = ["Tag", "Name", "Category", "Zone", "Vendor", "Model", "Serial Number", "Status"];
@@ -162,7 +174,7 @@ public class AssetService : IAssetService
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
             doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
-            PdfReportHelper.AddHeader(doc, _loc.T("Asset Register"), _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
+            PdfReportHelper.AddHeader(doc, _loc.T("Asset Register"), _loc.TDate(DateTime.UtcNow.ToString("dddd, dd MMMM yyyy")));
 
             var byStatus = assets.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count());
             PdfReportHelper.AddKpiRow(doc,

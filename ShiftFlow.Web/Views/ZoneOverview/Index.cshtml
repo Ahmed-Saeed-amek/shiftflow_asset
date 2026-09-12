@@ -12,8 +12,6 @@
         : "OK";
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="~/js/zone-map.js" asp-append-version="true"></script>
 
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Zone Overview"),Subtitle=Loc.T("Latest orders by zone")})" />
 
@@ -66,12 +64,12 @@
                             var rowStatus = RowStatus(z.Id);
                             var rowClass = rowStatus == "Defective" ? "table-danger" : rowStatus == "Maintenance" ? "table-warning" : "";
                             <tr class="cursor-pointer @rowClass" data-zone-row data-category="@z.LocationCategory?.Name" data-status="@rowStatus"
-                                onclick="location.href='@Url.Action("Details", new { zoneId = z.Id })'">
+                                onclick="location.href='@Url.Action("Details", new { id = z.Id })'">
                                 <td class="small text-muted">@(z.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null)</td>
                                 <td>@Loc.LocalizedName(z.Name, z.NameAr)</td>
                                 <td>@dispatchedByZone.GetValueOrDefault(z.Id, 0)</td>
                                 <td class="small text-muted d-none d-md-table-cell">@(lastVisitedByZone.TryGetValue(z.Id, out var lastVisited) ? Loc.TDate(lastVisited.ToString("dd/MM/yyyy")) : "—")</td>
-                                <td class="text-end"><a asp-action="Details" asp-route-zoneId="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
+                                <td class="text-end"><a asp-action="Details" asp-route-id="@z.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
                             </tr>
                         }
                         <tr id="zoneNoMatchRow" class="d-none"><td colspan="5" class="text-center text-muted py-4">@Loc.T("No zones match these filters.")</td></tr>
@@ -85,9 +83,9 @@
             <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <span class="fw-semibold"><i class="bi bi-map me-1 text-primary"></i>@Loc.T("Asset Map")</span>
                 <div class="d-flex align-items-center gap-3 small text-muted">
-                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#dc3545"></span>@Loc.T("Defective")</span>
-                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#ffc107"></span>@Loc.T("Maintenance")</span>
-                    <span><span class="d-inline-block rounded-circle me-1" style="width:10px;height:10px;background:#198754"></span>@Loc.T("Working")</span>
+                    <span><span class="d-inline-block rounded-circle me-1 legend-dot" data-token="--destructive"></span>@Loc.T("Defective")</span>
+                    <span><span class="d-inline-block rounded-circle me-1 legend-dot" data-token="--warning"></span>@Loc.T("Maintenance")</span>
+                    <span><span class="d-inline-block rounded-circle me-1 legend-dot" data-token="--success"></span>@Loc.T("Working")</span>
                 </div>
             </div>
             <div id="assetOverviewMap" style="height:600px;border-radius:2px"></div>
@@ -95,7 +93,14 @@
     </div>
 </div>
 
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+<script src="~/js/theme-colors.js" asp-append-version="true"></script>
+<style>.legend-dot{width:10px;height:10px}</style>
 <script>
+    // Legend swatches take their colour from the site.css theme tokens, not hard-coded Bootstrap hex.
+    document.querySelectorAll('.legend-dot').forEach(el => { el.style.background = themeColor(el.dataset.token); });
 (function () {
     let mapHandle = null;
     let activeCategory = '';
@@ -138,3 +143,4 @@
         .then(handle => { mapHandle = handle; });
 })();
 </script>
+}
