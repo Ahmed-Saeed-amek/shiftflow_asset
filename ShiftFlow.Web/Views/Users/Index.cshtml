@@ -4,6 +4,8 @@
 @using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
 @inject IAuthorizationService AuthZ
+@using Microsoft.Extensions.Hosting
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
     ViewData["Title"] = Loc.T("Users");
     var rolesByUser = (Dictionary<string, IList<string>>)ViewBag.RolesByUser;
@@ -13,7 +15,9 @@
     string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
     var canManageUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserManage)).Succeeded;
     var canViewProfile = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
-    var canSeedData = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded;
+    // Re-running the seeder against a live production database is not a routine admin action —
+    // keep the button to Development, where it's a convenience.
+    var canSeedData = Env.IsDevelopment() && (await AuthZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded;
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
     var exportUrl = Url.Action("ExportExcel", new { role = (string)ViewBag.RoleFilter, search = (string)ViewBag.SearchFilter });
     string actionsHtml = "<a href='" + exportUrl + "' class='btn btn-outline-success btn-sm me-2'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a>"
@@ -110,7 +114,7 @@
                                     else
                                     {
                                         <form method="post" asp-action="ToggleActive" asp-route-id="@u.Id"
-                                              onsubmit="return confirm('@(u.IsActive ? Loc.T("Deactivate") : Loc.T("Activate")) @u.FullName?')">
+                                              onsubmit="return confirm('@(u.IsActive ? Loc.T("Deactivate {0}?", u.FullName) : Loc.T("Activate {0}?", u.FullName))')">
                                             @Html.AntiForgeryToken()
                                             <button class="btn btn-sm @(u.IsActive ? "btn-outline-warning" : "btn-outline-success")"
                                                     title="@(u.IsActive ? Loc.T("Deactivate user") : Loc.T("Activate user"))">
@@ -118,7 +122,7 @@
                                             </button>
                                         </form>
                                         <form method="post" asp-action="Delete" asp-route-id="@u.Id"
-                                              onsubmit="return confirm('@Loc.T("Delete") @u.FullName? @Loc.T("This cannot be undone")')">
+                                              onsubmit="return confirm('@Loc.T("Delete {0}? This cannot be undone.", u.FullName)')">
                                             @Html.AntiForgeryToken()
                                             <button class="btn btn-sm btn-outline-danger" title="@Loc.T("Delete user")">
                                                 <i class="bi bi-trash3"></i>
@@ -134,4 +138,6 @@
         </table>
     </div>
 </div>
+
+<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
 

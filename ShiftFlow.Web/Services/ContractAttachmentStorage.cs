@@ -46,9 +46,17 @@ public static class ContractAttachmentStorage
         return rejected;
     }
 
-    public static string ResolvePhysicalPath(string relativeFilePath)
+    /// <summary>Maps a stored FilePath back to disk. Returns null if the result would escape the
+    /// uploads root (a "../" in a tampered FilePath), so a caller can never serve or delete a file
+    /// outside App_Data/uploads.</summary>
+    public static string? ResolvePhysicalPath(string relativeFilePath)
     {
+        if (string.IsNullOrWhiteSpace(relativeFilePath)) return null;
+
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "App_Data", "uploads"))
+                       .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var trimmed = relativeFilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-        return Path.Combine(AppContext.BaseDirectory, "App_Data", trimmed);
+        var full = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "App_Data", trimmed));
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? full : null;
     }
 }

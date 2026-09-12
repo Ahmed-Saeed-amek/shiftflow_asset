@@ -18,16 +18,40 @@ public class VendorsController : Controller
     private readonly IVendorService _vendorService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILanguageService _loc;
-    public VendorsController(ApplicationDbContext db, IVendorService vendorService, UserManager<ApplicationUser> userManager, ILanguageService loc)
+    private readonly IAuditService _audit;
+    public VendorsController(ApplicationDbContext db, IVendorService vendorService, UserManager<ApplicationUser> userManager, ILanguageService loc, IAuditService audit)
     {
-        _db = db; _vendorService = vendorService; _userManager = userManager; _loc = loc;
+        _db = db; _vendorService = vendorService; _userManager = userManager; _loc = loc; _audit = audit;
     }
 
+    private const int PageSize = 25;
+
     [Authorize(Policy = PermissionCatalog.VendorView)]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
-        var vendors = await _db.Vendors.OrderBy(v => v.Name).ToListAsync();
+        if (page < 1) page = 1;
+        var query = _db.Vendors.AsNoTracking().OrderBy(v => v.Name);
+        var totalCount = await query.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        ViewBag.Pagination = new ShiftFlow.Web.ViewModels.PaginationModel { Page = page, TotalPages = totalPages };
+        var vendors = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
         return View(vendors);
+    }
+
+    /// <summary>Real Edit page. Index used to be linked to with ?edit=id and a script that
+    /// auto-clicked the row's modal button — a deep link that broke whenever the vendor wasn't on
+    /// the current page (and now that Index is paged, that is the normal case).</summary>
+    [Authorize(Policy = PermissionCatalog.VendorManage)]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var vendor = await _db.Vendors.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id);
+        if (vendor == null) return NotFound();
+        return View(new VendorViewModel
+        {
+            Id = vendor.Id, Name = vendor.Name, NameAr = vendor.NameAr, ContactName = vendor.ContactName,
+            Phone = vendor.Phone, Email = vendor.Email, Specialization = vendor.Specialization, Status = vendor.Status,
+        });
     }
 
     [Authorize(Policy = PermissionCatalog.VendorView)]
@@ -45,7 +69,14 @@ public class VendorsController : Controller
         var vendor = await _db.Vendors.FindAsync(vendorId);
         if (vendor == null) return NotFound();
         if (vendor.UserId != null) { TempData["Error"] = "This vendor already has a login."; return RedirectToAction(nameof(Details), new { id = vendorId }); }
-        if (string.IsNullOrWhiteSpace(email)) { TempData["Error"] = "An email is required to create a login."; return RedirectToAction(nameof(Details), new { id = vendorId }); }
+
+        email = email?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(email)) { TempData["Error"] = _loc.T("An email is required to create a login."); return RedirectToAction(nameof(Details), new { id = vendorId }); }
+        if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+        {
+            TempData["Error"] = _loc.T("Enter a valid email address.");
+            return RedirectToAction(nameof(Details), new { id = vendorId });
+        }
 
         var tempPassword = ShiftFlow.Web.Services.TempPasswordGenerator.Generate();
         var user = new ApplicationUser { UserName = email, Email = email, FullName = vendor.Name, IsActive = true, EmailConfirmed = true };
@@ -56,10 +87,16 @@ public class VendorsController : Controller
             return RedirectToAction(nameof(Details), new { id = vendorId });
         }
         await _userManager.AddToRoleAsync(user, "Vendor");
+        // Same first-login gate as UsersController.Create — without it the admin-generated temp
+        // password stayed valid indefinitely as the vendor's real credential.
+        await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "true"));
         vendor.UserId = user.Id;
-        vendor.Email = email;
+        // Only fill in the vendor's contact email when it's blank. Overwriting an existing,
+        // curated contact address with whatever was typed into the login form silently discarded it.
+        if (string.IsNullOrWhiteSpace(vendor.Email)) vendor.Email = email;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Login created.";
+        await _audit.LogAsync("CreateLogin", "Vendor", vendorId.ToString(), _userManager.GetUserId(User)!, newValue: $"{vendor.Name} ({email})");
+        TempData["Success"] = _loc.T("Login created.");
         TempData["TempPassword"] = tempPassword;
         return RedirectToAction(nameof(Details), new { id = vendorId });
     }
@@ -78,7 +115,12 @@ public class VendorsController : Controller
             TempData["Error"] = string.Join(" ", result.Errors.Select(e => e.Description));
             return RedirectToAction(nameof(Details), new { id = vendorId });
         }
-        TempData["Success"] = "Password reset.";
+        var existingClaims = await _userManager.GetClaimsAsync(vendor.User);
+        if (!existingClaims.Any(c => c.Type == "must_change_password"))
+            await _userManager.AddClaimAsync(vendor.User, new System.Security.Claims.Claim("must_change_password", "true"));
+
+        await _audit.LogAsync("ResetPassword", "Vendor", vendorId.ToString(), _userManager.GetUserId(User)!, newValue: vendor.Name);
+        TempData["Success"] = _loc.T("Password reset.");
         TempData["TempPassword"] = tempPassword;
         return RedirectToAction(nameof(Details), new { id = vendorId });
     }

@@ -4,6 +4,12 @@
     var roles        = (List<ApplicationRole>)ViewBag.Roles;
     var rolesByUser  = (Dictionary<string, IList<string>>)ViewBag.RolesByUser;
     var roleNames    = roles.Select(r => r.Name!).OrderBy(n => n).ToList();
+    // Only the roles this caller may actually grant/revoke - RbacController.BulkAssignRoles
+    // enforces the same rule server-side.
+    var assignableRoleNames = ViewBag.AssignableRoleNames as List<string> ?? roleNames;
+    var searchFilter = (string?)ViewBag.SearchFilter;
+    var roleFilter   = (string?)ViewBag.RoleFilter;
+    var totalCount   = (int)(ViewBag.TotalCount ?? 0);
     var roleNameArByName = roles.ToDictionary(r => r.Name!, r => r.NameAr);
     string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
     var selectAtLeastOneUserJson = System.Text.Json.JsonSerializer.Serialize(Loc.T("Select at least one user."));
@@ -76,7 +82,7 @@
                             <i class="bi bi-chevron-right text-muted small ms-auto"></i>
                         </a>
                         <form method="post" asp-action="DeleteRole" class="flex-shrink-0"
-                              onsubmit="return confirm('@Loc.T("Delete role") \'@RoleLabel(role.Name!)\'?')">
+                              onsubmit="return confirm('@Loc.T("Delete role '{0}'?", RoleLabel(role.Name!))')">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="roleId" value="@role.Id" />
                             <button class="btn btn-sm btn-outline-danger py-1 px-2"
@@ -117,7 +123,7 @@
                         <div>
                             <label class="form-label small mb-1 fw-semibold text-success">@Loc.T("Add roles")</label>
                             <div class="d-flex flex-wrap gap-2" id="addRoleChecks">
-                                @foreach (var rn in roleNames)
+                                @foreach (var rn in assignableRoleNames)
                                 {
                                     <div class="form-check form-check-inline mb-0">
                                         <input class="form-check-input border-success" type="checkbox"
@@ -132,7 +138,7 @@
                         <div>
                             <label class="form-label small mb-1 fw-semibold text-danger">@Loc.T("Remove roles")</label>
                             <div class="d-flex flex-wrap gap-2" id="removeRoleChecks">
-                                @foreach (var rn in roleNames)
+                                @foreach (var rn in assignableRoleNames)
                                 {
                                     <div class="form-check form-check-inline mb-0">
                                         <input class="form-check-input border-danger" type="checkbox"
@@ -159,28 +165,33 @@
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <i class="bi bi-people text-success fs-5"></i>
                     <span class="fw-semibold">@Loc.T("Users")</span>
-                    <span class="badge bg-success" id="visibleCount">@Model.Count</span>
+                    <span class="badge bg-success" id="visibleCount">@totalCount</span>
                     <div class="form-check mb-0 ms-auto" title="@Loc.T("Select all visible")">
                         <input class="form-check-input" type="checkbox" id="checkAll" />
                         <label class="form-check-label small text-muted" for="checkAll">@Loc.T("Select all")</label>
                     </div>
                 </div>
-                <!-- row 2: filters -->
-                <div class="d-flex gap-2 flex-wrap">
-                    <input id="filterName" type="search" class="form-control form-control-sm"
+                <!-- row 2: filters (submitted to the server - the list is paged, so filtering
+                     only the rows currently rendered would silently miss matches) -->
+                <form method="get" class="d-flex gap-2 flex-wrap">
+                    <input name="search" type="search" value="@searchFilter" class="form-control form-control-sm"
                            placeholder="@Loc.T("Search by name or email…")" style="max-width:240px" />
-                    <select id="filterRole" class="form-select form-select-sm" style="max-width:180px">
+                    <select name="role" class="form-select form-select-sm" style="max-width:180px">
                         <option value="">@Loc.T("All roles")</option>
                         @foreach (var rn in roleNames)
                         {
-                            <option value="@rn">@RoleLabel(rn)</option>
+                            <option value="@rn" selected="@(rn == roleFilter)">@RoleLabel(rn)</option>
                         }
-                        <option value="__none__">@Loc.T("No role assigned")</option>
+                        <option value="__none__" selected="@(roleFilter == "__none__")">@Loc.T("No role assigned")</option>
                     </select>
-                    <button id="clearFilters" class="btn btn-sm btn-outline-secondary d-none">
-                        <i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")
-                    </button>
-                </div>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
+                    @if (!string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(roleFilter))
+                    {
+                        <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>@Loc.T("Clear")
+                        </a>
+                    }
+                </form>
             </div>
 
             <div style="max-height:620px;overflow-y:auto" class="table-responsive">
@@ -189,11 +200,7 @@
                     @foreach (var user in Model)
                     {
                         var userRoles = rolesByUser[user.Id];
-                        <tr class="user-row"
-                            data-name="@user.FullName.ToLower() @user.Email.ToLower()"
-                            data-roles="@string.Join(" ", userRoles).ToLower()"
-                            data-hasroles="@(userRoles.Any() ? "yes" : "no")"
-                            data-rolecount="@userRoles.Count">
+                        <tr class="user-row">
                             <!-- Checkbox -->
                             <td class="ps-3" style="width:40px">
                                 <input class="form-check-input user-check" type="checkbox"
@@ -247,6 +254,7 @@
                 </table>
             </div>
         </div>
+        <partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
     </div>
 </div>
 
@@ -256,55 +264,11 @@
     const bulkBar       = document.getElementById('bulkBar');
     const selCount      = document.getElementById('selCount');
     const userInputsDiv = document.getElementById('bulkUserInputs');
-    const filterName    = document.getElementById('filterName');
-    const filterRole    = document.getElementById('filterRole');
-    const clearBtn      = document.getElementById('clearFilters');
-    const visibleCount  = document.getElementById('visibleCount');
     const allRows       = [...document.querySelectorAll('.user-row')];
 
-    // ── Filtering ──────────────────────────────────────────────────
-    function applyFilters() {
-        const name = filterName.value.trim().toLowerCase();
-        const role = filterRole.value;
-        const hasFilter = name !== '' || role !== '';
-
-        clearBtn.classList.toggle('d-none', !hasFilter);
-
-        let visible = 0;
-        allRows.forEach(row => {
-            const matchName = !name || row.dataset.name.includes(name);
-            let matchRole = true;
-            if (role === '__none__')      matchRole = row.dataset.hasroles === 'no';
-            else if (role !== '')         matchRole = row.dataset.roles.split(' ').includes(role.toLowerCase());
-
-            const show = matchName && matchRole;
-            row.classList.toggle('d-none', !show);
-            if (show) visible++;
-        });
-
-        visibleCount.textContent = visible;
-
-        // Uncheck hidden rows so they don't sneak into bulk actions
-        allRows.forEach(row => {
-            if (row.classList.contains('d-none'))
-                row.querySelector('.user-check').checked = false;
-        });
-        refreshBulk();
-    }
-
-    filterName.addEventListener('input',  applyFilters);
-    filterRole.addEventListener('change', applyFilters);
-    clearBtn.addEventListener('click', () => {
-        filterName.value = '';
-        filterRole.value = '';
-        applyFilters();
-    });
-
-    // ── Bulk selection ─────────────────────────────────────────────
+    // Filtering and paging happen on the server now - every rendered row is "visible".
     function visibleChecks() {
-        return allRows
-            .filter(r => !r.classList.contains('d-none'))
-            .map(r => r.querySelector('.user-check'));
+        return allRows.map(r => r.querySelector('.user-check'));
     }
 
     function getChecked() {

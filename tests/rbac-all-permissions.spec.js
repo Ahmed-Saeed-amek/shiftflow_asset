@@ -135,74 +135,34 @@ async function runToggleRoundTrip({ browser, permission, subjectRole, verify }) 
 
 test.describe.configure({ mode: 'serial' }); // toggles shared role state — must not run concurrently
 
-// ── Tier 1: page-gated permissions, no extra role gate beyond the policy ────
+// Every entry's permission must exist in PermissionCatalog.All and its URL must map to a real
+// controller action. The retired shift/rostering permissions (ShiftOps.*, Schedule.*,
+// ChangeRequest.*, ShiftAnalytics.*, Group.Member.*, Location.Manage) were removed along with
+// their controllers, so those rows are gone.
 const PAGE_CHECKS = [
-    { permission: 'ChangeRequest.Submit',     url: '/ChangeRequests/MyRequests', subject: 'Engineer' },
-    { permission: 'ChangeRequest.Review',     url: '/ChangeRequests/Review/1',   subject: 'Engineer' },
-    { permission: 'ChangeRequest.View.All',   url: '/ChangeRequests',            subject: 'Engineer' },
-    { permission: 'ShiftOps.View',            url: '/ShiftOps/Today',            subject: 'Engineer' },
-    { permission: 'ShiftOps.Report.View',     url: '/ShiftOps/History',          subject: 'Engineer' },
     { permission: 'AiAssistant.Use',          url: '/AiAssistant',               subject: 'Engineer' },
-    // ShiftMakerController's class-level [Authorize(Roles="Admin,ShiftManager")] was
-    // removed (converted to per-action policies) — these now gate purely on the
-    // permission for ANY subject, no role requirement left underneath.
-    { permission: 'Schedule.View',            url: '/ShiftMaker',                subject: 'Engineer' },
-    { permission: 'Schedule.Create',          url: '/ShiftMaker/Create',         subject: 'Engineer' },
-    { permission: 'Schedule.Generate',        url: '/ShiftMaker/Planner/1',      subject: 'Engineer' },
-    { permission: 'Group.Member.Manage',      url: '/ShiftMaker/Groups',         subject: 'Engineer' },
-    // System.IsAdmin is a role-only gate (UsersController), not a policy gate — included
-    // here anyway since runToggleRoundTrip only cares about blocked/allowed either way.
-    // Exercises both the PermissionService short-circuit and AdminClaimsTransformation
-    // (the synthetic "Admin" role claim) in one round-trip.
+    // System.IsAdmin short-circuits every permission check (PermissionService) and also drives
+    // AdminClaimsTransformation's synthetic "Admin" role claim.
     { permission: 'System.IsAdmin',           url: '/Users',                     subject: 'Engineer' },
-    // Converted this session from hardcoded [Authorize(Roles=...)] to real policies.
     { permission: 'User.View',                url: '/Users',                     subject: 'Engineer' },
+    { permission: 'User.Manage',              url: '/Users/Create',              subject: 'Engineer' },
     { permission: 'AuditLog.View',            url: '/AuditLogs',                 subject: 'Engineer' },
     { permission: 'Rbac.Manage',              url: '/Rbac',                      subject: 'Engineer' },
-    { permission: 'ShiftAnalytics.View',      url: '/ShiftAnalytics',            subject: 'Engineer' },
-    // Location.Manage only gates Create/Edit, not Index — Create is a GET, safe to
-    // exercise directly (no data mutation).
-    { permission: 'Location.Manage',          url: '/Locations/Create',          subject: 'Engineer' },
-    // DashboardController was re-gated onto ShiftAnalyticsView (same permission as
-    // Task Analytics) so "Overview permissions" is a single switch for both.
-    { permission: 'ShiftAnalytics.View',      url: '/Dashboard',                 subject: 'Engineer' },
-    // Was exercised via the now-deleted Controllers/Api/PermissionsController
-    // (/api/permissions, dead REST API superseded by RbacController's server-rendered
-    // pages — removed in the ultra-ponytail dead-code sweep). UsersController.Create
-    // is gated by the same UserManage policy, so it covers this permission just as well.
-    { permission: 'User.Manage',              url: '/Users/Create',              subject: 'Engineer' },
-];
-
-// ── Tier 3: data-scoping permissions — the underlying page is always reachable
-// (gated by a different, broader permission), so "blocked/allowed" doesn't apply.
-// Instead check for a UI element that only appears when the scoping permission is held.
-const SCOPING_CHECKS = [
-    {
-        permission: 'ShiftOps.ManageAll', subject: 'Engineer', url: '/ShiftOps/Today',
-        // Work-area filter toggle buttons only render for holders of ManageAll.
-        selector: '#areaToggles',
-    },
-    {
-        permission: 'ShiftOps.Report.ManageAll', subject: 'Engineer', url: '/ShiftReports',
-        // "Submitted by" filter dropdown only renders for holders of ManageAll.
-        selector: 'select[name="submittedBy"]',
-    },
+    { permission: 'Asset.View',               url: '/Assets',                    subject: 'Engineer' },
+    { permission: 'Vendor.View',              url: '/Vendors',                   subject: 'Engineer' },
+    { permission: 'Contract.View',            url: '/Contracts',                 subject: 'Engineer' },
+    { permission: 'WorkOrder.View',           url: '/WorkOrders',                subject: 'Engineer' },
+    { permission: 'SparePart.View',           url: '/SpareParts',                subject: 'Engineer' },
+    { permission: 'InspectionOrder.View',     url: '/InspectionOrders',          subject: 'Engineer' },
+    { permission: 'MaintenanceOrder.View',    url: '/MaintenanceOrders',         subject: 'Engineer' },
+    { permission: 'Group.View',               url: '/Groups',                    subject: 'Engineer' },
+    { permission: 'Asset.ScopeManage',        url: '/UserAssetScopes',           subject: 'Engineer' },
+    { permission: 'MyWork.View',              url: '/MyHome',                    subject: 'Engineer' },
 ];
 
 async function checkElementPresence(subjectPage, url, selector) {
     await subjectPage.goto(`${BASE_URL}${url}`);
     return (await subjectPage.locator(selector).count()) > 0 ? 'allowed' : 'blocked';
-}
-
-for (const check of SCOPING_CHECKS) {
-    test(`RBAC round-trip: ${check.permission} scopes data on ${check.url} (${check.subject})`, async ({ browser }) => {
-        await runToggleRoundTrip({
-            browser,
-            permission: check.permission,
-            subjectRole: check.subject,
-            verify: (subjectPage) => checkElementPresence(subjectPage, check.url, check.selector),
-        });
-    });
 }
 
 for (const check of PAGE_CHECKS) {
@@ -216,30 +176,26 @@ for (const check of PAGE_CHECKS) {
     });
 }
 
-// ── Not testable: no [Authorize(Policy=...)] anywhere checks these ─────────
-// Confirmed via full-repo grep.
-const NOT_POLICY_GATED = [
-    'Shift.Manage',
-    'ShiftOps.Task.UpdateStatus', // UpdateTask action has no policy attribute at all
-    // RotationTemplatesController (the only thing these ever gated) was deleted as
-    // dead code — the entity/permissions remain seeded but nothing checks them.
-    'Schedule.Template.View', 'Schedule.Template.Manage',
-];
-for (const permission of NOT_POLICY_GATED) {
-    test.skip(`RBAC round-trip: ${permission} — no policy-gated endpoint exists (verified via grep)`, () => {});
-}
-
-// ── Not exercised: real policy gates, but every action is POST-only and mutates
-// real data (activates/closes shifts, publishes/archives schedules, adds tasks
-// or incidents). Skipped to avoid corrupting the dev DB this session has been
-// actively using; the auth mechanism is identical to the GET-gated permissions
-// above (same [Authorize(Policy=PermissionCatalog.X)] pattern), which already
-// prove the plumbing works end-to-end.
+// Permissions whose only gates are POST-only, data-mutating actions. The auth mechanism is the
+// same [Authorize(Policy=...)] pattern the GET-gated permissions above already prove end-to-end,
+// so they are skipped rather than allowed to mutate the dev database.
 const MUTATING_SKIPPED = [
-    'ShiftOps.Activate', 'ShiftOps.Attendance.Update', 'ShiftOps.Task.Add',
-    'ShiftOps.Close', 'ShiftOps.Incident.Add',
-    'Schedule.Publish', 'Schedule.Archive', 'Schedule.Override.Apply', 'Schedule.Delete',
+    'Asset.Manage', 'AssetCategory.Manage', 'Asset.ReportAction',
+    'Vendor.Manage', 'Contract.Manage',
+    'WorkOrder.Manage', 'WorkOrder.Assign',
+    'MaintenanceOrder.Manage', 'MaintenanceOrder.Report',
+    'InspectionOrder.Manage', 'InspectionOrder.Report',
+    'Group.Manage', 'OrderType.Manage', 'SparePart.Manage',
 ];
 for (const permission of MUTATING_SKIPPED) {
     test.skip(`RBAC round-trip: ${permission} — POST-only, would mutate real data (skipped intentionally)`, () => {});
+}
+
+// Export-only permissions stream a file rather than render a page, so the blocked/allowed page
+// check above does not apply.
+const EXPORT_ONLY = [
+    'Asset.Export', 'WorkOrder.Export', 'InspectionOrder.Export', 'MaintenanceOrder.Export',
+];
+for (const permission of EXPORT_ONLY) {
+    test.skip(`RBAC round-trip: ${permission} — file download, not a page gate`, () => {});
 }

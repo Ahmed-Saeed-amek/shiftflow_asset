@@ -18,9 +18,13 @@ public class AccountController : Controller
     private readonly IConfiguration _config;
     private readonly IPermissionService _permissions;
     private readonly ILanguageService _loc;
+    private readonly IdentityOptions _identityOptions;
+    private readonly ILogger<AccountController> _logger;
 
-    public AccountController(SignInManager<ApplicationUser> si, UserManager<ApplicationUser> um, IConfiguration config, IPermissionService permissions, ILanguageService loc)
-    { _si = si; _um = um; _config = config; _permissions = permissions; _loc = loc; }
+    public AccountController(SignInManager<ApplicationUser> si, UserManager<ApplicationUser> um, IConfiguration config,
+        IPermissionService permissions, ILanguageService loc,
+        Microsoft.Extensions.Options.IOptions<IdentityOptions> identityOptions, ILogger<AccountController> logger)
+    { _si = si; _um = um; _config = config; _permissions = permissions; _loc = loc; _identityOptions = identityOptions.Value; _logger = logger; }
 
     // Mirrors the Program.cs check that gates whether the "EntraID" scheme
     // was registered at all — the button/action must agree with that or
@@ -85,8 +89,11 @@ public class AccountController : Controller
             return LocalRedirect(BuildLandingPath(canViewDashboard, returnUrl, isVendor, isHR));
         }
 
+        // Derived from IdentityOptions rather than hardcoded — Program.cs owns the lockout window,
+        // and a hardcoded "5 min" silently goes wrong the moment that value is tuned.
+        var lockoutMinutes = Math.Max(1, (int)Math.Ceiling(_identityOptions.Lockout.DefaultLockoutTimeSpan.TotalMinutes));
         ModelState.AddModelError("", result.IsLockedOut
-            ? _loc.T("Account locked. Try in 5 min.")
+            ? _loc.T("Account locked. Try again in {0} minutes.", lockoutMinutes)
             : _loc.T("Invalid email or password."));
 
         return View(vm);
@@ -114,7 +121,10 @@ public class AccountController : Controller
     {
         if (remoteError != null)
         {
-            ModelState.AddModelError("", $"{_loc.T("Microsoft sign-in error:")} {remoteError}");
+            // remoteError is attacker-controllable query text — reflecting it into ModelState
+            // rendered it straight back onto the login page. Log the raw value, show a fixed one.
+            _logger.LogWarning("External login returned a remote error: {RemoteError}", remoteError);
+            ModelState.AddModelError("", _loc.T("Microsoft sign-in failed. Please try again or use your email and password."));
             return View(nameof(Login), new LoginViewModel());
         }
 

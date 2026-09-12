@@ -37,3 +37,8 @@ playwright-report/
 graphify-out/
 UsersAhmedDesktopgraphify/
 UsersAhmedDesktoprased/
+
+## Production/server settings copies kept locally — never commit (real credentials)
+prod settings.txt
+prod-settings.local.txt
+ShiftFlow.Web/appsettings.Production.json

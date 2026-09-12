@@ -18,15 +18,40 @@ public sealed class MustChangePasswordFilter : IAsyncActionFilter
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var user = context.HttpContext.User;
-        if (user.Identity?.IsAuthenticated == true
-            && user.HasClaim(c => c.Type == "must_change_password")
-            && context.ActionDescriptor is ControllerActionDescriptor cad
-            && !(cad.ControllerName == "Account" && (cad.ActionName == nameof(Controllers.AccountController.ChangePassword) || cad.ActionName == nameof(Controllers.AccountController.Logout)))
-            && cad.ControllerName != "Language")
+        if (user.Identity?.IsAuthenticated != true
+            || !user.HasClaim(c => c.Type == "must_change_password")
+            || context.ActionDescriptor is not ControllerActionDescriptor cad
+            || IsExempt(cad))
         {
-            context.Result = new RedirectToActionResult(nameof(Controllers.AccountController.ChangePassword), "Account", null);
+            await next();
             return;
         }
-        await next();
+
+        // A 302 to a login-ish page is invisible to fetch()/XHR (it follows the redirect and
+        // reports a plain 200), so API callers get an explicit 403 they can act on instead.
+        if (RequestKinds.IsApiRequest(context.HttpContext.Request))
+        {
+            context.Result = new ObjectResult(new { error = "password_change_required" })
+            {
+                StatusCode = StatusCodes.Status403Forbidden,
+            };
+            return;
+        }
+
+        context.Result = new RedirectToActionResult(nameof(Controllers.AccountController.ChangePassword), "Account", null);
+    }
+
+    private static bool IsExempt(ControllerActionDescriptor cad)
+    {
+        // The ChangePassword form itself, signing out, and switching language must stay reachable
+        // while the claim is set. Controllers/Api is exempt by namespace rather than by name so a
+        // new API controller doesn't have to be added to a string list to keep working.
+        if (cad.ControllerTypeInfo.Namespace?.EndsWith(".Controllers.Api", StringComparison.Ordinal) == true)
+            return true;
+        if (cad.ControllerName == "Language")
+            return true;
+        return cad.ControllerName == "Account"
+            && (cad.ActionName == nameof(Controllers.AccountController.ChangePassword)
+                || cad.ActionName == nameof(Controllers.AccountController.Logout));
     }
 }

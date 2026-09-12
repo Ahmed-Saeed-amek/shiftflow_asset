@@ -5,6 +5,9 @@ namespace ShiftFlow.Web.Controllers;
 
 public class LanguageController : Controller
 {
+    private readonly IWebHostEnvironment _env;
+    public LanguageController(IWebHostEnvironment env) => _env = env;
+
     [HttpPost, ValidateAntiForgeryToken]
     public IActionResult SetLanguage(string lang, string? returnUrl = "/")
     {
@@ -13,6 +16,10 @@ public class LanguageController : Controller
         {
             Expires = DateTimeOffset.UtcNow.AddYears(1),
             IsEssential = true,
+            // Same policy as the Identity and antiforgery cookies: Lax everywhere, Secure outside
+            // Development (the dev preview serves plain HTTP, where Secure makes it undeliverable).
+            SameSite = SameSiteMode.Lax,
+            Secure = !_env.IsDevelopment(),
         });
         // LocalRedirect() throws InvalidOperationException on a non-local URL rather than
         // safely rejecting it — Url.IsLocalUrl must be checked first, or a crafted

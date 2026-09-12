@@ -61,8 +61,6 @@
     <div class="row g-3 mb-4">
         @foreach (var group in groups)
         {
-            @* Locations feature is dormant (nav link commented out in _Layout.cshtml) — hide its permission card too until it's reactivated. *@
-            if (group.Key == "Locations") { continue; }
 
             var pairsInGroup = PermissionDisplay.Pairs.Where(p => group.Any(x => x.Name == p.ReadPermission)).ToList();
             var standalone = group.Where(p => !PermissionDisplay.PairedPermissionNames.Contains(p.Name)).ToList();

@@ -14,7 +14,12 @@ public static class DbSeeder
         ("Vendor", "المورد"),
     ];
 
-    public static async Task SeedAsync(ApplicationDbContext db, UserManager<ApplicationUser> um, RoleManager<ApplicationRole> rm)
+    /// <param name="seedDemoAccounts">When false, the fixed-password demo logins
+    /// (admin/manager/engineer/hr/vendor) are skipped. Roles, permissions, lookup data and
+    /// locations always seed. Program.cs passes true only in Development or when
+    /// Seed:DemoAccounts is set.</param>
+    public static async Task SeedAsync(ApplicationDbContext db, UserManager<ApplicationUser> um, RoleManager<ApplicationRole> rm,
+        bool seedDemoAccounts = false)
     {
         await db.Database.MigrateAsync();
 
@@ -52,26 +57,35 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        async Task CreateUser(string email, string pass, string name, string role, string emp, string department)
+        if (seedDemoAccounts)
         {
-            if (await um.FindByEmailAsync(email) != null) return;
-            var u = new ApplicationUser
-            {
-                UserName = email, Email = email, FullName = name,
-                EmployeeNumber = emp, Department = department, IsActive = true, EmailConfirmed = true
-            };
-            var r = await um.CreateAsync(u, pass);
-            if (r.Succeeded) await um.AddToRoleAsync(u, role);
+            await CreateDemoUserAsync(um, "admin@shiftflow.com",    "Admin@123456",   "System Administrator", "Admin",             "EMP-0001", "IT Administration");
+            await CreateDemoUserAsync(um, "manager@shiftflow.com",  "Manager@123456", "Ahmed Al-Rashidi",     "OperationsManager", "EMP-0002", "Operations");
+            await CreateDemoUserAsync(um, "engineer@shiftflow.com", "Engineer@123456","Khalid Al-Mutairi",    "Engineer",          "EMP-0003", "Engineering");
+            // "Hr@123456" (9 chars) no longer meets the 12-char password policy.
+            await CreateDemoUserAsync(um, "hr@shiftflow.com",       "HrDept@123456",  "Sara Al-Kandari",      "HR",                "EMP-0004", "Human Resources");
         }
 
-        await CreateUser("admin@shiftflow.com",    "Admin@123456",   "System Administrator", "Admin",            "EMP-0001", "IT Administration");
-        await CreateUser("manager@shiftflow.com",  "Manager@123456", "Ahmed Al-Rashidi",     "OperationsManager", "EMP-0002", "Operations");
-        await CreateUser("engineer@shiftflow.com", "Engineer@123456","Khalid Al-Mutairi",    "Engineer",         "EMP-0003", "Engineering");
-        // "Hr@123456" (9 chars) no longer meets the 12-char password policy below.
-        await CreateUser("hr@shiftflow.com",       "HrDept@123456",  "Sara Al-Kandari",      "HR",               "EMP-0004", "Human Resources");
-
         await SeedPermissionsAsync(db, rm);
-        await SeedAssetManagementAsync(db, um);
+        await SeedAssetManagementAsync(db, um, seedDemoAccounts);
+    }
+
+    /// <summary>Creates one fixed-password demo login. Every account seeded this way carries the
+    /// must_change_password claim, so the published password stops working as a real credential
+    /// the moment someone signs in with it (MustChangePasswordFilter gates every other page).</summary>
+    private static async Task CreateDemoUserAsync(UserManager<ApplicationUser> um,
+        string email, string pass, string name, string role, string emp, string department)
+    {
+        if (await um.FindByEmailAsync(email) != null) return;
+        var u = new ApplicationUser
+        {
+            UserName = email, Email = email, FullName = name,
+            EmployeeNumber = emp, Department = department, IsActive = true, EmailConfirmed = true
+        };
+        var r = await um.CreateAsync(u, pass);
+        if (!r.Succeeded) return;
+        await um.AddToRoleAsync(u, role);
+        await um.AddClaimAsync(u, new System.Security.Claims.Claim("must_change_password", "true"));
     }
 
     /// <summary>Fixed, not user-editable — see LocationCategory.cs. Every Zone belongs to exactly one of these 3.</summary>
@@ -82,7 +96,7 @@ public static class DbSeeder
         ("Governmental Locations", "المواقع الحكومية"),
     ];
 
-    private static async Task SeedAssetManagementAsync(ApplicationDbContext db, UserManager<ApplicationUser> um)
+    private static async Task SeedAssetManagementAsync(ApplicationDbContext db, UserManager<ApplicationUser> um, bool seedDemoAccounts)
     {
         if (!await db.LocationCategories.AnyAsync())
         {
@@ -353,66 +367,96 @@ public static class DbSeeder
             }
         }
 
-        // Demo vendor portal login — same "Gulf HVAC Solutions" vendor as the Service contract
-        // above, so the whole employee-report → accept → vendor-fix flow is testable right after seeding.
-        var gulfHvac = await db.Vendors.Include(v => v.User).FirstOrDefaultAsync(v => v.Name == "Gulf HVAC Solutions");
-        if (gulfHvac != null && gulfHvac.UserId == null)
+        // Everything below this point is demo/testing data with published fixed passwords — only
+        // seeded in Development or when Seed:DemoAccounts is explicitly turned on.
+        if (seedDemoAccounts)
         {
-            const string vendorEmail = "vendor@gulfhvac.kw";
-            var vendorUser = await um.FindByEmailAsync(vendorEmail);
-            if (vendorUser == null)
-            {
-                vendorUser = new ApplicationUser { UserName = vendorEmail, Email = vendorEmail, FullName = gulfHvac.Name, IsActive = true, EmailConfirmed = true };
-                var r = await um.CreateAsync(vendorUser, "Vendor@123456");
-                if (r.Succeeded) await um.AddToRoleAsync(vendorUser, "Vendor");
-            }
-            gulfHvac.UserId = vendorUser.Id;
-            await db.SaveChangesAsync();
-        }
 
-        // Second demo vendor login — deliberately has no work orders assigned, so it exercises
-        // the "vendor A cannot see vendor B's data" access-control boundary right after seeding.
-        var kcs = await db.Vendors.Include(v => v.User).FirstOrDefaultAsync(v => v.Name == "Kuwait Cooling Systems");
-        if (kcs != null && kcs.UserId == null)
-        {
-            const string vendor2Email = "vendor2@kcs.kw";
-            var vendor2User = await um.FindByEmailAsync(vendor2Email);
-            if (vendor2User == null)
+            // Demo vendor portal login — same "Gulf HVAC Solutions" vendor as the Service contract
+            // above, so the whole employee-report → accept → vendor-fix flow is testable right after seeding.
+            var gulfHvac = await db.Vendors.Include(v => v.User).FirstOrDefaultAsync(v => v.Name == "Gulf HVAC Solutions");
+            if (gulfHvac != null && gulfHvac.UserId == null)
             {
-                vendor2User = new ApplicationUser { UserName = vendor2Email, Email = vendor2Email, FullName = kcs.Name, IsActive = true, EmailConfirmed = true };
-                var r = await um.CreateAsync(vendor2User, "Vendor2@123456");
-                if (r.Succeeded) await um.AddToRoleAsync(vendor2User, "Vendor");
-            }
-            kcs.UserId = vendor2User.Id;
-            await db.SaveChangesAsync();
-        }
-
-        // Demo work order already "Sent to Vendor" for Gulf HVAC on AST-0001, so the vendor
-        // portal, admin work-order list, and attachment-validation flows are all testable
-        // immediately after seeding instead of depending on ad-hoc manual testing to create one.
-        if (!await db.WorkOrders.AnyAsync(w => w.Notes == "PW-SEED-DEMO-WO"))
-        {
-            var demoAsset = await db.Assets.FirstOrDefaultAsync(a => a.AssetTag == "AST-0001");
-            var demoActionType = await db.AssetActionTypes.Include(t => t.Causes)
-                .FirstOrDefaultAsync(t => t.Name == "Report Failure" && t.Category!.Name == "HVAC");
-            var demoVendor = await db.Vendors.FirstOrDefaultAsync(v => v.Name == "Gulf HVAC Solutions");
-            var demoAdminUser = await um.FindByEmailAsync("admin@shiftflow.com");
-            if (demoAsset != null && demoActionType != null && demoVendor != null && demoAdminUser != null)
-            {
-                var year = DateTime.UtcNow.Year;
-                var seq = await db.WorkOrders.CountAsync(w => w.CreatedDate.Year == year) + 1;
-                var demoWorkOrder = new WorkOrder
+                const string vendorEmail = "vendor@gulfhvac.kw";
+                var vendorUser = await um.FindByEmailAsync(vendorEmail);
+                if (vendorUser == null)
                 {
-                    WorkOrderNumber = $"WO-{year}-{seq:D4}", AssetId = demoAsset.Id, Priority = "Medium", Stage = "Sent to Vendor",
-                    VendorId = demoVendor.Id, ActionTypeId = demoActionType.Id, CauseId = demoActionType.Causes.First().Id,
-                    Description = "Seeded demo work order for Playwright/manual testing.", Notes = "PW-SEED-DEMO-WO",
-                    CreatedByUserId = demoAdminUser.Id, CreatedDate = DateTime.UtcNow,
-                };
-                demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Draft", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
-                demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "New", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
-                demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
-                db.WorkOrders.Add(demoWorkOrder);
+                    vendorUser = new ApplicationUser { UserName = vendorEmail, Email = vendorEmail, FullName = gulfHvac.Name, IsActive = true, EmailConfirmed = true };
+                    var r = await um.CreateAsync(vendorUser, "Vendor@123456");
+                    if (r.Succeeded)
+                    {
+                        await um.AddToRoleAsync(vendorUser, "Vendor");
+                        await um.AddClaimAsync(vendorUser, new System.Security.Claims.Claim("must_change_password", "true"));
+                    }
+                }
+                gulfHvac.UserId = vendorUser.Id;
                 await db.SaveChangesAsync();
+            }
+
+            // Second demo vendor login — deliberately has no work orders assigned, so it exercises
+            // the "vendor A cannot see vendor B's data" access-control boundary right after seeding.
+            var kcs = await db.Vendors.Include(v => v.User).FirstOrDefaultAsync(v => v.Name == "Kuwait Cooling Systems");
+            if (kcs != null && kcs.UserId == null)
+            {
+                const string vendor2Email = "vendor2@kcs.kw";
+                var vendor2User = await um.FindByEmailAsync(vendor2Email);
+                if (vendor2User == null)
+                {
+                    vendor2User = new ApplicationUser { UserName = vendor2Email, Email = vendor2Email, FullName = kcs.Name, IsActive = true, EmailConfirmed = true };
+                    var r = await um.CreateAsync(vendor2User, "Vendor2@123456");
+                    if (r.Succeeded)
+                    {
+                        await um.AddToRoleAsync(vendor2User, "Vendor");
+                        await um.AddClaimAsync(vendor2User, new System.Security.Claims.Claim("must_change_password", "true"));
+                    }
+                }
+                kcs.UserId = vendor2User.Id;
+                await db.SaveChangesAsync();
+            }
+
+            // Demo work order already "Sent to Vendor" for Gulf HVAC on AST-0001, so the vendor
+            // portal, admin work-order list, and attachment-validation flows are all testable
+            // immediately after seeding instead of depending on ad-hoc manual testing to create one.
+            if (!await db.WorkOrders.AnyAsync(w => w.Notes == "PW-SEED-DEMO-WO"))
+            {
+                var demoAsset = await db.Assets.FirstOrDefaultAsync(a => a.AssetTag == "AST-0001");
+                // "Report Failure" was renamed to a per-category name ("Report HVAC Failure") and the
+                // old row soft-disabled, so the previous lookup never matched and the demo work order
+                // was silently never created.
+                var demoActionType = await db.AssetActionTypes.Include(t => t.Causes)
+                    .FirstOrDefaultAsync(t => t.Name == "Report HVAC Failure" && t.Category!.Name == "HVAC" && t.IsActive);
+                var demoVendor = await db.Vendors.FirstOrDefaultAsync(v => v.Name == "Gulf HVAC Solutions");
+                var demoAdminUser = await um.FindByEmailAsync("admin@shiftflow.com");
+                if (demoAsset != null && demoActionType != null && demoVendor != null && demoAdminUser != null)
+                {
+                    // Count+1 collides with any gap in the sequence (a deleted order) and with a
+                    // concurrent create. Take the highest existing suffix for the year instead, and
+                    // skip forward past any number that somehow already exists.
+                    var year = DateTime.UtcNow.Year;
+                    var prefix = $"WO-{year}-";
+                    var usedNumbers = await db.WorkOrders
+                        .Where(w => w.WorkOrderNumber.StartsWith(prefix))
+                        .Select(w => w.WorkOrderNumber)
+                        .ToListAsync();
+                    var used = usedNumbers.ToHashSet();
+                    var seq = usedNumbers
+                        .Select(n => int.TryParse(n[prefix.Length..], out var v) ? v : 0)
+                        .DefaultIfEmpty(0)
+                        .Max() + 1;
+                    while (used.Contains($"{prefix}{seq:D4}")) seq++;
+                    var demoWorkOrder = new WorkOrder
+                    {
+                        WorkOrderNumber = $"{prefix}{seq:D4}", AssetId = demoAsset.Id, Priority = "Medium", Stage = "Sent to Vendor",
+                        VendorId = demoVendor.Id, ActionTypeId = demoActionType.Id, CauseId = demoActionType.Causes.First().Id,
+                        Description = "Seeded demo work order for Playwright/manual testing.", Notes = "PW-SEED-DEMO-WO",
+                        CreatedByUserId = demoAdminUser.Id, CreatedDate = DateTime.UtcNow,
+                    };
+                    demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Draft", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
+                    demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "New", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
+                    demoWorkOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = demoAdminUser.Id });
+                    db.WorkOrders.Add(demoWorkOrder);
+                    await db.SaveChangesAsync();
+                }
             }
         }
 
