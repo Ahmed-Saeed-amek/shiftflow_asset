@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -29,6 +30,7 @@ public class OrderTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(OrderTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (!ModelState.IsValid || !OrderType.AssignmentModes.Contains(vm.AssignmentMode))
         {
             TempData["Error"] = "Name and prefix are required.";
@@ -66,6 +68,7 @@ public class OrderTypesController : Controller
             Color = OrderTypeColors.NextColor(usedColors),
         });
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = "Order type created.";
         return RedirectToAction(nameof(Index));
     }
@@ -73,6 +76,7 @@ public class OrderTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(OrderTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (!ModelState.IsValid || !OrderType.AssignmentModes.Contains(vm.AssignmentMode))
         {
             TempData["Error"] = "Name and prefix are required.";
@@ -134,6 +138,7 @@ public class OrderTypesController : Controller
         type.AllowsMultipleAssets = vm.AllowsMultipleAssets; type.AssignmentMode = vm.AssignmentMode;
         type.RequiresApproval = vm.RequiresApproval;
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));
     }

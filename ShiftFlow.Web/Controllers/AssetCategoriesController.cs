@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
@@ -27,6 +28,7 @@ public class AssetCategoriesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(AssetCategoryViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (vm.ParentCategoryId.HasValue)
         {
             var parent = await _db.AssetCategories.FindAsync(vm.ParentCategoryId.Value);
@@ -50,6 +52,7 @@ public class AssetCategoriesController : Controller
         }
         _db.AssetCategories.Add(new AssetCategory { Name = vm.Name, NameAr = vm.NameAr, ParentCategoryId = vm.ParentCategoryId, CreatedDate = DateTime.UtcNow });
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = _loc.T("Asset category created.");
         return RedirectToAction(nameof(Index));
     }
@@ -60,6 +63,7 @@ public class AssetCategoriesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetCategoryViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (vm.ParentCategoryId.HasValue)
         {
             if (vm.ParentCategoryId == vm.Id)
@@ -92,6 +96,7 @@ public class AssetCategoriesController : Controller
         if (category == null) return NotFound();
         category.Name = vm.Name; category.NameAr = vm.NameAr; category.ParentCategoryId = vm.ParentCategoryId;
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = _loc.T("Asset category updated.");
         return RedirectToAction(nameof(Index));
     }

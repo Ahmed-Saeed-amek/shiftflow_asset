@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
@@ -19,7 +20,7 @@ public class WorkOrderBlockReasonsController : Controller
     [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
     {
-        var reasons = await _db.WorkOrderBlockReasons.OrderBy(r => r.Name).ToListAsync();
+        var reasons = await _db.WorkOrderBlockReasons.AsNoTracking().OrderBy(r => r.Name).ToListAsync();
         return View(reasons);
     }
 
@@ -29,9 +30,10 @@ public class WorkOrderBlockReasonsController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(WorkOrderBlockReasonViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (!ModelState.IsValid)
         {
-            TempData["Error"] = "Name is required.";
+            TempData["Error"] = _loc.T("Name is required.");
             return RedirectToAction(nameof(Index));
         }
         if (await _db.WorkOrderBlockReasons.AnyAsync(r => r.Name == vm.Name))
@@ -41,13 +43,15 @@ public class WorkOrderBlockReasonsController : Controller
         }
         _db.WorkOrderBlockReasons.Add(new WorkOrderBlockReason { Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Block reason created.";
+        ModalRedisplay.Clear(TempData);
+        TempData["Success"] = _loc.T("Block reason created.");
         return RedirectToAction(nameof(Index));
     }
 
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(WorkOrderBlockReasonViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Name is required.";
@@ -62,7 +66,8 @@ public class WorkOrderBlockReasonsController : Controller
         }
         reason.Name = vm.Name; reason.NameAr = vm.NameAr; reason.IsActive = vm.IsActive;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Block reason updated.";
+        ModalRedisplay.Clear(TempData);
+        TempData["Success"] = _loc.T("Block reason updated.");
         return RedirectToAction(nameof(Index));
     }
 }

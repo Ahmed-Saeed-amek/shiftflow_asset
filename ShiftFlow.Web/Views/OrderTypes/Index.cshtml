@@ -1,7 +1,7 @@
 @model List<OrderType>
 @{
     ViewData["Title"] = Loc.T("Order Types");
-    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#orderTypeModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order Type") + "</button>";
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#orderTypeModal' data-modal-create='orderTypeModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Order Type") + "</button>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Order Types"),Subtitle=Loc.T("Shared by Inspection Orders and Maintenance Orders"),ActionsHtml=actionsHtml})" />
 
@@ -26,7 +26,12 @@
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
                         <td class="text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#orderTypeModal"
-                                    onclick='openEdit(@t.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.NameAr)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.Prefix)), @t.SortOrder, @(t.TracksDefectOutcome ? "true" : "false"), @(t.RequiresVendor ? "true" : "false"), @(t.IsActive ? "true" : "false"), @(t.IsDirectFix ? "true" : "false"), @(t.AllowsMultipleAssets ? "true" : "false"), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(t.AssignmentMode)), @(t.RequiresApproval ? "true" : "false"))'>
+                                    data-modal-edit="orderTypeModal"
+                                    data-id="@t.Id" data-name="@t.Name" data-name-ar="@t.NameAr" data-prefix="@t.Prefix"
+                                    data-sort-order="@t.SortOrder" data-tracks-defect-outcome="@(t.TracksDefectOutcome ? "true" : "false")"
+                                    data-requires-vendor="@(t.RequiresVendor ? "true" : "false")" data-is-active="@(t.IsActive ? "true" : "false")"
+                                    data-is-direct-fix="@(t.IsDirectFix ? "true" : "false")" data-allows-multiple-assets="@(t.AllowsMultipleAssets ? "true" : "false")"
+                                    data-assignment-mode="@t.AssignmentMode" data-requires-approval="@(t.RequiresApproval ? "true" : "false")">
                                 @Loc.T("Edit")
                             </button>
                             <form method="post" asp-action="Delete" asp-route-id="@t.Id" class="d-inline"
@@ -53,6 +58,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="orderTypeModalError" class="alert alert-danger small" role="alert" hidden></div>
+
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label small">@Loc.T("Name")</label>
@@ -118,10 +125,8 @@
 </div>
 
 @section Scripts {
+<script src="~/js/modal-editor.js" asp-append-version="true"></script>
 <script>
-    const jsNewOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Order Type")));
-    const jsEditOrderType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Order Type")));
-
     function applyVendorGate() {
         const requiresVendor = document.getElementById('otRequiresVendor').checked;
         const approvalCb = document.getElementById('otRequiresApproval');
@@ -131,48 +136,33 @@
 
         // A vendor-required type creates a WorkOrder, which has no group-assignment concept —
         // force Employee-only so a group pick at Orders/Create time is never silently discarded.
-        // (Left enabled, not disabled — a disabled <select> doesn't post its value at all, which
-        // would submit no AssignmentMode and fall back to the "Either" model default instead.)
+        // (Left enabled, not disabled — a disabled <select> doesn't post its value at all.)
         const assignmentSel = document.getElementById('otAssignmentMode');
         assignmentSel.classList.toggle('bg-light', requiresVendor);
         if (requiresVendor) assignmentSel.value = 'EmployeeOnly';
         [...assignmentSel.options].forEach(o => { if (o.value !== 'EmployeeOnly') o.disabled = requiresVendor; });
     }
 
-    function openCreate() {
-        document.getElementById('orderTypeModalTitle').textContent = jsNewOrderType;
-        document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Create")');
-        document.getElementById('otId').value = 0;
-        document.getElementById('otName').value = '';
-        document.getElementById('otNameAr').value = '';
-        document.getElementById('otPrefix').value = '';
-        document.getElementById('otSortOrder').value = 0;
-        document.getElementById('otTracksDefect').checked = false;
-        document.getElementById('otRequiresVendor').checked = false;
-        document.getElementById('otIsDirectFix').checked = false;
-        document.getElementById('otAllowsMultiple').checked = false;
-        document.getElementById('otAssignmentMode').value = 'Either';
-        document.getElementById('otRequiresApproval').checked = false;
-        document.getElementById('otIsActive').checked = true;
-        applyVendorGate();
-    }
-
-    function openEdit(id, name, nameAr, prefix, sortOrder, tracksDefect, requiresVendor, isActive, isDirectFix, allowsMultiple, assignmentMode, requiresApproval) {
-        document.getElementById('orderTypeModalTitle').textContent = jsEditOrderType;
-        document.getElementById('orderTypeForm').setAttribute('action', '@Url.Action("Edit")');
-        document.getElementById('otId').value = id;
-        document.getElementById('otName').value = name || '';
-        document.getElementById('otNameAr').value = nameAr || '';
-        document.getElementById('otPrefix').value = prefix || '';
-        document.getElementById('otSortOrder').value = sortOrder;
-        document.getElementById('otTracksDefect').checked = tracksDefect;
-        document.getElementById('otRequiresVendor').checked = requiresVendor;
-        document.getElementById('otIsActive').checked = isActive;
-        document.getElementById('otIsDirectFix').checked = isDirectFix;
-        document.getElementById('otAllowsMultiple').checked = allowsMultiple;
-        document.getElementById('otAssignmentMode').value = assignmentMode || 'Either';
-        document.getElementById('otRequiresApproval').checked = requiresApproval;
-        applyVendorGate();
-    }
+    initModalEditor({
+        modalId: 'orderTypeModal',
+        formId: 'orderTypeForm',
+        titleId: 'orderTypeModalTitle',
+        errorId: 'orderTypeModalError',
+        titles: { create: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Order Type"))), edit: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Order Type"))) },
+        urls: { create: '@Url.Action("Create")', edit: '@Url.Action("Edit")' },
+        fieldMap: {
+            id: 'otId', name: 'otName', nameAr: 'otNameAr', prefix: 'otPrefix', sortOrder: 'otSortOrder',
+            tracksDefectOutcome: 'otTracksDefect', requiresVendor: 'otRequiresVendor', isActive: 'otIsActive',
+            isDirectFix: 'otIsDirectFix', allowsMultipleAssets: 'otAllowsMultiple',
+            assignmentMode: 'otAssignmentMode', requiresApproval: 'otRequiresApproval'
+        },
+        defaults: {
+            id: 0, name: '', nameAr: '', prefix: '', sortOrder: 0, tracksDefectOutcome: false,
+            requiresVendor: false, isActive: true, isDirectFix: false, allowsMultipleAssets: false,
+            assignmentMode: 'Either', requiresApproval: false
+        },
+        onApply: applyVendorGate,
+        reopen: @Html.Raw(ShiftFlow.Web.Services.ModalRedisplay.ReopenScript(TempData))
+    });
 </script>
 }

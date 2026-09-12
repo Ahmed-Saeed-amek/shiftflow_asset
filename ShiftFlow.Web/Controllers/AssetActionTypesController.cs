@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -29,6 +30,7 @@ public class AssetActionTypesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(AssetActionTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (ModelState.IsValid)
         {
             // A stale dropdown value or a raw/tampered POST with a non-existent CategoryId
@@ -40,6 +42,7 @@ public class AssetActionTypesController : Controller
             }
             _db.AssetActionTypes.Add(new AssetActionType { CategoryId = vm.CategoryId, Name = vm.Name, NameAr = vm.NameAr, IsActive = true });
             await _db.SaveChangesAsync();
+            ModalRedisplay.Clear(TempData);
             TempData["Success"] = "Action type added.";
         }
         return RedirectToAction(nameof(Index), new { categoryId = vm.CategoryId });
@@ -48,6 +51,7 @@ public class AssetActionTypesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetActionTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         // Unlike Create, this had no ModelState.IsValid check at all — submitting an empty Name
         // (e.g. by clearing the field in the edit modal) bypassed the [Required] validation and hit
         // the DB's NOT NULL constraint on AssetActionTypes.Name, raising an unhandled
@@ -62,6 +66,7 @@ public class AssetActionTypesController : Controller
         {
             actionType.Name = vm.Name; actionType.NameAr = vm.NameAr; actionType.IsActive = vm.IsActive;
             await _db.SaveChangesAsync();
+            ModalRedisplay.Clear(TempData);
             TempData["Success"] = "Action type updated.";
         }
         return RedirectToAction(nameof(Index), new { categoryId = vm.CategoryId });

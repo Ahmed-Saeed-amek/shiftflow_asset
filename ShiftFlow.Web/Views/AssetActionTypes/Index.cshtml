@@ -15,7 +15,9 @@
                     <div class="d-flex align-items-center gap-2">
                         <partial name="_StatusBadge" model="@(actionType.IsActive ? "Active" : "Inactive")" />
                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeEditModal"
-                                onclick='openEditActionType(@actionType.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(actionType.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(actionType.NameAr)), @(actionType.IsActive ? "true" : "false"))'>
+                                data-modal-edit="actionTypeEditModal"
+                                data-id="@actionType.Id" data-name="@actionType.Name" data-name-ar="@actionType.NameAr"
+                                data-is-active="@(actionType.IsActive ? "true" : "false")">
                             @Loc.T("Edit")
                         </button>
                     </div>
@@ -32,7 +34,9 @@
                             <div class="d-flex align-items-center gap-2">
                                 <partial name="_StatusBadge" model="@(cause.IsActive ? "Active" : "Inactive")" />
                                 <button type="button" class="btn btn-sm btn-outline-primary py-0" data-bs-toggle="modal" data-bs-target="#causeEditModal"
-                                        onclick='openEditCause(@cause.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(cause.NameAr)), @(cause.IsActive ? "true" : "false"))'>
+                                        data-modal-edit="causeEditModal"
+                                        data-id="@cause.Id" data-name="@cause.Name" data-name-ar="@cause.NameAr"
+                                        data-is-active="@(cause.IsActive ? "true" : "false")">
                                     @Loc.T("Edit")
                                 </button>
                             </div>
@@ -68,7 +72,7 @@
 <div class="modal fade" id="actionTypeEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" asp-action="Edit">
+            <form method="post" asp-action="Edit" id="actionTypeEditForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="Id" id="atId" value="0" />
                 <input type="hidden" name="CategoryId" value="@category.Id" />
@@ -77,9 +81,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="actionTypeEditModalError" class="alert alert-danger small" role="alert" hidden></div>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Name")</label>
+                            <label for="atName" class="form-label small">@Loc.T("Name")</label>
                             <input name="Name" id="atName" class="form-control" required />
                         </div>
                         <div class="col-12">
@@ -107,7 +112,7 @@
 <div class="modal fade" id="causeEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" asp-action="EditCause">
+            <form method="post" asp-action="EditCause" id="causeEditForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="Id" id="causeId" value="0" />
                 <div class="modal-header">
@@ -115,9 +120,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="causeEditModalError" class="alert alert-danger small" role="alert" hidden></div>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Name")</label>
+                            <label for="causeName" class="form-label small">@Loc.T("Name")</label>
                             <input name="Name" id="causeName" class="form-control" required />
                         </div>
                         <div class="col-12">
@@ -143,19 +149,24 @@
 </div>
 
 @section Scripts {
+<script src="~/js/modal-editor.js" asp-append-version="true"></script>
 <script>
-    function openEditActionType(id, name, nameAr, isActive) {
-        document.getElementById('atId').value = id;
-        document.getElementById('atName').value = name || '';
-        document.getElementById('atNameAr').value = nameAr || '';
-        document.getElementById('atIsActive').checked = isActive;
-    }
+    initModalEditor({
+        modalId: 'actionTypeEditModal',
+        formId: 'actionTypeEditForm',
+        errorId: 'actionTypeEditModalError',
+        urls: { create: '@Url.Action("Create")', edit: '@Url.Action("Edit")' },
+        fieldMap: { id: 'atId', name: 'atName', nameAr: 'atNameAr', isActive: 'atIsActive' },
+        defaults: { id: 0, name: '', nameAr: '', isActive: true }
+    });
 
-    function openEditCause(id, name, nameAr, isActive) {
-        document.getElementById('causeId').value = id;
-        document.getElementById('causeName').value = name || '';
-        document.getElementById('causeNameAr').value = nameAr || '';
-        document.getElementById('causeIsActive').checked = isActive;
-    }
+    initModalEditor({
+        modalId: 'causeEditModal',
+        formId: 'causeEditForm',
+        errorId: 'causeEditModalError',
+        urls: { create: '@Url.Action("CreateCause")', edit: '@Url.Action("EditCause")' },
+        fieldMap: { id: 'causeId', name: 'causeName', nameAr: 'causeNameAr', isActive: 'causeIsActive' },
+        defaults: { id: 0, name: '', nameAr: '', isActive: true }
+    });
 </script>
 }

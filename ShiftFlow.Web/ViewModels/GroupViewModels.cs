@@ -32,3 +32,13 @@ public class GroupMemberChip
     public string UserId { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
 }
+
+/// <summary>Drives Views/Groups/_MemberPicker.cshtml. RootId scopes every element id and the
+/// picker's own querySelectors, so more than one picker could live on a page.</summary>
+public class MemberPickerModel
+{
+    public string RootId { get; set; } = "memberPicker";
+    /// <summary>Hidden input name, repeated once per selected member.</summary>
+    public string FieldName { get; set; } = "MemberUserIds";
+    public List<GroupMemberChip> Selected { get; set; } = [];
+}

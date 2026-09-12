@@ -1,0 +1,21 @@
+@model ShiftFlow.Web.ViewModels.MemberPickerModel
+@* The one member picker for Groups/Create and Groups/Edit — the two views each carried their own
+   45-line copy that built result rows and chips by interpolating names and emails into innerHTML. *@
+<div class="col-12" id="@Model.RootId">
+    <label for="@(Model.RootId)Search" class="form-label">@Loc.T("Members")</label>
+    <div class="position-relative">
+        <input type="text" id="@(Model.RootId)Search" data-member-search class="form-control" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="@(Model.RootId)Results"
+               placeholder="@Loc.T("Search by name or email…")" />
+        <div id="@(Model.RootId)Results" data-member-results role="listbox"
+             class="list-group position-absolute w-100 shadow-sm d-none member-results"></div>
+    </div>
+    <div data-member-status class="text-danger small mt-1" role="alert" hidden></div>
+    <div data-member-chips class="d-flex flex-wrap gap-1 mt-2"></div>
+</div>
+
+<style>
+    .member-results { z-index: 1055; max-height: 260px; overflow: auto; }
+    .member-result-email { font-size: .72rem; }
+    .member-chip-close { font-size: .6rem; }
+</style>

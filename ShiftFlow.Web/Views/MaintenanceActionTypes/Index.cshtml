@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = Loc.T("Maintenance Action Types");
     var categories = (List<AssetCategory>)ViewBag.Categories;
-    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#actionTypeModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</button>";
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#actionTypeModal' data-modal-create='actionTypeModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Maintenance Action") + "</button>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Maintenance Action Types"),Subtitle=Loc.T("Optionally scope an action to a category or subcategory — unscoped actions apply everywhere"),ActionsHtml=actionsHtml})" />
 
@@ -32,7 +32,9 @@
                         <td><partial name="_StatusBadge" model="@(m.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#actionTypeModal"
-                                    onclick='openEdit(@m.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(m.NameAr)), @(m.IsActive ? "true" : "false"), @(m.CategoryId?.ToString() ?? "null"))'>
+                                    data-modal-edit="actionTypeModal"
+                                    data-id="@m.Id" data-name="@m.Name" data-name-ar="@m.NameAr"
+                                    data-is-active="@(m.IsActive ? "true" : "false")" data-category-id="@m.CategoryId">
                                 @Loc.T("Edit")
                             </button>
                         </td>
@@ -54,6 +56,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="actionTypeModalError" class="alert alert-danger small" role="alert" hidden></div>
+
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label small">@Loc.T("Name")</label>
@@ -96,51 +100,39 @@
 </div>
 
 @section Scripts {
+<script src="~/js/modal-editor.js" asp-append-version="true"></script>
 <script>
-    const jsNewActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Maintenance Action")));
-    const jsEditActionType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Maintenance Action")));
-
     const scopeAll = document.getElementById('scopeAll');
     const scopeSpecific = document.getElementById('scopeSpecific');
     const categorySelect = document.getElementById('actionTypeCategoryId');
 
-    function setScopeMode(hasCategoryId) {
-        scopeSpecific.checked = hasCategoryId;
-        scopeAll.checked = !hasCategoryId;
-        categorySelect.classList.toggle('d-none', !hasCategoryId);
-    }
     document.querySelectorAll('input[name=scopeMode]').forEach(r => r.addEventListener('change', () => {
         categorySelect.classList.toggle('d-none', scopeAll.checked);
         if (scopeAll.checked) categorySelect.value = '';
     }));
 
-    // "All Categories" clears CategoryId to null before submit, regardless of whatever the
-    // (now-hidden) select still holds from an earlier toggle — the toggle is the source of
-    // truth, not the select's own value.
+    // "All Categories" clears CategoryId before submit, regardless of what the (now-hidden) select
+    // still holds from an earlier toggle — the toggle is the source of truth.
     document.getElementById('actionTypeForm').addEventListener('submit', () => {
         if (scopeAll.checked) categorySelect.value = '';
     });
 
-    function openCreate() {
-        document.getElementById('actionTypeModalTitle').textContent = jsNewActionType;
-        document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Create")');
-        document.getElementById('actionTypeId').value = 0;
-        document.getElementById('actionTypeName').value = '';
-        document.getElementById('actionTypeNameAr').value = '';
-        document.getElementById('actionTypeIsActive').checked = true;
-        categorySelect.value = '';
-        setScopeMode(false);
-    }
-
-    function openEdit(id, name, nameAr, isActive, categoryId) {
-        document.getElementById('actionTypeModalTitle').textContent = jsEditActionType;
-        document.getElementById('actionTypeForm').setAttribute('action', '@Url.Action("Edit")');
-        document.getElementById('actionTypeId').value = id;
-        document.getElementById('actionTypeName').value = name || '';
-        document.getElementById('actionTypeNameAr').value = nameAr || '';
-        document.getElementById('actionTypeIsActive').checked = isActive;
-        categorySelect.value = categoryId ?? '';
-        setScopeMode(categoryId != null);
-    }
+    initModalEditor({
+        modalId: 'actionTypeModal',
+        formId: 'actionTypeForm',
+        titleId: 'actionTypeModalTitle',
+        errorId: 'actionTypeModalError',
+        titles: { create: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Maintenance Action"))), edit: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Maintenance Action"))) },
+        urls: { create: '@Url.Action("Create")', edit: '@Url.Action("Edit")' },
+        fieldMap: { id: 'actionTypeId', name: 'actionTypeName', nameAr: 'actionTypeNameAr', isActive: 'actionTypeIsActive', categoryId: 'actionTypeCategoryId' },
+        defaults: { id: 0, name: '', nameAr: '', isActive: true, categoryId: '' },
+        onApply: function () {
+            var hasCategory = !!categorySelect.value;
+            scopeSpecific.checked = hasCategory;
+            scopeAll.checked = !hasCategory;
+            categorySelect.classList.toggle('d-none', !hasCategory);
+        },
+        reopen: @Html.Raw(ShiftFlow.Web.Services.ModalRedisplay.ReopenScript(TempData))
+    });
 </script>
 }
