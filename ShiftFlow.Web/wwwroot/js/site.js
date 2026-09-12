@@ -312,18 +312,12 @@ function initSidebar(){
   mq.addEventListener('change',close);
 }
 
-// Floating AI avatar. The open/close toggle used to be an inline onclick= in the
-// partial; keeping it here means the markup carries no executable content.
+// Floating AI avatar. Opening is Bootstrap's own offcanvas toggle (data-bs-toggle on the
+// button in _FloatingAvatar.cshtml, target #aiDrawer) — all that's left here is keeping the
+// fixed bubble out of the way of the content underneath it.
 function initFloatingAvatar(){
   var el=document.getElementById('floatingAvatar');
   if(!el) return;
-  var bubble=el.querySelector('[data-avatar-toggle]');
-  if(bubble){
-    bubble.addEventListener('click',function(){el.classList.toggle('open');});
-    bubble.addEventListener('keydown',function(e){
-      if(e.key==='Enter'||e.key===' '){e.preventDefault();el.classList.toggle('open');}
-    });
-  }
   // Applies at any viewport/zoom — originally mobile-only on the assumption that desktop's
   // wider layout always leaves the bubble in empty margin, but at 200% browser zoom it was
   // confirmed overlapping real content (a Dashboard stat value, an Assets row's Edit button).

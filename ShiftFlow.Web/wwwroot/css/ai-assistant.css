@@ -197,11 +197,6 @@
     outline-offset: 2px;
 }
 
-.ai-mic-standalone {
-    margin: .75rem auto 0;
-    display: flex;
-}
-
 .ai-input-row {
     display: flex;
     align-items: center;
@@ -434,4 +429,195 @@ html[dir="rtl"] .btn-send i { transform: scaleX(-1); }
     }
 
     .ai-chip { font-size: .75rem; padding: .25rem .6rem; }
+}
+
+/* ===========================================================================
+   Shared chat component (_AiChat), rich attachments and the slide-over drawer
+   (_AiDrawer). Tokens only — no hex — and logical properties throughout, so the
+   whole thing mirrors in Arabic without a single RTL override.
+   =========================================================================== */
+
+/* The mic/stop buttons moved into the composer row (they used to sit on their own
+   centered row above it), so the drawer's much shorter body doesn't spend a whole
+   line on them. */
+.ai-input-row { flex-wrap: nowrap; }
+.ai-bubble-text > :first-child { margin-block-start: 0; }
+
+/* Copy-to-clipboard, revealed on hover/focus of an assistant bubble so it isn't
+   permanent visual noise. Still reachable by keyboard — focus reveals it too. */
+.ai-bubble.assistant { position: relative; }
+.ai-copy {
+    position: absolute;
+    inset-block-start: .25rem;
+    inset-inline-end: .25rem;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: var(--radius);
+    background: hsl(var(--card));
+    color: hsl(var(--muted-foreground));
+    font-size: .75rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s, color .15s;
+}
+.ai-bubble.assistant:hover .ai-copy,
+.ai-copy:focus-visible { opacity: 1; }
+.ai-copy:hover { color: hsl(var(--primary)); }
+.ai-copy:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+
+/* An answer carrying a table or a card grid needs the room; a plain sentence still
+   reads better in a narrow bubble, so the default max-width stays. */
+.ai-bubble.assistant:has(.ai-att) { max-width: 100%; width: 100%; }
+
+/* ------------------------------------------------------------------ context pill */
+
+.ai-context-pill {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    margin: 0 1.25rem;
+    padding: .25rem .6rem;
+    align-self: flex-start;
+    border-radius: 20px;
+    border: 1px solid hsl(var(--primary) / .25);
+    background: hsl(var(--primary) / .07);
+    color: hsl(var(--primary));
+    font-size: .75rem;
+    width: fit-content;
+    max-width: calc(100% - 2.5rem);
+}
+.ai-context-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-context-x {
+    border: none;
+    background: transparent;
+    color: inherit;
+    padding: 0 .1rem;
+    font-size: .65rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.ai-context-x:hover { color: hsl(var(--destructive)); }
+.ai-context-x:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ attachments */
+
+.ai-att { margin-block-start: .6rem; }
+.ai-att-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: .8rem;
+    margin-block-end: .35rem;
+    color: hsl(var(--foreground));
+}
+.ai-att-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4rem;
+    margin-block-start: .5rem;
+}
+
+/* Tables reuse the app's own .table styling; this only trims it down for a bubble. */
+.ai-att-table table { font-size: .8rem; background: hsl(var(--card)); border-radius: var(--radius); }
+.ai-att-table th { font-weight: 600; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.ai-att-table td, .ai-att-table th { padding: .35rem .5rem; }
+.ai-att-table .badge { font-size: .7rem; font-weight: 500; }
+.ai-att-table .table-responsive { border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+
+/* Two columns where there is room, one in the drawer and on a phone (below). */
+.ai-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.ai-card {
+    display: block;
+    padding: .5rem .65rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    text-decoration: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+a.ai-card:hover { border-color: hsl(var(--primary)); box-shadow: 0 2px 8px hsl(var(--primary) / .15); }
+a.ai-card:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.ai-card-title { font-weight: 600; font-size: .82rem; }
+.ai-card-sub { font-size: .75rem; color: hsl(var(--muted-foreground)); margin-block-end: .25rem; }
+.ai-card-field { display: flex; justify-content: space-between; gap: .5rem; font-size: .75rem; }
+.ai-card-label { color: hsl(var(--muted-foreground)); }
+.ai-card-value { text-align: end; }
+
+/* Confirmation card — deliberately louder than the bubble around it, because it is the
+   one attachment that changes data when clicked. */
+.ai-confirm {
+    padding: .65rem .75rem;
+    border: 1px solid hsl(var(--primary) / .4);
+    border-inline-start: 3px solid hsl(var(--primary));
+    border-radius: var(--radius);
+    background: hsl(var(--primary) / .06);
+}
+.ai-confirm.danger {
+    border-color: hsl(var(--destructive) / .4);
+    border-inline-start-color: hsl(var(--destructive));
+    background: hsl(var(--destructive) / .06);
+}
+.ai-confirm.settled { opacity: .75; }
+.ai-confirm-title { font-family: var(--font-heading); font-weight: 600; font-size: .85rem; }
+.ai-confirm-summary { font-size: .8rem; margin-block-start: .2rem; }
+.ai-confirm-items {
+    margin: .4rem 0 0;
+    padding-inline-start: 1.1rem;
+    font-size: .78rem;
+    color: hsl(var(--muted-foreground));
+}
+.ai-confirm-more { list-style: none; margin-inline-start: -1.1rem; font-style: italic; }
+.ai-confirm-state { font-size: .78rem; font-weight: 600; color: hsl(var(--muted-foreground)); }
+
+/* ------------------------------------------------------------------ drawer */
+
+/* `offcanvas-end` is mirrored by the RTL Bootstrap build (_HeadLinks), so in Arabic
+   this slides in from the start side with no extra rule here. */
+.ai-drawer { width: 420px; max-width: 100%; }
+.ai-drawer-header {
+    border-bottom: 1px solid hsl(var(--border));
+    padding: .5rem .75rem;
+    gap: .5rem;
+}
+.ai-drawer-header .offcanvas-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: .9rem;
+    margin: 0;
+    color: hsl(var(--foreground));
+}
+.ai-drawer-actions { display: flex; align-items: center; gap: .35rem; margin-inline-start: auto; }
+.ai-drawer-link { font-size: .75rem; padding: .2rem .4rem; text-decoration: none; white-space: nowrap; }
+.ai-drawer-body {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden; /* the message log is the only scroller */
+}
+.ai-drawer .ai-messages { padding: 1rem; }
+.ai-drawer .ai-bubble { max-width: 88%; }
+.ai-drawer .ai-context-pill { margin-inline: 1rem; }
+.ai-drawer .ai-input-row, .ai-drawer .ai-quick-chips { padding-inline: 1rem; }
+/* One column: 420px minus padding cannot carry two readable cards. */
+.ai-drawer .ai-card-grid { grid-template-columns: minmax(0, 1fr); }
+.ai-drawer .ai-quick-chips { max-height: 5.5rem; overflow-y: auto; }
+
+@media (max-width: 575.98px) {
+    /* Full width on a phone — a 420px panel over a 390px screen is just a modal with a
+       sliver of the page peeking out from under it. */
+    .ai-drawer { width: 100%; }
+    .ai-card-grid { grid-template-columns: minmax(0, 1fr); }
+    .ai-context-pill { margin-inline: .75rem; }
+    .ai-att-table table { font-size: .75rem; }
+    /* A touch screen never produces the hover that reveals it — keep it visible. */
+    .ai-copy { opacity: .6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-copy, .ai-card, a.ai-card { transition: none; }
+    .ai-drawer.offcanvas { transition: none; }
 }

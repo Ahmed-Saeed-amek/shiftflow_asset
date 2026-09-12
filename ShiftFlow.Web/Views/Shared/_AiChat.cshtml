@@ -1,0 +1,55 @@
+@*
+    Shared chat component — the message log, the context pill, the composer and the
+    quick-prompt chips. Rendered by BOTH the full AI Assistant page (Views/AiAssistant/Index)
+    and the slide-over drawer (_AiDrawer), so the two stay in sync by construction.
+
+    Only ONE instance is ever on a page at a time (the layout skips the drawer on the
+    AI Assistant page itself), so the element ids below are safe.
+
+    The avatar panel is deliberately NOT part of this partial — it stays on the full page.
+    Everything else here is driven by wwwroot/js/ai-assistant.js.
+*@
+<form class="d-none">@Html.AntiForgeryToken()</form>
+
+<div class="ai-messages" id="aiMessages" role="log" aria-live="polite" aria-relevant="additions"
+     aria-label="@Loc.T("Conversation")">
+    @* Bubbles are inserted before the typing indicator by ai-assistant.js. *@
+    <div class="ai-typing" id="aiTyping" aria-hidden="true">
+        <span></span><span></span><span></span>
+    </div>
+</div>
+
+@* Context pill — "Viewing WO-2026-0004 · ×". Filled in (and shown) by JS from the
+   <meta name="ai-context"> tag the layout emits; dismissing it drops the page context
+   from subsequent messages. *@
+<div class="ai-context-pill d-none" id="aiContextPill">
+    <i class="bi bi-eye" aria-hidden="true"></i>
+    <span id="aiContextText"></span>
+    <button type="button" class="ai-context-x" id="aiContextDismiss"
+            aria-label="@Loc.T("Stop using this page as context")" title="@Loc.T("Stop using this page as context")">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+</div>
+
+<div class="ai-input-row">
+    <button type="button" class="btn-mic" id="btnMic" aria-pressed="false"
+            title="@Loc.T("Voice input")" aria-label="@Loc.T("Voice input")">
+        <i class="bi bi-mic" id="micIcon" aria-hidden="true"></i>
+    </button>
+    <button type="button" class="btn-mic btn-mic-stop d-none" id="btnStopSpeak"
+            title="@Loc.T("Stop speaking")" aria-label="@Loc.T("Stop speaking")">
+        <i class="bi bi-stop-fill" aria-hidden="true"></i>
+    </button>
+    @* Short placeholder: the long one wrapped to a clipped second line in the 420px drawer.
+       The full sentence stays as the accessible name. *@
+    <textarea id="aiInput" rows="1" maxlength="500"
+              placeholder="@Loc.T("Ask me anything…")"
+              aria-label="@Loc.T("Ask me anything about inspection orders...")"></textarea>
+    <button type="button" class="btn-send" id="btnSend" title="@Loc.T("Send")" aria-label="@Loc.T("Send")">
+        <i class="bi bi-send-fill" aria-hidden="true"></i>
+    </button>
+</div>
+
+@* Chips are context-aware, so their labels/prompts come from ai-assistant.js rather than
+   being hard-coded here. *@
+<div class="ai-quick-chips" id="aiChips" aria-label="@Loc.T("Suggested prompts")" role="group"></div>

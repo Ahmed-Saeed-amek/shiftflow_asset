@@ -1,14 +1,10 @@
-@* Markup only — the open/close toggle and the scroll-hide behaviour live in site.js
-   (initFloatingAvatar), so nothing here carries an inline onclick= handler. *@
+@* Launcher for the slide-over assistant (_AiDrawer). Bootstrap's offcanvas toggle does the
+   opening — the only behaviour left in site.js (initFloatingAvatar) is the scroll-hide, which
+   keeps the fixed bubble from permanently covering whatever lands under it.
+   The old hover card is gone: its single "Open Chat" link now lives in the drawer header. *@
 <div id="floatingAvatar">
-    <div class="avatar-card">
-        <div class="small fw-semibold text-primary mb-1">@Loc.T("AI Assistant")</div>
-        <div class="small text-muted mb-2">@Loc.T("Ask me anything about the system!")</div>
-        <a asp-controller="AiAssistant" asp-action="Index" class="small fw-semibold text-decoration-none">
-            <i class="bi bi-chat-dots me-1"></i>@Loc.T("Open Chat")
-        </a>
-    </div>
-    <button type="button" class="avatar-bubble" data-avatar-toggle aria-label="@Loc.T("AI Assistant")">
+    <button type="button" class="avatar-bubble" data-bs-toggle="offcanvas" data-bs-target="#aiDrawer"
+            aria-controls="aiDrawer" title="@Loc.T("AI Assistant")" aria-label="@Loc.T("AI Assistant")">
         <i class="bi bi-robot fs-4" aria-hidden="true"></i>
     </button>
 </div>

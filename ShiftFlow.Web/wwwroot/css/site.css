@@ -625,19 +625,10 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   transition: transform .2s;
 }
 #floatingAvatar .avatar-bubble:hover { transform: scale(1.05); }
-#floatingAvatar .avatar-card {
-  position: absolute;
-  bottom: 76px;
-  inset-inline-end: 0;
-  width: 220px;
-  background: #fff;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
-  box-shadow: 0 4px 12px rgba(17,24,39,.08);
-  padding: .75rem;
-  display: none;
-}
-#floatingAvatar.open .avatar-card { display: block; }
+/* The bubble now opens the slide-over assistant (_AiDrawer) rather than a little hover card
+   with one link in it, so while the drawer is up the bubble would only sit on top of its own
+   panel. ai-assistant.js toggles this class on <body> with the offcanvas. */
+body.ai-drawer-open #floatingAvatar { opacity: 0; pointer-events: none; }
 /* On narrow viewports the fixed bubble can land directly on top of a list page's
    right-aligned row actions (e.g. Users) with no way to reach them underneath it —
    shrinking it here reduces how much of the corner it permanently occupies. */
@@ -645,7 +636,6 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
   #floatingAvatar { bottom: .75rem; inset-inline-end: .75rem; }
   #floatingAvatar .avatar-bubble { width: 44px; height: 44px; }
   #floatingAvatar .avatar-bubble i { font-size: 1.1rem; }
-  #floatingAvatar .avatar-card { bottom: 54px; width: 200px; }
   /* Shrinking the bubble (above) only reduces how much of the corner it occupies — it's
      still a fixed-position element sitting on top of whatever content scrolls under it,
      which on narrow viewports kept landing on the last table row, a "View all" link, or a
@@ -661,7 +651,7 @@ html[dir="rtl"] #sidebar { border-inline-end: none; border-inline-start: 1px sol
    in _FloatingAvatar.cshtml, which now runs unconditionally rather than mobile-only) means it's
    never in the way at the moment something lands under it — it only reappears once things have
    settled, by which point the user has already picked where to look. */
-#floatingAvatar.scroll-hide:not(.open) { opacity: 0; pointer-events: none; transition: opacity .15s ease-out; }
+#floatingAvatar.scroll-hide { opacity: 0; pointer-events: none; transition: opacity .15s ease-out; }
 
 /* Bootstrap's .btn-close sizes its tappable box from font-size + padding — the chip "remove"
    buttons in _AssetMultiPicker/_EmployeePicker-style chip lists set font-size:.6rem for a small

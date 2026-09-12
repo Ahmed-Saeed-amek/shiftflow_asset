@@ -46,6 +46,142 @@
         ["qrLookupFailed"] = Loc.T("Couldn't look that asset up — please try again."),
         ["status"] = StatusStyle.JsLabelNames.ToDictionary(n => n, n => Loc.T(n)),
     };
+
+    // ---------------------------------------------------------------------------------
+    // AI assistant (drawer + full page). Everything the client script needs is emitted
+    // here so ai-assistant.js stays Razor-free and can live on every page, not just the
+    // AI Assistant view.
+    // ---------------------------------------------------------------------------------
+    // Redundant on the AI Assistant page itself — you're already looking at the chat there,
+    // and _AiChat's element ids must stay unique per page.
+    var onAiAssistantPage = string.Equals(currentController, "AiAssistant", StringComparison.OrdinalIgnoreCase);
+
+    // Page context sent with every assistant query. A detail view opts in precisely with
+    //     ViewData["AiContext"] = new { entityType = "WorkOrder", entityId = Model.Id, title = Model.WorkOrderNumber };
+    // (see NOTES-ai-frontend.md); everything else falls back to a best-effort guess from the
+    // route + page title, which is enough for "what am I looking at" style questions.
+    object? aiContext;
+    if (ViewData["AiContext"] is { } explicitAiContext)
+    {
+        aiContext = explicitAiContext;
+    }
+    else if (onAiAssistantPage)
+    {
+        // "Viewing AI Assistant" is a meaningless self-reference — the assistant page is not a
+        // record you can ask about, so it contributes no context at all.
+        aiContext = null;
+    }
+    else
+    {
+        var controllerEntityTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["WorkOrders"] = "WorkOrder",
+            ["InspectionOrders"] = "InspectionOrder",
+            ["Orders"] = "InspectionOrder",
+            ["MaintenanceOrders"] = "MaintenanceOrder",
+            ["Assets"] = "Asset",
+            ["Zones"] = "Zone",
+            ["ZoneOverview"] = "Zone",
+            ["SpareParts"] = "SparePart",
+            ["Contracts"] = "Contract",
+            ["Vendors"] = "Vendor",
+            ["Users"] = "User",
+            ["Groups"] = "Group",
+        };
+        var routeId = ViewContext.RouteData.Values["id"]?.ToString();
+        // entityType only means something alongside an id — on a list page it would claim the
+        // user is looking at one record when they're looking at all of them.
+        var entityType = !string.IsNullOrEmpty(routeId)
+            && controllerEntityTypes.TryGetValue(currentController, out var mappedEntityType) ? mappedEntityType : null;
+        aiContext = new
+        {
+            page = $"{currentController}/{currentAction}",
+            title = ViewData["Title"] as string,
+            entityType,
+            entityId = string.IsNullOrEmpty(routeId) ? null : routeId,
+        };
+    }
+
+    var aiConfig = new
+    {
+        urls = new
+        {
+            query = Url.Action("Query", "AiAssistant"),
+            confirm = Url.Action("Confirm", "AiAssistant"),
+            dismiss = Url.Action("Dismiss", "AiAssistant"),
+            speechToken = Url.Action("SpeechToken", "AiAssistant"),
+            avatarIceToken = Url.Action("AvatarIceToken", "AiAssistant"),
+            login = Url.Action("Login", "Account"),
+            fullPage = Url.Action("Index", "AiAssistant"),
+            // Order/asset codes inside a reply are auto-linked to these search pages, since the
+            // reply text carries a human-readable code, not a database id.
+            searchWorkOrders = Url.Action("Index", "WorkOrders"),
+            searchOrders = Url.Action("Index", "Orders"),
+            searchAssets = Url.Action("Index", "Assets"),
+            // Loaded on demand the first time voice is used, so the ~1MB SDK isn't pulled onto
+            // every page of the app just because the drawer exists there.
+            speechSdk = "https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.38.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js",
+        },
+        speech = new
+        {
+            locale = Loc.Lang == "ar" ? "ar-SA" : "en-US",
+            voice = Loc.Lang == "ar" ? "ar-SA-ZariyahNeural" : "en-US-JennyNeural",
+            // Real-time Avatar uses its own character/style/voice config, independent of the
+            // plain-audio fallback voice above.
+            avatarVoice = Loc.Lang == "ar" ? "ar-KW-FahedNeural" : "en-US-GuyNeural",
+            avatarCharacter = "harry",
+            avatarStyle = "business",
+            avatarBackground = "#F3F4F6FF",
+        },
+        strings = new
+        {
+            greeting = Loc.T("Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage groups, report on assets, and more. What can I do for you today?"),
+            noResponse = Loc.T("No response received."),
+            genericError = Loc.T("An error occurred. Please try again."),
+            networkError = Loc.T("Network error. Please check your connection and try again."),
+            chatCleared = Loc.T("Chat cleared. How can I help you?"),
+            avatarUnavailable = Loc.T("Avatar unavailable — voice replies still work."),
+            voiceUnavailable = Loc.T("Voice is unavailable right now."),
+            voiceOff = Loc.T("Voice and avatar are off."),
+            connectingAvatar = Loc.T("Connecting avatar…"),
+            sessionExpired = Loc.T("Your session expired. Please sign in again."),
+            rateLimited = Loc.T("Too many requests. Please wait a moment and try again."),
+            signIn = Loc.T("Sign in"),
+            retry = Loc.T("Retry"),
+            copy = Loc.T("Copy reply"),
+            copied = Loc.T("Copied"),
+            confirmAction = Loc.T("Confirm"),
+            cancel = Loc.T("Cancel"),
+            cancelled = Loc.T("Cancelled"),
+            confirmed = Loc.T("Done"),
+            download = Loc.T("Download"),
+            andMore = Loc.T("…and more"),
+            viewing = Loc.T("Viewing"),
+            chips = new
+            {
+                workOrder = new[]
+                {
+                    new { label = Loc.T("Summarize"), prompt = Loc.T("Summarize this order") },
+                    new { label = Loc.T("Asset history"), prompt = Loc.T("What's the asset's history?") },
+                    new { label = Loc.T("Send to vendor"), prompt = Loc.T("Send to vendor…") },
+                },
+                asset = new[]
+                {
+                    new { label = Loc.T("Health summary"), prompt = Loc.T("Health summary") },
+                    new { label = Loc.T("Open work orders"), prompt = Loc.T("Open work orders") },
+                    new { label = Loc.T("Report a defect"), prompt = Loc.T("Report a defect") },
+                },
+                fallback = new[]
+                {
+                    new { label = Loc.T("My attention"), prompt = Loc.T("What needs my attention today?") },
+                    new { label = Loc.T("My open orders"), prompt = Loc.T("My open orders") },
+                    new { label = Loc.T("Low stock parts"), prompt = Loc.T("Low stock parts") },
+                    new { label = Loc.T("Expiring contracts"), prompt = Loc.T("Contracts expiring soon") },
+                    new { label = Loc.T("Export to Excel"), prompt = Loc.T("Export work orders to Excel") },
+                },
+            },
+        },
+    };
 }
 <!DOCTYPE html>
 <html lang="@Loc.Lang" dir="@(isRTL ? "rtl" : "ltr")">
@@ -64,6 +200,17 @@
         }
     </script>
     <script>window.i18n = @Html.Raw(JsonSerializer.Serialize(i18n));</script>
+    @if (perms.CanUseAi)
+    {
+        @* What the user is looking at right now, read by ai-assistant.js and sent as `context`
+           with every query. Razor HTML-encodes the JSON into the attribute; the browser decodes
+           it back before JSON.parse sees it. *@
+        @if (aiContext is not null)
+        {
+            <meta name="ai-context" content="@JsonSerializer.Serialize(aiContext)" />
+        }
+        <link rel="stylesheet" href="~/css/ai-assistant.css" asp-append-version="true" />
+    }
 </head>
 <body>
 <a href="#mainContent" class="skip-link">@Loc.T("Skip to main content")</a>
@@ -272,13 +419,12 @@
 @* Every TempData Success/Error message in the app surfaces here, once. *@
 <partial name="_Toast" />
 
-@{
-    // Redundant on the AI Assistant page itself — you're already looking at the chat there.
-    var onAiAssistantPage = string.Equals(currentController, "AiAssistant", StringComparison.OrdinalIgnoreCase);
-}
+@* The floating button opens the slide-over drawer (_AiDrawer); both are skipped on the AI
+   Assistant page itself, where the full-page chat already owns those element ids. *@
 @if (perms.CanUseAi && !onAiAssistantPage)
 {
     <partial name="_FloatingAvatar" />
+    <partial name="_AiDrawer" />
 }
 
 @* Shared across every asset picker's "Scan QR" button (see _AssetSinglePicker/_AssetMultiPicker) —
@@ -305,6 +451,14 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
+@if (perms.CanUseAi)
+{
+    @* Loaded on every page now, not just Views/AiAssistant — the drawer is everywhere.
+       The Azure Speech SDK is NOT loaded here; ai-assistant.js injects it the first time
+       the user actually asks for voice. *@
+    <script>window.aiAssistantConfig = @Html.Raw(JsonSerializer.Serialize(aiConfig));</script>
+    <script src="~/js/ai-assistant.js" asp-append-version="true"></script>
+}
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

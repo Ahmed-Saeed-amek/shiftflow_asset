@@ -1,52 +1,13 @@
 @using ShiftFlow.Web.ViewModels
 @{
     ViewData["Title"] = Loc.T("AI Assistant");
-
-    // Everything the extracted script needs, so ai-assistant.js stays Razor-free.
-    var aiConfig = new
-    {
-        urls = new
-        {
-            query = Url.Action("Query", "AiAssistant"),
-            speechToken = Url.Action("SpeechToken", "AiAssistant"),
-            avatarIceToken = Url.Action("AvatarIceToken", "AiAssistant"),
-            login = Url.Action("Login", "Account"),
-        },
-        speech = new
-        {
-            locale = Loc.Lang == "ar" ? "ar-SA" : "en-US",
-            voice = Loc.Lang == "ar" ? "ar-SA-ZariyahNeural" : "en-US-JennyNeural",
-            // Real-time Avatar uses its own character/style/voice config, independent of the
-            // plain-audio fallback voice above.
-            avatarVoice = Loc.Lang == "ar" ? "ar-KW-FahedNeural" : "en-US-GuyNeural",
-            avatarCharacter = "harry",
-            avatarStyle = "business",
-            avatarBackground = "#F3F4F6FF",
-        },
-        strings = new
-        {
-            noResponse = Loc.T("No response received."),
-            genericError = Loc.T("An error occurred. Please try again."),
-            networkError = Loc.T("Network error. Please check your connection and try again."),
-            chatCleared = Loc.T("Chat cleared. How can I help you?"),
-            avatarUnavailable = Loc.T("Avatar unavailable — voice replies still work."),
-            voiceUnavailable = Loc.T("Voice is unavailable right now."),
-            voiceOff = Loc.T("Voice and avatar are off."),
-            connectingAvatar = Loc.T("Connecting avatar…"),
-            sessionExpired = Loc.T("Your session expired. Please sign in again."),
-            rateLimited = Loc.T("Too many requests. Please wait a moment and try again."),
-            signIn = Loc.T("Sign in"),
-        },
-    };
+    // window.aiAssistantConfig, ai-assistant.css and ai-assistant.js are emitted globally by
+    // _Layout (the drawer needs them on every page), so this view carries no config of its own.
 }
-
-<link rel="stylesheet" href="~/css/ai-assistant.css" asp-append-version="true" />
 
 <partial name="_PageHeader" model="@(new PageHeaderModel {
     Title = Loc.T("AI Assistant"),
     Subtitle = Loc.T("Ask STEP about inspection orders, groups, and more — by voice or text.") })" />
-
-<form class="d-none">@Html.AntiForgeryToken()</form>
 
 <div class="ai-layout">
     <div class="ai-side">
@@ -56,6 +17,7 @@
             </div>
 
             <div class="ai-side-card-body">
+                @* The video avatar is full-page only — the drawer keeps voice but no avatar. *@
                 <div class="ai-avatar-scene" id="avatarScene">
                     <video id="avatarVideo" autoplay playsinline muted></video>
                     <audio id="avatarAudio" autoplay></audio>
@@ -77,50 +39,6 @@
             <button type="button" class="btn-clear" id="btnClear" aria-label="@Loc.T("Clear conversation")">@Loc.T("Clear")</button>
         </div>
 
-        <div class="ai-messages" id="aiMessages" role="log" aria-live="polite" aria-relevant="additions"
-             aria-labelledby="aiConversationLabel">
-            <div class="ai-bubble assistant">
-                @Loc.T("Hi! I'm your STEP AI assistant. I can help you check inspection orders, manage groups, report on assets, and more. What can I do for you today?")
-            </div>
-            <div class="ai-typing" id="aiTyping" aria-hidden="true">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-
-        <div class="ai-mic-standalone d-flex gap-2 justify-content-center">
-            <button type="button" class="btn-mic" id="btnMic" aria-pressed="false"
-                    title="@Loc.T("Voice input")" aria-label="@Loc.T("Voice input")">
-                <i class="bi bi-mic" id="micIcon" aria-hidden="true"></i>
-            </button>
-            <button type="button" class="btn-mic btn-mic-stop d-none" id="btnStopSpeak"
-                    title="@Loc.T("Stop speaking")" aria-label="@Loc.T("Stop speaking")">
-                <i class="bi bi-stop-fill" aria-hidden="true"></i>
-            </button>
-        </div>
-
-        <div class="ai-input-row">
-            <textarea id="aiInput" rows="1" maxlength="500"
-                      placeholder="@Loc.T("Ask me anything about inspection orders...")"
-                      aria-label="@Loc.T("Ask me anything about inspection orders...")"></textarea>
-            <button type="button" class="btn-send" id="btnSend" title="@Loc.T("Send")" aria-label="@Loc.T("Send")">
-                <i class="bi bi-send-fill" aria-hidden="true"></i>
-            </button>
-        </div>
-
-        <div class="ai-quick-chips">
-            <button type="button" class="ai-chip" data-prompt="@Loc.T("Show me my inspection orders")">@Loc.T("My Orders")</button>
-            <button type="button" class="ai-chip" data-prompt="@Loc.T("Which of my inspection orders are overdue?")">@Loc.T("Overdue Orders")</button>
-            <button type="button" class="ai-chip" data-prompt="@Loc.T("List my groups")">@Loc.T("My Groups")</button>
-            <button type="button" class="ai-chip" data-prompt="@Loc.T("Help me create a new inspection order")">@Loc.T("New Order")</button>
-            <button type="button" class="ai-chip" data-prompt="@Loc.T("What are the dashboard KPIs?")">@Loc.T("Dashboard KPIs")</button>
-        </div>
+        <partial name="_AiChat" />
     </div>
 </div>
-
-@section Scripts {
-    <script>
-        window.aiAssistantConfig = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(aiConfig));
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@@1.38.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js" crossorigin="anonymous"></script>
-    <script src="~/js/ai-assistant.js" asp-append-version="true"></script>
-}
