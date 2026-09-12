@@ -39,9 +39,16 @@ builder.Services.Configure<IISServerOptions>(o =>
     o.AutomaticAuthentication = false;
 });
 
+// ReadFrom.Configuration so the appsettings Logging/Serilog levels actually apply — the previous
+// hardcoded config ignored them. The overrides keep framework noise out of the logs, in particular
+// EF Core's per-query SQL dump (which includes parameter values). retainedFileCountLimit caps the
+// rolling file set so logs/ can't grow unbounded.
 Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", Serilog.Events.LogEventLevel.Warning)
     .WriteTo.Console()
-    .WriteTo.File("logs/sf-.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File("logs/sf-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14)
     .CreateLogger();
 builder.Host.UseSerilog();
 
@@ -75,6 +82,13 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.LoginPath = "/Account/Login";
     o.AccessDeniedPath = "/Account/AccessDenied";
     o.Cookie.HttpOnly = true;
+    // Lax lets the cookie ride normal top-level navigations into the app (including the
+    // Entra redirect back) while blocking it on cross-site subrequests. Secure is forced
+    // outside Development for the same reason as the antiforgery cookie below — the dev
+    // preview serves plain HTTP, where Always would make the session cookie undeliverable.
+    o.Cookie.SameSite = SameSiteMode.Lax;
+    if (!builder.Environment.IsDevelopment())
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     o.ExpireTimeSpan = TimeSpan.FromHours(8);
     o.SlidingExpiration = true;
 
@@ -82,13 +96,9 @@ builder.Services.ConfigureApplicationCookie(o =>
     // navigation does. Without this, Identity turns Forbid()/Challenge() into a
     // 302 to the login/access-denied page, which fetch() follows and reports
     // back as a plain 200 OK — callers can't tell the request actually failed.
-    static bool IsApiRequest(HttpRequest request) =>
-        request.Headers.XRequestedWith == "XMLHttpRequest" ||
-        !request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase);
-
     o.Events.OnRedirectToAccessDenied = ctx =>
     {
-        if (IsApiRequest(ctx.Request))
+        if (ShiftFlow.Web.Authorization.RequestKinds.IsApiRequest(ctx.Request))
         {
             ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
             return Task.CompletedTask;
@@ -98,7 +108,7 @@ builder.Services.ConfigureApplicationCookie(o =>
     };
     o.Events.OnRedirectToLogin = ctx =>
     {
-        if (IsApiRequest(ctx.Request))
+        if (ShiftFlow.Web.Authorization.RequestKinds.IsApiRequest(ctx.Request))
         {
             ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
@@ -285,6 +295,14 @@ if (builder.Environment.IsDevelopment())
 // DefaultAntiforgery throws InvalidOperationException on every <form>-rendering GET, not just
 // POSTs, the moment Cookie.SecurePolicy=Always meets a non-SSL request — this 500'd the entire
 // app, confirmed live. Production behind real TLS is unaffected either way.
+// UseHsts() below defaults to a 30-day max-age with no includeSubDomains, which is short enough
+// that browsers treat it as provisional. One year + subdomains is the standard production value.
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+});
+
 builder.Services.AddAntiforgery(options =>
 {
     if (!builder.Environment.IsDevelopment())
@@ -388,7 +406,12 @@ using (var scope = app.Services.CreateScope())
     var db  = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var um  = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     var rm  = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-    await DbSeeder.SeedAsync(db, um, rm);
+    // Demo accounts (admin/manager/engineer/hr/vendor with fixed passwords) are seeded only in
+    // Development, or when Seed:DemoAccounts is explicitly turned on. Roles, permissions, lookup
+    // data and locations always seed.
+    var seedDemoAccounts = app.Environment.IsDevelopment()
+        || app.Configuration.GetValue<bool>("Seed:DemoAccounts");
+    await DbSeeder.SeedAsync(db, um, rm, seedDemoAccounts);
 }
 
 app.Run();
