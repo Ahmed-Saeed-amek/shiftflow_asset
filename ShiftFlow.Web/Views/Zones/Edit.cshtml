@@ -2,3 +2,15 @@
 @{ ViewData["Title"] = Model.Name; }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.Name})" />
 <partial name="_Form" model="Model" />
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+<script>
+(function () {
+    const initialLat = @Html.Raw(Model.Latitude.HasValue ? Model.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
+    const initialLng = @Html.Raw(Model.Longitude.HasValue ? Model.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null");
+    initZonePickerMap('zoneMap', 'latInput', 'lngInput', initialLat, initialLng);
+})();
+</script>
+}

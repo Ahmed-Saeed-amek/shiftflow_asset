@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -15,11 +17,12 @@ namespace ShiftFlow.Web.Controllers;
 public class OrderTypesController : Controller
 {
     private readonly ApplicationDbContext _db;
-    public OrderTypesController(ApplicationDbContext db) => _db = db;
+    private readonly ILookupCache _lookups;
+    public OrderTypesController(ApplicationDbContext db, ILookupCache lookups) { _db = db; _lookups = lookups; }
 
     public async Task<IActionResult> Index()
     {
-        var types = await _db.OrderTypes.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
+        var types = await _db.OrderTypes.AsNoTracking().OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
         return View(types);
     }
 
@@ -29,6 +32,7 @@ public class OrderTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(OrderTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (!ModelState.IsValid || !OrderType.AssignmentModes.Contains(vm.AssignmentMode))
         {
             TempData["Error"] = "Name and prefix are required.";
@@ -55,7 +59,7 @@ public class OrderTypesController : Controller
             TempData["Error"] = $"An order type named '{vm.Name}' already exists.";
             return RedirectToAction(nameof(Index));
         }
-        var usedColors = await _db.OrderTypes.Select(t => t.Color).ToListAsync();
+        var usedColors = await _db.OrderTypes.AsNoTracking().Select(t => t.Color).ToListAsync();
         _db.OrderTypes.Add(new OrderType
         {
             Name = vm.Name, NameAr = vm.NameAr, Prefix = vm.Prefix,
@@ -66,6 +70,8 @@ public class OrderTypesController : Controller
             Color = OrderTypeColors.NextColor(usedColors),
         });
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type created.";
         return RedirectToAction(nameof(Index));
     }
@@ -73,6 +79,7 @@ public class OrderTypesController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(OrderTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (!ModelState.IsValid || !OrderType.AssignmentModes.Contains(vm.AssignmentMode))
         {
             TempData["Error"] = "Name and prefix are required.";
@@ -134,6 +141,8 @@ public class OrderTypesController : Controller
         type.AllowsMultipleAssets = vm.AllowsMultipleAssets; type.AssignmentMode = vm.AssignmentMode;
         type.RequiresApproval = vm.RequiresApproval;
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));
     }
@@ -157,6 +166,7 @@ public class OrderTypesController : Controller
 
         _db.OrderTypes.Remove(type);
         await _db.SaveChangesAsync();
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type deleted.";
         return RedirectToAction(nameof(Index));
     }

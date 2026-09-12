@@ -1,5 +1,5 @@
 @using Microsoft.AspNetCore.Authorization
-@model List<SparePart>
+@model SparePartIndexViewModel
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Spare Parts");
@@ -7,15 +7,21 @@
     string actionsHtml = canManage
         ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Spare Part") + "</a>"
         : "";
-    var lowStockOnly = (bool)ViewBag.LowStockOnly;
+    var lowStockOnly = Model.LowStockOnly;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Spare Parts"),ActionsHtml=actionsHtml})" />
 
-<div class="mb-3">
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <div class="btn-group btn-group-sm" role="group">
         <a href="@Url.Action("Index")" class="btn @(lowStockOnly ? "btn-outline-secondary" : "btn-secondary")">@Loc.T("All")</a>
         <a href="@Url.Action("Index", new { lowStockOnly = true })" class="btn @(lowStockOnly ? "btn-danger" : "btn-outline-danger")">@Loc.T("Low Stock Only")</a>
     </div>
+    <form method="get" class="d-flex gap-2 flex-grow-1 w-100 w-sm-auto">
+        @if (lowStockOnly) { <input type="hidden" name="lowStockOnly" value="true" /> }
+        <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm w-100 w-sm-auto"
+               placeholder="@Loc.T("Search by name or SKU")" aria-label="@Loc.T("Search by name or SKU")" />
+        <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">@Loc.T("Search")</button>
+    </form>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -32,15 +38,15 @@
                 </tr>
             </thead>
             <tbody>
-                @if (Model.Count == 0)
+                @if (Model.Parts.Count == 0)
                 {
                     <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
                 }
-                @foreach (var p in Model)
+                @foreach (var p in Model.Parts)
                 {
-                    var isLow = p.ReorderThreshold != null && p.StockQuantity <= p.ReorderThreshold;
+                    var isLow = p.IsLowStock;
                     <tr class="cursor-pointer @(isLow ? "table-danger" : "")" onclick="location.href='@Url.Action("Details", new { id = p.Id })'">
-                        <td class="small">@Loc.LocalizedName(p.Name, p.NameAr)</td>
+                        <td class="small"><a asp-action="Details" asp-route-id="@p.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@Loc.LocalizedName(p.Name, p.NameAr)</a></td>
                         <td class="d-none d-sm-table-cell small font-monospace">@p.Sku</td>
                         <td class="small">
                             @p.StockQuantity
@@ -60,3 +66,4 @@
         </table>
     </div>
 </div>
+<partial name="_Pagination" model="Model.Pagination" />

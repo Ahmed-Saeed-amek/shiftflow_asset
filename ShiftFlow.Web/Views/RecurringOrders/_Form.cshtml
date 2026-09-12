@@ -20,7 +20,7 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Order Type")</label>
+                    <label asp-for="OrderTypeId" class="form-label small">@Loc.T("Order Type")</label>
                     <select asp-for="OrderTypeId" id="roOrderTypeId" class="form-select" onchange="applyRoOrderTypeMeta()">
                         @foreach (var t in orderTypes)
                         {
@@ -29,7 +29,7 @@
                     </select>
                 </div>
                 <div class="col-md-6" id="roVendorWrap">
-                    <label class="form-label small">@Loc.T("Vendor")</label>
+                    <label asp-for="VendorId" class="form-label small">@Loc.T("Vendor")</label>
                     <select asp-for="VendorId" class="form-select">
                         <option value="">@Loc.T("Select vendor…")</option>
                         @foreach (var v in vendors)
@@ -62,7 +62,7 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Cadence")</label>
+                    <label asp-for="Cadence" class="form-label small">@Loc.T("Cadence")</label>
                     <select asp-for="Cadence" class="form-select">
                         @foreach (var c in RecurringOrder.Cadences)
                         {
@@ -71,12 +71,12 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Start Date")</label>
+                    <label asp-for="StartDate" class="form-label small">@Loc.T("Start Date")</label>
                     <input asp-for="StartDate" type="date" class="form-control" />
                     <span asp-validation-for="StartDate" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("End Date (optional)")</label>
+                    <label asp-for="EndDate" class="form-label small">@Loc.T("End Date (optional)")</label>
                     <input asp-for="EndDate" type="date" class="form-control" />
                     <span asp-validation-for="EndDate" class="text-danger small"></span>
                     <div class="form-text">@Loc.T("Leave blank for an open-ended schedule — occurrences generate up to today until you set an end date or deactivate it.")</div>
@@ -88,7 +88,7 @@
                     </div>
                 </div>
                 <div class="col-12">
-                    <label class="form-label small">@Loc.T("Assets")</label>
+                    <label asp-for="AssetIds" class="form-label small">@Loc.T("Assets")</label>
                     @* Cardinality is a property of the selected OrderType (AllowsMultipleAssets), same
                        as Orders/Create.cshtml — Maintenance (tied to spare-part usage per asset) gets
                        the single-asset picker, Inspection/Quick Check get the multi-asset one. Both

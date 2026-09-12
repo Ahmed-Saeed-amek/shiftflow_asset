@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
 
@@ -12,14 +14,18 @@ namespace ShiftFlow.Web.Controllers;
 [Authorize]
 public class AssetCategoriesController : Controller
 {
+    private readonly ILookupCache _lookups;
     private readonly ApplicationDbContext _db;
     private readonly ILanguageService _loc;
-    public AssetCategoriesController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
+    public AssetCategoriesController(ApplicationDbContext db, ILanguageService loc, ILookupCache lookups)
+    { _db = db; _loc = loc;
+        _lookups = lookups;
+    }
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Index()
     {
-        var categories = await _db.AssetCategories.Include(c => c.Subcategories)
+        var categories = await _db.AssetCategories.AsNoTracking().Include(c => c.Subcategories)
             .OrderBy(c => c.Name).ToListAsync();
         return View(categories.Where(c => c.ParentCategoryId == null).ToList());
     }
@@ -27,6 +33,7 @@ public class AssetCategoriesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(AssetCategoryViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (vm.ParentCategoryId.HasValue)
         {
             var parent = await _db.AssetCategories.FindAsync(vm.ParentCategoryId.Value);
@@ -50,6 +57,8 @@ public class AssetCategoriesController : Controller
         }
         _db.AssetCategories.Add(new AssetCategory { Name = vm.Name, NameAr = vm.NameAr, ParentCategoryId = vm.ParentCategoryId, CreatedDate = DateTime.UtcNow });
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateCategories();
         TempData["Success"] = _loc.T("Asset category created.");
         return RedirectToAction(nameof(Index));
     }
@@ -60,6 +69,7 @@ public class AssetCategoriesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AssetCategoryViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (vm.ParentCategoryId.HasValue)
         {
             if (vm.ParentCategoryId == vm.Id)
@@ -92,6 +102,8 @@ public class AssetCategoriesController : Controller
         if (category == null) return NotFound();
         category.Name = vm.Name; category.NameAr = vm.NameAr; category.ParentCategoryId = vm.ParentCategoryId;
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateCategories();
         TempData["Success"] = _loc.T("Asset category updated.");
         return RedirectToAction(nameof(Index));
     }
@@ -100,7 +112,7 @@ public class AssetCategoriesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> ByParent(int parentId)
     {
-        var subcategories = await _db.AssetCategories.Where(c => c.ParentCategoryId == parentId)
+        var subcategories = await _db.AssetCategories.AsNoTracking().Where(c => c.ParentCategoryId == parentId)
             .OrderBy(c => c.Name).Select(c => new { c.Id, c.Name, c.NameAr }).ToListAsync();
         return Json(subcategories);
     }

@@ -1,16 +1,15 @@
 @using Microsoft.AspNetCore.Authorization
-@model Zone
+@model ZoneDetailsViewModel
 @inject IAuthorizationService AuthZ
 @{
-    var localizedName = Loc.LocalizedName(Model.Name, Model.NameAr);
+    var zone = Model.Zone;
+    var localizedName = Loc.LocalizedName(zone.Name, zone.NameAr);
     ViewData["Title"] = localizedName;
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.AssetManage)).Succeeded;
-    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = Model.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
-    var categoryLocalized = Model.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null;
+    string actionsHtml = canManage ? "<a href='" + Url.Action("Edit", new { id = zone.Id }) + "' class='btn btn-primary btn-sm'>" + Loc.T("Edit") + "</a>" : "";
+    var categoryLocalized = zone.LocationCategory is { } cat ? Loc.LocalizedName(cat.Name, cat.NameAr) : null;
 }
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="~/js/zone-map.js" asp-append-version="true"></script>
 
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=localizedName,Subtitle=categoryLocalized,ActionsHtml=actionsHtml})" />
 
@@ -18,14 +17,14 @@
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
-                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(Model.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Location Category")</span><span class="small fw-semibold">@categoryLocalized</span></div>
-                @if (!string.IsNullOrWhiteSpace(Model.Address))
+                <div class="d-flex justify-content-between py-1 @(string.IsNullOrWhiteSpace(zone.Address) ? "" : "border-bottom")"><span class="text-muted small">@Loc.T("Location Category")</span><span class="small fw-semibold">@categoryLocalized</span></div>
+                @if (!string.IsNullOrWhiteSpace(zone.Address))
                 {
-                    <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Address")</span><span class="small fw-semibold text-end">@Model.Address</span></div>
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Address")</span><span class="small fw-semibold text-end">@zone.Address</span></div>
                 }
             </div>
         </div>
-        @if (Model.Latitude.HasValue && Model.Longitude.HasValue)
+        @if (zone.Latitude.HasValue && zone.Longitude.HasValue)
         {
             <div class="card border-0 shadow-sm">
                 <div id="zoneDetailMap" style="height:280px;border-radius:2px"></div>
@@ -39,7 +38,7 @@
                     @Loc.T("No coordinates set")
                     @if (canManage)
                     {
-                        <div class="mt-2"><a asp-action="Edit" asp-route-id="@Model.Id" class="small">@Loc.T("Add coordinates")</a></div>
+                        <div class="mt-2"><a asp-action="Edit" asp-route-id="@zone.Id" class="small">@Loc.T("Add coordinates")</a></div>
                     }
                 </div>
             </div>
@@ -72,9 +71,13 @@
     </div>
 </div>
 
-@if (Model.Latitude.HasValue && Model.Longitude.HasValue)
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/zone-map.js" asp-append-version="true"></script>
+@if (zone.Latitude.HasValue && zone.Longitude.HasValue)
 {
     <script>
-        initZoneReadonlyMap('zoneDetailMap', @Model.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), @Model.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(localizedName)));
+        initZoneReadonlyMap('zoneDetailMap', @zone.Latitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), @zone.Longitude.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(localizedName)));
     </script>
+}
 }

@@ -14,11 +14,13 @@ namespace ShiftFlow.Web.Controllers;
 public class GroupsController : Controller
 {
     private readonly IGroupService _groups;
+    private readonly ILookupCache _lookups;
     private readonly UserManager<ApplicationUser> _um;
 
-    public GroupsController(IGroupService groups, UserManager<ApplicationUser> um)
+    public GroupsController(IGroupService groups, ILookupCache lookups, UserManager<ApplicationUser> um)
     {
         _groups = groups;
+        _lookups = lookups;
         _um = um;
     }
 
@@ -50,6 +52,7 @@ public class GroupsController : Controller
         try
         {
             var group = await _groups.CreateAsync(vm.Name, vm.NameAr, vm.Description, vm.MemberUserIds, CurrentUserId);
+            _lookups.InvalidateGroups();
             TempData["Success"] = $"Group \"{group.Name}\" created.";
             return RedirectToAction(nameof(Details), new { id = group.Id });
         }
@@ -86,6 +89,7 @@ public class GroupsController : Controller
             await _groups.UpdateAsync(id, vm.Name, vm.NameAr, vm.Description, CurrentUserId);
             await _groups.SetActiveAsync(id, vm.IsActive, CurrentUserId);
             await _groups.SetMembersAsync(id, vm.MemberUserIds ?? new(), vm.OriginalMemberUserIds ?? new(), CurrentUserId);
+            _lookups.InvalidateGroups();
             TempData["Success"] = "Group updated.";
             return RedirectToAction(nameof(Details), new { id });
         }

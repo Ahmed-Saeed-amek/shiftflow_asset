@@ -6,8 +6,10 @@ using ShiftFlow.Application.Services;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
+using Microsoft.Data.SqlClient;
 
 namespace ShiftFlow.Web.Controllers;
 
@@ -18,10 +20,38 @@ public class AssetsController : Controller
     private readonly IAssetService _assetService;
     private readonly IContractService _contractService;
     private readonly IAssetScopeService _scopeService;
+    private readonly ILookupCache _lookups;
+    private readonly ILanguageService _loc;
+    private readonly ILogger<AssetsController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
-    public AssetsController(ApplicationDbContext db, IAssetService assetService, IContractService contractService, IAssetScopeService scopeService, UserManager<ApplicationUser> userManager)
+    public AssetsController(ApplicationDbContext db, IAssetService assetService, IContractService contractService,
+        IAssetScopeService scopeService, ILookupCache lookups, ILanguageService loc, ILogger<AssetsController> logger,
+        UserManager<ApplicationUser> userManager)
     {
-        _db = db; _assetService = assetService; _contractService = contractService; _scopeService = scopeService; _userManager = userManager;
+        _db = db; _assetService = assetService; _contractService = contractService; _scopeService = scopeService;
+        _lookups = lookups; _loc = loc; _logger = logger; _userManager = userManager;
+    }
+
+    // SQL Server's unique-index and unique-constraint violation numbers. Anything else coming out of
+    // SaveChanges is a different failure and must not be reported as a duplicate Asset Tag.
+    private const int SqlDuplicateKey = 2601;
+    private const int SqlUniqueConstraint = 2627;
+
+    /// <summary>True only for a real unique-key violation. Every other DbUpdateException is logged
+    /// and shown as a generic save failure — this used to blanket-report "Asset Tag already in use"
+    /// for any database error, including FK and length violations.</summary>
+    private bool IsDuplicateKey(DbUpdateException ex) =>
+        ex.GetBaseException() is SqlException sql && (sql.Number == SqlDuplicateKey || sql.Number == SqlUniqueConstraint);
+
+    private void AddSaveError(DbUpdateException ex, AssetViewModel vm, string operation)
+    {
+        if (IsDuplicateKey(ex))
+        {
+            ModelState.AddModelError(nameof(vm.AssetTag), _loc.T("This Asset Tag is already in use."));
+            return;
+        }
+        _logger.LogError(ex, "Asset {Operation} failed for asset {AssetId} ({AssetTag}).", operation, vm.Id, vm.AssetTag);
+        ModelState.AddModelError("", _loc.T("Couldn't save this asset. Please check the values and try again."));
     }
 
     /// <summary>Applies the caller's UserAssetScope (Zone/LocationCategory/Category), if any, to
@@ -30,7 +60,7 @@ public class AssetsController : Controller
     /// zone) must not be able to view, search, or print a code for an asset outside their scope
     /// just because they hold the blanket Asset.View permission and know/guess an ID.</summary>
     private Task<IQueryable<Asset>> ScopedAssetsAsync(string userId) =>
-        _scopeService.ApplyScopeAsync(_db.Assets.AsQueryable(), userId);
+        _scopeService.GetScopedAssetsAsync(userId);
 
     private const int PageSize = 25;
 
@@ -54,11 +84,9 @@ public class AssetsController : Controller
         if (assignedToMe == true)
             query = query.Where(a => AssignedToUserAssetIdsQuery(currentUserId).Contains(a.Id));
 
-        var categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
-            .OrderBy(c => c.Name).ToListAsync();
-        var zones = await _db.Zones.Include(z => z.LocationCategory)
-            .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name).ToListAsync();
-        var locationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
+        var categories = await _lookups.TopLevelCategoriesAsync();
+        var zones = await _lookups.ZonesAsync();
+        var locationCategories = await _lookups.LocationCategoriesAsync();
 
         // Narrow/lock the filter dropdowns themselves to what the caller's own scope actually
         // allows — before this, a scoped user could still pick a Zone/Category outside their scope
@@ -67,40 +95,45 @@ public class AssetsController : Controller
         // scope pins that dropdown and narrows Zone to just its own zones; a Category scope narrows
         // the Category dropdown to that branch (its own subcategories are still a real, meaningful
         // choice, so that one isn't fully locked to a single option).
-        ViewBag.ZoneLocked = scope?.ZoneId != null;
-        ViewBag.LocationCategoryLocked = scope?.ZoneId != null || scope?.LocationCategoryId != null;
         if (scope?.ZoneId is int scopedZoneId)
         {
-            zones = zones.Where(z => z.Id == scopedZoneId).ToList();
-            locationCategories = locationCategories.Where(c => c.Id == zones[0].LocationCategoryId).ToList();
+            zones = [.. zones.Where(z => z.Id == scopedZoneId)];
+            locationCategories = [.. locationCategories.Where(c => c.Id == zones[0].LocationCategoryId)];
             zoneId = scopedZoneId;
             locationCategoryId ??= zones[0].LocationCategoryId;
         }
         else if (scope?.LocationCategoryId is int scopedLocationCategoryId)
         {
-            zones = zones.Where(z => z.LocationCategoryId == scopedLocationCategoryId).ToList();
-            locationCategories = locationCategories.Where(c => c.Id == scopedLocationCategoryId).ToList();
+            zones = [.. zones.Where(z => z.LocationCategoryId == scopedLocationCategoryId)];
+            locationCategories = [.. locationCategories.Where(c => c.Id == scopedLocationCategoryId)];
             locationCategoryId = scopedLocationCategoryId;
         }
         if (scope?.CategoryId is int scopedCategoryId)
-            categories = categories.Where(c => c.Id == scopedCategoryId).ToList();
-
-        ViewBag.Categories = categories;
-        ViewBag.Zones = zones;
-        ViewBag.LocationCategories = locationCategories;
-        ViewBag.Status = status; ViewBag.CategoryId = categoryId; ViewBag.ZoneId = zoneId; ViewBag.Q = q;
-        ViewBag.LocationCategoryId = locationCategoryId;
-        ViewBag.AssignedToMe = assignedToMe == true;
-        ViewBag.IsScoped = scope != null;
+            categories = [.. categories.Where(c => c.Id == scopedCategoryId)];
 
         var orderedQuery = query.OrderBy(a => a.AssetTag);
         var totalCount = await orderedQuery.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         if (page > totalPages) page = totalPages;
-        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
-        ViewBag.TotalCount = totalCount;
 
-        return View(await orderedQuery.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync());
+        return View(new AssetIndexViewModel
+        {
+            Assets = await orderedQuery.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(),
+            Categories = categories,
+            Zones = zones,
+            LocationCategories = locationCategories,
+            Status = status,
+            CategoryId = categoryId,
+            ZoneId = zoneId,
+            LocationCategoryId = locationCategoryId,
+            Q = q,
+            AssignedToMe = assignedToMe == true,
+            IsScoped = scope != null,
+            ZoneLocked = scope?.ZoneId != null,
+            LocationCategoryLocked = scope?.ZoneId != null || scope?.LocationCategoryId != null,
+            TotalCount = totalCount,
+            Pagination = new PaginationModel { Page = page, TotalPages = totalPages },
+        });
     }
 
     /// <summary>Every asset tied to an Inspection/Maintenance/Work order assigned to this user —
@@ -128,10 +161,11 @@ public class AssetsController : Controller
             .Include(a => a.AssignedToUser)
             .Include(a => a.ContractLinks).ThenInclude(l => l.Contract).ThenInclude(c => c!.Vendor)
             .Include(a => a.WorkOrders).ThenInclude(w => w.Vendor)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(a => a.Id == id);
         if (asset == null) return NotFound();
         ViewBag.DerivedVendor = await _contractService.GetDerivedVendorAsync(id);
-        ViewBag.Inspections = await _db.InspectionRunAssets
+        ViewBag.Inspections = await _db.InspectionRunAssets.AsNoTracking().AsSplitQuery()
             .Include(i => i.InspectedByUser)
             .Include(i => i.MaintenanceActions).ThenInclude(m => m.MaintenanceActionType)
             .Where(i => i.AssetId == id && i.Outcome != "Pending")
@@ -182,7 +216,7 @@ public class AssetsController : Controller
     public async Task<IActionResult> Create(AssetViewModel vm)
     {
         if (!ModelState.IsValid) { await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId); return View(vm); }
-        if (await _db.Assets.AnyAsync(a => a.AssetTag == vm.AssetTag))
+        if (await _db.Assets.AsNoTracking().AnyAsync(a => a.AssetTag == vm.AssetTag))
         {
             ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
             await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
@@ -198,11 +232,11 @@ public class AssetsController : Controller
                 AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
             }, userId);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
             // The AnyAsync check above and this save aren't atomic — two concurrent submissions with
-            // the same tag can both pass the check and race the DB's unique index on AssetTag.
-            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            // the same tag can both pass the check and race the unique index on AssetTag.
+            AddSaveError(ex, vm, "create");
             await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
             return View(vm);
         }
@@ -244,13 +278,8 @@ public class AssetsController : Controller
         // vm.Id itself, so the scope check here is a direct existence check against the scoped
         // queryable rather than routing the whole update through it.
         if (!await (await ScopedAssetsAsync(userId)).AnyAsync(a => a.Id == vm.Id)) return NotFound();
-        // The Asset Tag field is editable on this form (shared _Form.cshtml with Create) and was
-        // validated above, but AssetService.UpdateAsync never actually saved it — every other field
-        // change took effect and the user got a "Asset updated" success message, so a changed tag
-        // was silently discarded with no error anywhere (confirmed live: posting a new AssetTag
-        // returned 302/success but the DB row kept its original tag). Mirror Create's duplicate
-        // check here now that the tag is actually being persisted.
-        if (await _db.Assets.AnyAsync(a => a.AssetTag == vm.AssetTag && a.Id != vm.Id))
+        // AssetTag is editable on this form, so mirror Create's duplicate check.
+        if (await _db.Assets.AsNoTracking().AnyAsync(a => a.AssetTag == vm.AssetTag && a.Id != vm.Id))
         {
             ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
             await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
@@ -265,10 +294,10 @@ public class AssetsController : Controller
                 AssignedToUserId = vm.AssignedToUserId, PurchaseDate = vm.PurchaseDate, WarrantyExpiry = vm.WarrantyExpiry, Notes = vm.Notes,
             }, userId);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
             // Same TOCTOU race as Create: the AnyAsync check above isn't atomic with this save.
-            ModelState.AddModelError(nameof(vm.AssetTag), "This Asset Tag is already in use.");
+            AddSaveError(ex, vm, "update");
             await PopulateLookupsAsync(); await PopulateSelectedAsync(vm.CategoryId, vm.ZoneId);
             return View(vm);
         }
@@ -280,6 +309,31 @@ public class AssetsController : Controller
         }
         TempData["Success"] = "Asset updated.";
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost, Authorize(Policy = PermissionCatalog.AssetManage), ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var userId = _userManager.GetUserId(User)!;
+        if (!await (await ScopedAssetsAsync(userId)).AnyAsync(a => a.Id == id)) return NotFound();
+        try
+        {
+            await _assetService.DeleteAsync(id, userId);
+            TempData["Success"] = _loc.T("Asset deleted.");
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            // AssetService lists exactly what still references the asset.
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Asset delete failed for asset {AssetId}.", id);
+            TempData["Error"] = _loc.T("Couldn't delete this asset.");
+            return RedirectToAction(nameof(Details), new { id });
+        }
     }
 
     /// <summary>Typeahead data source for the Asset multi-picker (e.g. Contracts' Linked Assets) — capped so it never dumps the full asset list to the client regardless of how many assets exist.</summary>
@@ -317,7 +371,7 @@ public class AssetsController : Controller
     public async Task<IActionResult> ByCategory(int categoryId)
     {
         var userId = _userManager.GetUserId(User)!;
-        var categoryIds = await _db.AssetCategories
+        var categoryIds = await _db.AssetCategories.AsNoTracking()
             .Where(c => c.Id == categoryId || c.ParentCategoryId == categoryId)
             .Select(c => c.Id).ToListAsync();
         var results = await (await ScopedAssetsAsync(userId)).Where(a => categoryIds.Contains(a.CategoryId))
@@ -341,7 +395,7 @@ public class AssetsController : Controller
 
         if (categoryId.HasValue)
         {
-            var categoryIds = await _db.AssetCategories
+            var categoryIds = await _db.AssetCategories.AsNoTracking()
                 .Where(c => c.Id == categoryId.Value || c.ParentCategoryId == categoryId.Value)
                 .Select(c => c.Id).ToListAsync();
             query = query.Where(a => categoryIds.Contains(a.CategoryId));
@@ -356,20 +410,20 @@ public class AssetsController : Controller
     public async Task<IActionResult> ExportExcel()
     {
         var bytes = await _assetService.ExportToExcelAsync(_userManager.GetUserId(User)!);
-        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Assets_{DateTime.Today:yyyyMMdd}.xlsx");
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Assets_{DateTime.UtcNow:yyyyMMdd}.xlsx");
     }
 
     [Authorize(Policy = PermissionCatalog.AssetExport)]
     public async Task<IActionResult> ExportPdf()
     {
         var bytes = await _assetService.ExportToPdfAsync(_userManager.GetUserId(User)!);
-        return File(bytes, "application/pdf", $"Assets_{DateTime.Today:yyyyMMdd}.pdf");
+        return File(bytes, "application/pdf", $"Assets_{DateTime.UtcNow:yyyyMMdd}.pdf");
     }
 
     private async Task PopulateLookupsAsync()
     {
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
-        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
+        ViewBag.Categories = await _lookups.TopLevelCategoriesAsync();
+        ViewBag.LocationCategories = await _lookups.LocationCategoriesAsync();
         ViewBag.Statuses = Asset.Statuses;
     }
 

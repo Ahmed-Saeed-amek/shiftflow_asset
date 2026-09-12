@@ -27,56 +27,53 @@ public class DashboardController : Controller
         _dash = dash; _um = um; _db = db; _loc = loc; _scope = scope;
     }
 
+    /// <summary>The viewer's scoped Assets set as a composable IQueryable (correlated EXISTS
+    /// subquery), or null when unrestricted.</summary>
+    private async Task<IQueryable<Asset>?> GetScopedAssetsAsync()
+    {
+        var userId = _um.GetUserId(User);
+        if (userId == null || !await _scope.HasScopeAsync(userId)) return null;
+        return await _scope.GetScopedAssetsAsync(userId);
+    }
+
     public async Task<IActionResult> Index()
     {
-        var user = await _um.GetUserAsync(User);
-
         // NOTE: a scoped DbContext cannot run multiple queries concurrently — each query
-        // must be awaited before the next starts, otherwise EF throws
-        // "A second operation was started on this context instance".
-        var kpis = await _dash.GetKpisAsync(user?.Id);
-
-        // Same UserAssetScope a scoped user is already restricted to everywhere else (Orders
-        // list, Details, the KPI cards above) — without it, the widgets below leaked full order
-        // numbers/status/assignee for out-of-scope assets that the same user is 404'd out of one
-        // click later on Details.
-        List<int>? scopedAssetIds = user != null && await _scope.HasScopeAsync(user.Id)
-            ? await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), user.Id)).Select(a => a.Id).ToListAsync()
-            : null;
+        // must be awaited before the next starts.
+        var kpis = await _dash.GetKpisAsync(_um.GetUserId(User));
+        var scopedAssets = await GetScopedAssetsAsync();
 
         // Inspection-order-status chart: fixed status list so the chart's shape/order/colors
         // stay stable as data grows instead of silently changing whenever a status count
         // drops to/from zero.
         string[] statusOrder = ["Open", "InProgress", "Done"];
         var statusChartQuery = _db.InspectionOrders.AsNoTracking();
-        if (scopedAssetIds != null) statusChartQuery = statusChartQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        if (scopedAssets != null) statusChartQuery = statusChartQuery.Where(o => o.InspectionRun!.Items.Any() && o.InspectionRun.Items.All(i => scopedAssets.Any(a => a.Id == i.AssetId)));
         var statusCounts = (await statusChartQuery
                 .GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync())
             .ToDictionary(x => x.Key, x => x.Count);
-        ViewBag.OrderStatusLabels = statusOrder;
-        ViewBag.OrderStatusData = statusOrder.Select(s => statusCounts.GetValueOrDefault(s, 0)).ToList();
+        var orderStatusLabels = statusOrder;
+        var orderStatusData = statusOrder.Select(s => statusCounts.GetValueOrDefault(s, 0)).ToList();
 
-        ViewBag.RecentOrders = await BuildRecentOrdersAsync(scopedAssetIds);
+        var vm = new DashboardViewModel { Kpis = kpis, OrderStatusLabels = orderStatusLabels, OrderStatusData = orderStatusData };
+        vm.RecentOrders = await BuildRecentOrdersAsync(scopedAssets);
 
-        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssetIds);
-        ViewBag.OverdueOrderCount = overdueCount;
-        ViewBag.OverdueOrders = overdueOrders;
+        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssets);
+        vm.OverdueOrderCount = overdueCount;
+        vm.OverdueOrders = overdueOrders;
 
-        return View(kpis);
+        return View(vm);
     }
 
     public async Task<IActionResult> ExportPdf()
     {
-        var user = await _um.GetUserAsync(User);
-        var kpis = await _dash.GetKpisAsync(user?.Id);
-        List<int>? scopedAssetIds = user != null && await _scope.HasScopeAsync(user.Id)
-            ? await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), user.Id)).Select(a => a.Id).ToListAsync()
-            : null;
-        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssetIds);
+        var kpis = await _dash.GetKpisAsync(_um.GetUserId(User));
+        var scopedAssets = await GetScopedAssetsAsync();
+        var (overdueCount, overdueOrders) = await BuildOverdueOrdersAsync(scopedAssets);
 
         string[] statusOrder = ["Open", "InProgress", "Done"];
         var statusChartQuery = _db.InspectionOrders.AsNoTracking();
-        if (scopedAssetIds != null) statusChartQuery = statusChartQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        if (scopedAssets != null) statusChartQuery = statusChartQuery.Where(o => o.InspectionRun!.Items.Any() && o.InspectionRun.Items.All(i => scopedAssets.Any(a => a.Id == i.AssetId)));
         var statusCounts = (await statusChartQuery
                 .GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync())
             .ToDictionary(x => x.Key, x => x.Count);
@@ -89,7 +86,7 @@ public class DashboardController : Controller
             var doc = new Document(pdf);
             doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
             PdfReportHelper.AddHeader(doc, _loc.T("Executive Dashboard"),
-                _loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait") + " · " + _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
+                _loc.T("Ministry of Electricity, Water & Renewable Energy — Kuwait") + " · " + _loc.TDate(DateTime.UtcNow.ToString("dddd, dd MMMM yyyy")));
 
             PdfReportHelper.AddKpiRow(doc,
                 (_loc.T("Open Inspection Orders"), kpis.OpenInspectionOrders.ToString(), PdfReportHelper.Primary),
@@ -113,7 +110,7 @@ public class DashboardController : Controller
             }
             doc.Add(overdueTable);
         }
-        return File(ms.ToArray(), "application/pdf", $"Dashboard_{DateTime.Today:yyyyMMdd}.pdf");
+        return File(ms.ToArray(), "application/pdf", $"Dashboard_{DateTime.UtcNow:yyyyMMdd}.pdf");
     }
 
     /// <summary>Overdue = Inspection or Maintenance order, still open, past its DueDate — combined
@@ -121,13 +118,13 @@ public class DashboardController : Controller
     /// overdue" cares about both, not just Inspection Orders (the previous version's scope). Work
     /// Orders have no DueDate/deadline concept (only ScheduledDate, used for recurring-schedule
     /// dedup), so there's nothing comparable to include for them.</summary>
-    private async Task<(int Count, List<MyWorkOrderRow> Rows)> BuildOverdueOrdersAsync(List<int>? scopedAssetIds)
+    private async Task<(int Count, List<MyWorkOrderRow> Rows)> BuildOverdueOrdersAsync(IQueryable<Asset>? scopedAssets)
     {
         var today = DateTime.UtcNow.Date;
 
         var inspectionQuery = _db.InspectionOrders.AsNoTracking()
             .Where(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < today);
-        if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        if (scopedAssets != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.Any() && o.InspectionRun.Items.All(i => scopedAssets.Any(a => a.Id == i.AssetId)));
         var inspectionCount = await inspectionQuery.CountAsync();
         var inspectionRows = (await inspectionQuery.Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup)
             .OrderBy(o => o.DueDate).Take(6).ToListAsync())
@@ -141,7 +138,7 @@ public class DashboardController : Controller
 
         var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking()
             .Where(m => m.Status != "Done" && m.Status != "Cancelled" && m.DueDate != null && m.DueDate < today);
-        if (scopedAssetIds != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssetIds.Contains(m.AssetId));
+        if (scopedAssets != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssets.Any(a => a.Id == m.AssetId));
         var maintenanceCount = await maintenanceQuery.CountAsync();
         var maintenanceRows = (await maintenanceQuery.Include(m => m.AssignedToUser).Include(m => m.AssignedToGroup)
             .OrderBy(m => m.DueDate).Take(6).ToListAsync())
@@ -161,10 +158,10 @@ public class DashboardController : Controller
     /// categories (Inspection, Maintenance, Work Order), not just Inspection Orders, so the
     /// dashboard reflects actual recent activity rather than one order type. Restricted to the
     /// viewer's UserAssetScope, same as everywhere else scope is enforced (see Index above).</summary>
-    private async Task<List<MyWorkOrderRow>> BuildRecentOrdersAsync(List<int>? scopedAssetIds)
+    private async Task<List<MyWorkOrderRow>> BuildRecentOrdersAsync(IQueryable<Asset>? scopedAssets)
     {
         var inspectionQuery = _db.InspectionOrders.AsNoTracking().Include(o => o.AssignedToUser).Include(o => o.AssignedToGroup).AsQueryable();
-        if (scopedAssetIds != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+        if (scopedAssets != null) inspectionQuery = inspectionQuery.Where(o => o.InspectionRun!.Items.Any() && o.InspectionRun.Items.All(i => scopedAssets.Any(a => a.Id == i.AssetId)));
         var inspectionRows = (await inspectionQuery
             .OrderByDescending(o => o.CreatedAt).Take(6)
             .ToListAsync())
@@ -178,7 +175,7 @@ public class DashboardController : Controller
             .ToList();
 
         var maintenanceQuery = _db.MaintenanceOrders.AsNoTracking().Include(m => m.AssignedToUser).Include(m => m.AssignedToGroup).AsQueryable();
-        if (scopedAssetIds != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssetIds.Contains(m.AssetId));
+        if (scopedAssets != null) maintenanceQuery = maintenanceQuery.Where(m => scopedAssets.Any(a => a.Id == m.AssetId));
         var maintenanceRows = (await maintenanceQuery
             .OrderByDescending(m => m.CreatedDate).Take(6)
             .ToListAsync())
@@ -192,7 +189,7 @@ public class DashboardController : Controller
             .ToList();
 
         var workOrderQuery = _db.WorkOrders.AsNoTracking().Include(w => w.AssignedToUser).Include(w => w.Vendor).AsQueryable();
-        if (scopedAssetIds != null) workOrderQuery = workOrderQuery.Where(w => scopedAssetIds.Contains(w.AssetId));
+        if (scopedAssets != null) workOrderQuery = workOrderQuery.Where(w => scopedAssets.Any(a => a.Id == w.AssetId));
         var workOrderRows = await workOrderQuery
             .OrderByDescending(w => w.CreatedDate).Take(6)
             .Select(w => new MyWorkOrderRow

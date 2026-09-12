@@ -24,25 +24,19 @@ public class ZoneOverviewController : Controller
         _db = db; _um = um; _scope = scope;
     }
 
-    /// <summary>Same UserAssetScope enforced everywhere else (Orders list/Details, Dashboard) —
-    /// null means unscoped (see the caller sites below for how that's applied).</summary>
-    private async Task<List<int>?> GetScopedAssetIdsAsync()
-    {
-        var user = await _um.GetUserAsync(User);
-        if (user == null || !await _scope.HasScopeAsync(user.Id)) return null;
-        return await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), user.Id)).Select(a => a.Id).ToListAsync();
-    }
+    /// <summary>The caller's scoped Assets set — the same UserAssetScope enforced everywhere else.
+    /// Kept as a composable IQueryable and used as a correlated EXISTS subquery rather than
+    /// materialising ids.</summary>
+    private Task<IQueryable<Asset>> ScopedAssetsAsync() =>
+        _scope.GetScopedAssetsAsync(_um.GetUserId(User)!);
 
     public async Task<IActionResult> Index()
     {
-        var scopedAssetIds = await GetScopedAssetIdsAsync();
+        var assetQuery = await ScopedAssetsAsync();
 
-        var zones = await _db.Zones.Include(z => z.LocationCategory)
+        var zones = await _db.Zones.AsNoTracking().Include(z => z.LocationCategory)
             .OrderBy(z => z.LocationCategory!.Name).ThenBy(z => z.Name)
             .ToListAsync();
-
-        var assetQuery = _db.Assets.AsNoTracking();
-        if (scopedAssetIds != null) assetQuery = assetQuery.Where(a => scopedAssetIds.Contains(a.Id));
 
         var zoneStatus = (await assetQuery
             .GroupBy(a => a.ZoneId)
@@ -75,17 +69,16 @@ public class ZoneOverviewController : Controller
         return View(zones);
     }
 
-    public async Task<IActionResult> Details(int zoneId)
+    public async Task<IActionResult> Details(int id)
     {
-        var scopedAssetIds = await GetScopedAssetIdsAsync();
+        var scopedAssets = await ScopedAssetsAsync();
 
-        var zone = await _db.Zones.Include(z => z.LocationCategory).FirstOrDefaultAsync(z => z.Id == zoneId);
+        var zone = await _db.Zones.AsNoTracking().Include(z => z.LocationCategory).FirstOrDefaultAsync(z => z.Id == id);
         if (zone == null) return NotFound();
 
-        var problemAssetsQuery = _db.Assets.AsNoTracking()
+        var problemAssetsQuery = scopedAssets
             .Include(a => a.Category)
-            .Where(a => a.ZoneId == zoneId && (a.Status == "Defective" || a.Status == "Maintenance"));
-        if (scopedAssetIds != null) problemAssetsQuery = problemAssetsQuery.Where(a => scopedAssetIds.Contains(a.Id));
+            .Where(a => a.ZoneId == id && (a.Status == "Defective" || a.Status == "Maintenance"));
         ViewBag.ProblemAssets = await problemAssetsQuery
             .OrderBy(a => a.AssetTag)
             .ToListAsync();
@@ -95,8 +88,7 @@ public class ZoneOverviewController : Controller
         // what that column promises, instead of only ever showing the unrelated problem-assets list.
         var dispatchedOrdersQuery = _db.WorkOrders.AsNoTracking()
             .Include(w => w.Asset)
-            .Where(w => w.Asset!.ZoneId == zoneId);
-        if (scopedAssetIds != null) dispatchedOrdersQuery = dispatchedOrdersQuery.Where(w => scopedAssetIds.Contains(w.AssetId));
+            .Where(w => w.Asset!.ZoneId == id && scopedAssets.Any(a => a.Id == w.AssetId));
         ViewBag.DispatchedOrders = await dispatchedOrdersQuery
             .OrderByDescending(w => w.CreatedDate)
             .ToListAsync();
@@ -109,12 +101,8 @@ public class ZoneOverviewController : Controller
     /// then Working) so the worst status at a location is always the one visible/clickable.</summary>
     public async Task<IActionResult> AssetMap()
     {
-        var scopedAssetIds = await GetScopedAssetIdsAsync();
-
-        var query = _db.Assets.AsNoTracking()
-            .Include(a => a.Zone).ThenInclude(z => z!.LocationCategory)
+        var query = (await ScopedAssetsAsync())
             .Where(a => a.Zone != null && a.Zone.Latitude != null && a.Zone.Longitude != null);
-        if (scopedAssetIds != null) query = query.Where(a => scopedAssetIds.Contains(a.Id));
 
         var assets = await query
             .Select(a => new

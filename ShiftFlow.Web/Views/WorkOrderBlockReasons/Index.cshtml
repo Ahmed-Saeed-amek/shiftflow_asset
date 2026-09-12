@@ -1,7 +1,7 @@
 @model List<WorkOrderBlockReason>
 @{
     ViewData["Title"] = Loc.T("Block Reasons");
-    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#reasonModal' onclick='openCreate()'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Reason") + "</button>";
+    string actionsHtml = "<button type='button' class='btn btn-primary btn-sm' data-bs-toggle='modal' data-bs-target='#reasonModal' data-modal-create='reasonModal'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Reason") + "</button>";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Block Reasons"),ActionsHtml=actionsHtml})" />
 
@@ -21,7 +21,8 @@
                         <td><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reasonModal"
-                                    onclick='openEdit(@r.Id, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.Name)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(r.NameAr)), @(r.IsActive ? "true" : "false"))'>
+                                    data-modal-edit="reasonModal"
+                                    data-id="@r.Id" data-name="@r.Name" data-name-ar="@r.NameAr" data-is-active="@(r.IsActive ? "true" : "false")">
                                 @Loc.T("Edit")
                             </button>
                         </td>
@@ -43,6 +44,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="reasonModalError" class="alert alert-danger small" role="alert" hidden></div>
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label small">@Loc.T("Name")</label>
@@ -71,26 +73,18 @@
 </div>
 
 @section Scripts {
+<script src="~/js/modal-editor.js" asp-append-version="true"></script>
 <script>
-    const jsNewReason = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Reason")));
-    const jsEditReason = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Reason")));
-
-    function openCreate() {
-        document.getElementById('reasonModalTitle').textContent = jsNewReason;
-        document.getElementById('reasonForm').setAttribute('action', '@Url.Action("Create")');
-        document.getElementById('reasonId').value = 0;
-        document.getElementById('reasonName').value = '';
-        document.getElementById('reasonNameAr').value = '';
-        document.getElementById('reasonIsActive').checked = true;
-    }
-
-    function openEdit(id, name, nameAr, isActive) {
-        document.getElementById('reasonModalTitle').textContent = jsEditReason;
-        document.getElementById('reasonForm').setAttribute('action', '@Url.Action("Edit")');
-        document.getElementById('reasonId').value = id;
-        document.getElementById('reasonName').value = name || '';
-        document.getElementById('reasonNameAr').value = nameAr || '';
-        document.getElementById('reasonIsActive').checked = isActive;
-    }
+    initModalEditor({
+        modalId: 'reasonModal',
+        formId: 'reasonForm',
+        titleId: 'reasonModalTitle',
+        errorId: 'reasonModalError',
+        titles: { create: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("New Reason"))), edit: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Edit Reason"))) },
+        urls: { create: '@Url.Action("Create")', edit: '@Url.Action("Edit")' },
+        fieldMap: { id: 'reasonId', name: 'reasonName', nameAr: 'reasonNameAr', isActive: 'reasonIsActive' },
+        defaults: { id: 0, name: '', nameAr: '', isActive: true },
+        reopen: @Html.Raw(ShiftFlow.Web.Services.ModalRedisplay.ReopenScript(TempData))
+    });
 </script>
 }

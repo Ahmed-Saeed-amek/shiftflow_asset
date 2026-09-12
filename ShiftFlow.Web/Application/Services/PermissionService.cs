@@ -52,45 +52,29 @@ public sealed class PermissionService : IPermissionService
 
     private async Task<IReadOnlyList<string>> ComputeEffectivePermissionsAsync(string userId)
     {
-        // 1. Load all user-level overrides
-        var overrides = await _db.UserPermissions
+        // One round trip for the user-level overrides and one for the role-granted set (joined
+        // AspNetUserRoles -> RolePermissions server-side). This used to be 4-5 round trips: the
+        // overrides, a FindByIdAsync, GetRolesAsync, a Roles lookup to map those names back to ids,
+        // and finally RolePermissions.
+        var overrides = await _db.UserPermissions.AsNoTracking()
             .Where(up => up.UserId == userId)
+            .Select(up => new { up.PermissionName, up.IsGranted })
             .ToListAsync();
 
-        var deniedSet = overrides.Where(up => !up.IsGranted).Select(up => up.PermissionName).ToHashSet();
-        var allowedSet = overrides.Where(up => up.IsGranted).Select(up => up.PermissionName).ToHashSet();
-
-        // 2. Load role-level permissions for all roles this user belongs to
-        var user = await _userManager.FindByIdAsync(userId);
-        var roleNames = user is null
-            ? []
-            : (IList<string>)await _userManager.GetRolesAsync(user);
-
-        var roleIds = await _db.Roles
-            .Where(r => roleNames.Contains(r.Name!))
-            .Select(r => r.Id)
-            .ToListAsync();
-
-        var roleGranted = await _db.RolePermissions
-            .Where(rp => roleIds.Contains(rp.RoleId))
-            .Select(rp => rp.PermissionName)
+        var roleGranted = await _db.UserRoles.AsNoTracking()
+            .Where(ur => ur.UserId == userId)
+            .Join(_db.RolePermissions.AsNoTracking(), ur => ur.RoleId, rp => rp.RoleId, (_, rp) => rp.PermissionName)
             .Distinct()
             .ToListAsync();
 
-        // 3. Evaluate: Deny > Allow > Role
+        var deniedSet = overrides.Where(up => !up.IsGranted).Select(up => up.PermissionName).ToHashSet();
+
+        // Deny > Allow > Role.
         var effective = new HashSet<string>();
-
-        foreach (var perm in allowedSet)
-        {
-            if (!deniedSet.Contains(perm))
-                effective.Add(perm);
-        }
-
+        foreach (var perm in overrides.Where(up => up.IsGranted).Select(up => up.PermissionName))
+            if (!deniedSet.Contains(perm)) effective.Add(perm);
         foreach (var perm in roleGranted)
-        {
-            if (!deniedSet.Contains(perm))
-                effective.Add(perm);
-        }
+            if (!deniedSet.Contains(perm)) effective.Add(perm);
 
         // Super-permission: holding IsAdmin implicitly grants every permission,
         // including ones added to the catalog after this user was granted it.

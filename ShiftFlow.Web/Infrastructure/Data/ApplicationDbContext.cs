@@ -97,6 +97,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasKey(m => m.Id);
             e.HasIndex(m => new { m.GroupId, m.UserId }).IsUnique();
+            // The composite above is GroupId-leading, so "which groups is this user in" (asset
+            // scope resolution, once per request) can't seek on it.
+            e.HasIndex(m => m.UserId);
             e.HasOne(m => m.Group).WithMany(t => t.Members)
                 .HasForeignKey(m => m.GroupId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(m => m.User).WithMany(u => u.GroupMemberships)
@@ -111,6 +114,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.Property(o => o.Status).HasMaxLength(20).IsRequired();
             e.HasIndex(o => o.OrderNumber).IsUnique();
             e.HasIndex(o => o.Status);
+            // Assignee filters ("my orders", group queues) and the CreatedAt/DueDate sorts the
+            // dashboard and overdue widgets run on every load.
+            e.HasIndex(o => o.AssignedToUserId);
+            e.HasIndex(o => o.AssignedToGroupId);
+            e.HasIndex(o => o.CreatedAt);
+            e.HasIndex(o => o.DueDate);
             e.HasOne(o => o.AssignedToUser).WithMany(u => u.AssignedInspectionOrders)
                 .HasForeignKey(o => o.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(o => o.AssignedToGroup).WithMany()
@@ -158,6 +167,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasOne(i => i.WorkOrder).WithMany()
                 .HasForeignKey(i => i.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(i => i.InspectionRunId);
+            // An asset can only appear once in a given run.
+            e.HasIndex(i => new { i.InspectionRunId, i.AssetId }).IsUnique();
         });
         b.Entity<MaintenanceActionType>(e =>
         {
@@ -269,6 +280,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(w => w.WorkOrderNumber).IsUnique();
             e.HasIndex(w => new { w.Stage, w.Priority });
             e.HasIndex(w => w.AssetId);
+            // "My work orders" filters by assignee; the lists and dashboards order by CreatedDate.
+            e.HasIndex(w => w.AssignedToUserId);
+            e.HasIndex(w => w.CreatedDate);
             e.HasOne(w => w.Asset).WithMany(a => a.WorkOrders)
                 .HasForeignKey(w => w.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(w => w.Vendor).WithMany(v => v.WorkOrders)
@@ -349,6 +363,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.HasIndex(m => m.OrderNumber).IsUnique();
             e.HasIndex(m => m.AssetId);
             e.HasIndex(m => m.Status);
+            e.HasIndex(m => m.AssignedToUserId);
+            e.HasIndex(m => m.AssignedToGroupId);
+            e.HasIndex(m => m.CreatedDate);
             e.HasOne(m => m.Asset).WithMany()
                 .HasForeignKey(m => m.AssetId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(m => m.AssignedToUser).WithMany()
@@ -443,6 +460,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             e.Property(c => c.PmCadence).HasMaxLength(20);
             e.Property(c => c.Cost).HasColumnType("decimal(12,2)");
             e.HasIndex(c => c.VendorId);
+            // The PM scheduler scans by ContractType on every tick.
+            e.HasIndex(c => c.ContractType);
             e.HasOne(c => c.Vendor).WithMany()
                 .HasForeignKey(c => c.VendorId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -450,6 +469,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             e.HasKey(ca => ca.Id);
             e.HasIndex(ca => new { ca.ContractId, ca.AssetId }).IsUnique();
+            // ContractId-leading above; the derived-vendor lookup searches by AssetId.
+            e.HasIndex(ca => ca.AssetId);
             e.HasOne(ca => ca.Contract).WithMany(c => c.AssetLinks)
                 .HasForeignKey(ca => ca.ContractId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(ca => ca.Asset).WithMany(a => a.ContractLinks)

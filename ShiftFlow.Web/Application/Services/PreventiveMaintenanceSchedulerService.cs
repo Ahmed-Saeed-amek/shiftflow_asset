@@ -17,15 +17,9 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(5);
 
-    // Round 26 capped ComputeOccurrenceDueDates at 2000 occurrences, but that only bounds the date
-    // dimension — this loop nests assets *outside* dates, so the real per-tick blast radius is
-    // occurrences x linked-assets. A PM contract near that cap linked to a few hundred assets (one
-    // click via the asset picker's "add all in category") generates hundreds of thousands of
-    // WorkOrder/AuditLog inserts synchronously in a single tick (confirmed live: 105 occurrences x
-    // 3 assets = 315 WorkOrders from one tick). Capping WorkOrders created per contract per tick
-    // spreads a large backlog across multiple 5-minute ticks instead — safe because this method is
-    // idempotent and re-derives what's still missing every time, so nothing generated this tick is
-    // lost, just deferred.
+    // Per-tick blast radius is occurrences x linked-assets, so a long-running contract with many
+    // linked assets could insert hundreds of thousands of rows in one tick. Capping spreads the
+    // backlog across ticks — safe because this method re-derives what's still missing every time.
     private const int MaxOccurrencesGeneratedPerContractPerTick = 200;
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -59,6 +53,7 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var workOrderService = scope.ServiceProvider.GetRequiredService<IWorkOrderService>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditService>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         var today = DateTime.UtcNow.Date;
@@ -73,8 +68,23 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
         string? systemUserId = (await userManager.GetUsersInRoleAsync("Admin")).FirstOrDefault()?.Id;
         if (systemUserId is null)
         {
-            _logger.LogWarning("Preventive Maintenance scheduler: no Admin-role user found, skipping this tick.");
+            _logger.LogError("Preventive Maintenance scheduler: no Admin-role user found — no occurrences can be generated this tick.");
             return;
+        }
+
+        // Failures are surfaced on the Audit Logs screen (EntityType = Contract) as well as the log,
+        // so a schedule that has quietly stopped producing work orders is discoverable in the app.
+        async Task ReportFailureAsync(int contractId, string message)
+        {
+            _logger.LogError("Preventive Maintenance: contract {ContractId} failed to generate an occurrence: {Message}", contractId, message);
+            try
+            {
+                await audit.LogAsync("GenerationFailed", "Contract", contractId.ToString(), systemUserId, details: message);
+            }
+            catch (Exception auditEx)
+            {
+                _logger.LogError(auditEx, "Preventive Maintenance: could not write the failure audit row for contract {ContractId}.", contractId);
+            }
         }
 
         foreach (var contract in contracts)
@@ -117,11 +127,10 @@ public class PreventiveMaintenanceSchedulerService : BackgroundService
                     }
                     catch (InvalidOperationException ex)
                     {
-                        // e.g. the asset was retired after being linked to this contract — log and
-                        // move on rather than letting one bad asset link block every other link's
-                        // occurrences this tick (and every tick thereafter).
-                        _logger.LogWarning(ex, "Preventive Maintenance: occurrence for contract {ContractId}, asset {AssetId}, due {DueDate} failed: {Message}",
-                            contract.Id, link.AssetId, dueDate, ex.Message);
+                        // e.g. the asset was retired after being linked to this contract — surfaced,
+                        // then skipped, so one bad link can't block the rest of the contract forever.
+                        await ReportFailureAsync(contract.Id,
+                            $"Asset {link.AssetId}, due {dueDate:yyyy-MM-dd}: {ex.Message}");
                     }
                 }
             }

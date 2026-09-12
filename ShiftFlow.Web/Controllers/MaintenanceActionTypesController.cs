@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -17,9 +18,9 @@ public class MaintenanceActionTypesController : Controller
     [Authorize(Policy = PermissionCatalog.AssetCategoryManage)]
     public async Task<IActionResult> Index()
     {
-        var types = await _db.MaintenanceActionTypes.Include(m => m.Category)
+        var types = await _db.MaintenanceActionTypes.AsNoTracking().Include(m => m.Category)
             .OrderBy(m => m.Category == null ? "" : m.Category.Name).ThenBy(m => m.Name).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
+        ViewBag.Categories = await _db.AssetCategories.AsNoTracking().Include(c => c.Subcategories).Where(c => c.ParentCategoryId == null)
             .OrderBy(c => c.Name).ToListAsync();
         return View(types);
     }
@@ -30,6 +31,7 @@ public class MaintenanceActionTypesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MaintenanceActionTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: false);
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Name is required.";
@@ -44,6 +46,7 @@ public class MaintenanceActionTypesController : Controller
         }
         _db.MaintenanceActionTypes.Add(new MaintenanceActionType { CategoryId = vm.CategoryId, Name = vm.Name, NameAr = vm.NameAr, IsActive = vm.IsActive });
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = "Maintenance action created.";
         return RedirectToAction(nameof(Index));
     }
@@ -51,6 +54,7 @@ public class MaintenanceActionTypesController : Controller
     [HttpPost, Authorize(Policy = PermissionCatalog.AssetCategoryManage), ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(MaintenanceActionTypeViewModel vm)
     {
+        ModalRedisplay.Capture(TempData, vm, isEdit: true);
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Name is required.";
@@ -65,6 +69,7 @@ public class MaintenanceActionTypesController : Controller
         if (type == null) return NotFound();
         type.CategoryId = vm.CategoryId; type.Name = vm.Name; type.NameAr = vm.NameAr; type.IsActive = vm.IsActive;
         await _db.SaveChangesAsync();
+        ModalRedisplay.Clear(TempData);
         TempData["Success"] = "Maintenance action updated.";
         return RedirectToAction(nameof(Index));
     }

@@ -21,19 +21,21 @@ namespace ShiftFlow.Web.Controllers;
 [Authorize(Policy = PermissionCatalog.OrderTypeManage)]
 public class RecurringOrdersController : Controller
 {
+    private readonly ILookupCache _lookups;
     private readonly ApplicationDbContext _db;
     private readonly IRecurringOrderService _recurringOrders;
     private readonly UserManager<ApplicationUser> _userManager;
-    public RecurringOrdersController(ApplicationDbContext db, IRecurringOrderService recurringOrders, UserManager<ApplicationUser> userManager)
+    public RecurringOrdersController(ApplicationDbContext db, IRecurringOrderService recurringOrders, UserManager<ApplicationUser> userManager, ILookupCache lookups)
     {
         _db = db; _recurringOrders = recurringOrders; _userManager = userManager;
+        _lookups = lookups;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
 
     public async Task<IActionResult> Index()
     {
-        var schedules = await _db.RecurringOrders
+        var schedules = await _db.RecurringOrders.AsNoTracking()
             .Include(r => r.OrderType)
             .Include(r => r.AssetLinks)
             .Include(r => r.AssignedToUser)
@@ -83,11 +85,11 @@ public class RecurringOrdersController : Controller
 
     public async Task<IActionResult> Edit(int id)
     {
-        var schedule = await _db.RecurringOrders.Include(r => r.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(r => r.Id == id);
+        var schedule = await _db.RecurringOrders.AsNoTracking().Include(r => r.AssetLinks).ThenInclude(l => l.Asset).FirstOrDefaultAsync(r => r.Id == id);
         if (schedule == null) return NotFound();
         await PopulateLookupsAsync();
         ViewBag.SelectedEmployeeLabel = !string.IsNullOrEmpty(schedule.AssignedToUserId)
-            ? await _db.Users.Where(u => u.Id == schedule.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
+            ? await _db.Users.AsNoTracking().Where(u => u.Id == schedule.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
             : null;
         var linkedAssetIds = schedule.AssetLinks.Select(l => l.AssetId).ToList();
         ViewBag.SelectedAssetChips = schedule.AssetLinks
@@ -151,7 +153,7 @@ public class RecurringOrdersController : Controller
     // so a tampered POST can't submit a multi-asset list against a single-asset type or vice versa.
     private async Task<List<int>> ResolveAssetIdsAsync(RecurringOrderViewModel vm)
     {
-        var allowsMultipleAssets = await _db.OrderTypes.Where(t => t.Id == vm.OrderTypeId)
+        var allowsMultipleAssets = await _db.OrderTypes.AsNoTracking().Where(t => t.Id == vm.OrderTypeId)
             .Select(t => (bool?)t.AllowsMultipleAssets).FirstOrDefaultAsync();
         return allowsMultipleAssets == true
             ? (vm.AssetIds ?? []).Distinct().ToList()
@@ -161,16 +163,16 @@ public class RecurringOrdersController : Controller
     private async Task<List<AssetChip>> BuildChipsAsync(List<int>? assetIds)
     {
         if (assetIds == null || assetIds.Count == 0) return [];
-        return await _db.Assets.Where(a => assetIds.Contains(a.Id))
+        return await _db.Assets.AsNoTracking().Where(a => assetIds.Contains(a.Id))
             .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name }).ToListAsync();
     }
 
     private async Task PopulateLookupsAsync(RecurringOrderViewModel? vm = null)
     {
-        ViewBag.OrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ToListAsync();
-        ViewBag.Groups = await _db.Groups.Where(t => t.IsActive).OrderBy(t => t.Name).ToListAsync();
-        ViewBag.Vendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        ViewBag.OrderTypes = (await _lookups.ActiveOrderTypesAsync()).OrderBy(t => t.SortOrder).ToList();
+        ViewBag.Groups = await _lookups.ActiveGroupsAsync();
+        ViewBag.Vendors = await _lookups.ActiveVendorsAsync();
+        ViewBag.Categories = await _lookups.TopLevelCategoriesAsync();
         // requiresVendor here means "this schedule is vendor-routed", which mirrors Orders/Create's
         // own rule: only a direct-fix type that ALSO has RequiresVendor asks for a vendor at
         // creation. A survey-style (Inspection/Quick Check) type's RequiresVendor flag governs a
@@ -185,7 +187,7 @@ public class RecurringOrdersController : Controller
         string? assignedToUserId = vm?.AssignedToUserId;
         if (!string.IsNullOrEmpty(assignedToUserId) && ViewBag.SelectedEmployeeLabel == null)
         {
-            ViewBag.SelectedEmployeeLabel = await _db.Users.Where(u => u.Id == assignedToUserId)
+            ViewBag.SelectedEmployeeLabel = await _db.Users.AsNoTracking().Where(u => u.Id == assignedToUserId)
                 .Select(u => u.FullName).FirstOrDefaultAsync();
         }
         int assetId = vm?.AssetId ?? 0;
