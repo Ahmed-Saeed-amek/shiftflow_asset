@@ -1037,7 +1037,7 @@ public static class Translations
         Ar["Matched to the Microsoft directory"] = "تمت المطابقة مع دليل مايكروسوفت";
         Ar["Microsoft account has no email claim; cannot sign in."] = "حساب مايكروسوفت لا يحتوي على بريد إلكتروني؛ يتعذّر تسجيل الدخول.";
         Ar["Microsoft sign-in is not configured yet."] = "تسجيل الدخول عبر مايكروسوفت غير مُهيأ بعد.";
-        Ar["Minimum 8 characters."] = "8 أحرف على الأقل.";
+        Ar["At least 12 characters, including an uppercase letter, a lowercase letter, a digit and a symbol."] = "12 حرفًا على الأقل، تتضمن حرفًا كبيرًا وحرفًا صغيرًا ورقمًا ورمزًا.";
         Ar["Month"] = "الشهر";
         Ar["My Work"] = "أعمالي";
         Ar["New User"] = "مستخدم جديد";

@@ -23,7 +23,7 @@
     </div>
     <div class="col-6 col-md-2">
         <label for="actionFilter" class="form-label small">@Loc.T("Action")</label>
-        <select id="actionFilter" name="action" class="form-select form-select-sm w-100 w-sm-auto">
+        <select id="actionFilter" name="auditAction" class="form-select form-select-sm w-100 w-sm-auto">
             <option value="">@Loc.T("All")</option>
             @foreach (var a in Model.Actions)
             {

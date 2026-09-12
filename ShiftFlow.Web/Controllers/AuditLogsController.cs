@@ -17,7 +17,7 @@ public class AuditLogsController : Controller
 
     /// <summary>Server-paged and filterable — the list used to be a hard Take(50) with no way to
     /// reach anything older.</summary>
-    public async Task<IActionResult> Index(DateTime? from, DateTime? to, string? entityType, string? userId, string? action, int page = 1)
+    public async Task<IActionResult> Index(DateTime? from, DateTime? to, string? entityType, string? userId, string? auditAction, int page = 1)
     {
         if (page < 1) page = 1;
 
@@ -27,7 +27,7 @@ public class AuditLogsController : Controller
         if (to.HasValue) query = query.Where(l => l.CreatedDate < to.Value.Date.AddDays(1));
         if (!string.IsNullOrWhiteSpace(entityType)) query = query.Where(l => l.EntityType == entityType);
         if (!string.IsNullOrWhiteSpace(userId)) query = query.Where(l => l.UserId == userId);
-        if (!string.IsNullOrWhiteSpace(action)) query = query.Where(l => l.Action == action);
+        if (!string.IsNullOrWhiteSpace(auditAction)) query = query.Where(l => l.Action == auditAction);
 
         var totalCount = await query.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
@@ -41,7 +41,7 @@ public class AuditLogsController : Controller
         return View(new AuditLogIndexViewModel
         {
             Logs = logs,
-            From = from, To = to, EntityType = entityType, UserId = userId, Action = action,
+            From = from, To = to, EntityType = entityType, UserId = userId, Action = auditAction,
             EntityTypes = await _db.AuditLogs.AsNoTracking().Select(l => l.EntityType).Distinct().OrderBy(t => t).ToListAsync(),
             Actions = await _db.AuditLogs.AsNoTracking().Select(l => l.Action).Distinct().OrderBy(a => a).ToListAsync(),
             Users = (await _db.AuditLogs.AsNoTracking()
