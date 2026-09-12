@@ -19,9 +19,9 @@
     {
         <div class="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 bg-light rounded">
             <div>
-                <label class="form-label small mb-1">@Loc.T("Location Category")</label>
+                <label class="form-label small mb-1">@Loc.T("Zone Category")</label>
                 <select class="form-select form-select-sm" data-location-category-select style="min-width:160px">
-                    <option value="">@Loc.T("Location Category")</option>
+                    <option value="">@Loc.T("Zone Category")</option>
                     @foreach (var c in Model.LocationCategories)
                     {
                         <option value="@c.Id">@Loc.LocalizedName(c.Name, c.NameAr)</option>

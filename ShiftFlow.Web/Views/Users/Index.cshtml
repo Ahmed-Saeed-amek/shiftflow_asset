@@ -30,40 +30,39 @@
     var hasFilter = !string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(roleFilter) || !string.IsNullOrWhiteSpace(statusFilter);
     var exportUrl = Url.Action("ExportExcel", new { role = roleFilter, search = searchFilter, status = statusFilter });
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{ Title = Loc.T("Users"), Subtitle = Loc.T("All system accounts") })" />
-
-@* The header action cluster is written here rather than passed as ActionsHtml so the "More"
-   menu can carry Razor (anti-forgery token, Development-only Seed Data). *@
-<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
-    @if (canManageUsers)
-    {
-        <a href="@Url.Action("Create")" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>@Loc.T("New User")
+@{
+    // Rendered as a Razor template (not ActionsHtml) so the "More" menu can carry the
+    // anti-forgery token and the Development-only Seed Data form.
+    Func<dynamic, Microsoft.AspNetCore.Html.IHtmlContent> headerActions = @<text>
+        <a href="@exportUrl" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i>@Loc.T("Export Excel")
         </a>
-    }
-    <a href="@exportUrl" class="btn btn-outline-success btn-sm">
-        <i class="bi bi-file-earmark-excel me-1"></i>@Loc.T("Export Excel")
-    </a>
-    @if (canSeedData)
-    {
-        <div class="dropdown">
-            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
-                @Loc.T("More")<i class="bi bi-chevron-down ms-1"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li>
-                    <form method="post" asp-action="SeedData">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="dropdown-item"
-                                data-confirm="@Loc.T("This adds missing roles, permissions, and reference data. Safe to run again — nothing gets duplicated or overwritten. Continue?")">
-                            <i class="bi bi-database-add me-2"></i>@Loc.T("Seed Data")
-                        </button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    }
-</div>
+        @if (canSeedData)
+        {
+            <div class="dropdown d-inline-block">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">@Loc.T("More")</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form method="post" asp-action="SeedData">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item"
+                                    data-confirm="@Loc.T("This adds missing roles, permissions, and reference data. Safe to run again — nothing gets duplicated or overwritten. Continue?")">
+                                <i class="bi bi-database-add me-2"></i>@Loc.T("Seed Data")
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        }
+        @if (canManageUsers)
+        {
+            <a href="@Url.Action("Create")" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i>@Loc.T("New User")
+            </a>
+        }
+    </text>;
+}
+<partial name="_PageHeader" model="@(new PageHeaderWithActions{ Title = Loc.T("Users"), Subtitle = Loc.T("All system accounts"), Actions = headerActions(null) })" />
 
 <form method="get" class="filter-bar">
     <input type="search" name="search" value="@searchFilter" class="form-control form-control-sm"

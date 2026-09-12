@@ -760,8 +760,7 @@ main:focus { outline: none; }
    Detail/create/edit pages carry a breadcrumb instead of a Back button. The
    divider is set as a token so it mirrors under RTL — a literal "/" in the
    markup would point the wrong way in Arabic. */
-.breadcrumb { --bs-breadcrumb-divider: '/'; margin-bottom: 0; }
-html[dir="rtl"] .breadcrumb { --bs-breadcrumb-divider: '\'; }
+.breadcrumb { --bs-breadcrumb-divider: '/'; margin-bottom: 0; } /* a slash reads fine in both directions */
 .breadcrumb-item, .breadcrumb-item a { color: hsl(var(--muted-foreground)); text-decoration: none; }
 .breadcrumb-item a:hover { color: hsl(var(--primary)); text-decoration: underline; }
 .breadcrumb-item.active { color: hsl(var(--muted-foreground)); }
@@ -946,3 +945,8 @@ label.form-label.required::after { content: " *"; color: hsl(var(--destructive))
     gap: .75rem;
   }
 }
+
+/* Links inside data tables: no underline at rest (the row is already the target),
+   underline on hover/focus for affordance. Keeps Users/Assets/Orders lists identical. */
+.table a { text-decoration: none; }
+.table a:hover, .table a:focus-visible { text-decoration: underline; }

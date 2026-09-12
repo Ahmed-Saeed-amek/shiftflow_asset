@@ -10,7 +10,7 @@
 @model ShiftFlow.Web.ViewModels.ZoneComboboxModel
 <div class="zone-combobox" data-zone-combobox>
     <select class="form-select mb-2" data-zc-category>
-        <option value="">@Loc.T("Location Category")</option>
+        <option value="">@Loc.T("Zone Category")</option>
         @foreach (var c in Model.LocationCategories)
         {
             <option value="@c.Id" selected="@(Model.SelectedLocationCategoryId == c.Id)">@Loc.LocalizedName(c.Name, c.NameAr)</option>
