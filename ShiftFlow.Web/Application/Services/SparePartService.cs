@@ -90,8 +90,7 @@ public class SparePartService : ISparePartService
             .OrderBy(p => p.Name)
             .ToListAsync();
 
-    // Same TOCTOU-safe ExecuteUpdateAsync-with-WHERE-guard pattern already used for WorkOrder stage
-    // transitions - the WHERE clause is evaluated atomically by the database, so two concurrent fix
+    // TOCTOU-safe: the WHERE guard is evaluated atomically by the database, so two concurrent fix
     // submissions consuming the last unit of the same part can't both succeed and drive stock negative.
     public async Task<bool> TryDecrementStockAsync(int sparePartId, int quantity)
     {
@@ -100,5 +99,16 @@ public class SparePartService : ISparePartService
             .Where(p => p.Id == sparePartId && p.StockQuantity >= quantity)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.StockQuantity, p => p.StockQuantity - quantity));
         return rows > 0;
+    }
+
+    // The mirror of TryDecrementStockAsync, used when a re-submitted fix replaces a previous parts
+    // list: the superseded rows' units go back on the shelf. Atomic, and never guarded - returning
+    // stock can't fail the way consuming it can.
+    public async Task IncrementStockAsync(int sparePartId, int quantity)
+    {
+        if (quantity <= 0) return;
+        await _db.SpareParts
+            .Where(p => p.Id == sparePartId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.StockQuantity, p => p.StockQuantity + quantity));
     }
 }

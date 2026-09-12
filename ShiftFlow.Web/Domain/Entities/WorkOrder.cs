@@ -88,7 +88,7 @@ public class WorkOrderBlockReason
     public bool IsActive{get;set;}=true;
 }
 
-/// <summary>A file the vendor attached to their Fix report (e.g. a photo). Stored outside wwwroot — see ReportAttachmentStorage.</summary>
+/// <summary>A file the vendor attached to their Fix report (e.g. a photo). Stored outside wwwroot — see WorkOrderAttachmentStorage.</summary>
 public class WorkOrderAttachment
 {
     public int Id{get;set;}

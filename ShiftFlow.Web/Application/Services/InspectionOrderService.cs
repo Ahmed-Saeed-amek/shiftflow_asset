@@ -13,13 +13,15 @@ public class InspectionOrderService : IInspectionOrderService
     private readonly IAuditService _audit;
     private readonly IGroupService _groups;
     private readonly IAssetScopeService _scope;
+    private readonly IWorkOrderService _workOrders;
 
-    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, IGroupService groups, IAssetScopeService scope)
+    public InspectionOrderService(ApplicationDbContext db, IAuditService audit, IGroupService groups, IAssetScopeService scope, IWorkOrderService workOrders)
     {
         _db = db;
         _audit = audit;
         _groups = groups;
         _scope = scope;
+        _workOrders = workOrders;
     }
 
     /// <summary>Re-derives the same AssignmentMode rule OrdersController.Create already enforces for
@@ -60,15 +62,15 @@ public class InspectionOrderService : IInspectionOrderService
         if (hasUser == hasGroup)
             throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
         ValidateAssignmentMode(orderType.AssignmentMode, hasUser, hasGroup);
-        // A nonexistent user/group ID (stale form repost, hallucinated AI tool argument) otherwise
-        // reaches an unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync —
-        // same bug class as the VendorId existence check already added elsewhere (ContractService).
+        // Friendly error for a nonexistent user/group id instead of a raw FK-constraint failure.
         if (hasUser && !await _db.Users.AnyAsync(u => u.Id == assignedToUserId && u.IsActive))
             throw new InvalidOperationException("Selected employee not found or is inactive.");
         if (hasGroup && !await _db.Groups.AnyAsync(t => t.Id == assignedToGroupId))
             throw new InvalidOperationException("Selected group not found.");
 
-        var resolvedAssetIds = assetIds ?? [];
+        // De-duplicated: the same asset picked twice used to produce two InspectionRunAsset rows
+        // for one order, each needing its own outcome.
+        var resolvedAssetIds = (assetIds ?? []).Distinct().ToList();
         if (resolvedAssetIds.Count == 0)
             throw new InvalidOperationException("Select at least one asset to inspect.");
         // Same guard as MaintenanceOrderService.CreateAsync — without it, a recurring schedule (or
@@ -108,7 +110,7 @@ public class InspectionOrderService : IInspectionOrderService
             CreatedByUserId = createdByUserId,
             CreatedAt = DateTime.UtcNow,
             DueDate = dueDate,
-            Status = "Open",
+            Status = OrderStatuses.Open,
             SourceRecurringOrderId = sourceRecurringOrderId,
             ScheduledDate = scheduledDate,
             InspectionRun = new InspectionRun
@@ -117,56 +119,21 @@ public class InspectionOrderService : IInspectionOrderService
                 Items = resolvedAssetIds.Select(id => new InspectionRunAsset { AssetId = id }).ToList(),
             },
         };
+        await AssignNumberAsync(order, orderType.Prefix);
         _db.InspectionOrders.Add(order);
-        await SaveWithUniqueNumberRetryAsync(order, orderType.Prefix);
+        await _db.SaveChangesAsync();
         await _audit.LogAsync("Create", "InspectionOrder", order.Id.ToString(), createdByUserId, newValue: order.OrderNumber);
         return order;
     }
 
-    /// <summary>OrderNumber "{Prefix}-{year}-{seq:D4}" was assigned from a plain COUNT-then-use
-    /// query with no atomic guard — a stale/leftover count (e.g. after older rows were hard-deleted
-    /// by the pre-fix Cancel behavior, or two concurrent creates) can compute a seq that collides
-    /// with a still-existing row's number, hitting the unique index and raising a raw, unhandled
-    /// DbUpdateException all the way to the client (confirmed live). Worse, COUNT(*) itself goes
-    /// permanently stale the moment any row for the year is ever hard-deleted — it then recomputes
-    /// the exact same already-used number on every retry attempt and can never get past the gap.
-    /// The seq counter is shared across every prefix for the year (matching the existing numbering
-    /// scheme, not per-prefix), so the "highest existing seq" must be read across all of them —
-    /// find it from the numeric suffix of every InspectionOrder's OrderNumber that year rather than
-    /// a plain count, and advance it by the attempt number on retry so a genuine concurrent-insert
-    /// race still makes progress.</summary>
-    private async Task SaveWithUniqueNumberRetryAsync(InspectionOrder order, string prefix)
-    {
-        var year = order.CreatedAt.Year;
-        var suffix = $"-{year}-";
-        var existingNumbers = await _db.InspectionOrders
-            .Where(o => o.CreatedAt.Year == year)
-            .Select(o => o.OrderNumber)
-            .ToListAsync();
-        var nextSeq = existingNumbers.Count == 0 ? 1
-            : existingNumbers.Select(n =>
-            {
-                var idx = n.IndexOf(suffix, StringComparison.Ordinal);
-                return idx >= 0 && int.TryParse(n.AsSpan(idx + suffix.Length), out var s) ? s : 0;
-            }).Max() + 1;
-
-        for (var attempt = 0; ; attempt++)
-        {
-            order.OrderNumber = $"{prefix}-{year}-{nextSeq + attempt:D4}";
-            try
-            {
-                await _db.SaveChangesAsync();
-                return;
-            }
-            catch (DbUpdateException) when (attempt < 4)
-            {
-                // Concurrent insert claimed this number first — advance to the next one and retry.
-            }
-        }
-    }
+    /// <summary>Order numbers come from the shared, atomically-claimed OrderNumberSequence keyed by
+    /// the order type's own Prefix (see OrderNumberGenerator) - allocated before the entity is
+    /// added, so the insert is a plain SaveChanges with no duplicate-number retry loop.</summary>
+    private async Task AssignNumberAsync(InspectionOrder order, string prefix) =>
+        order.OrderNumber = await OrderNumberGenerator.NextAsync(_db, prefix, order.CreatedAt.Year);
 
     public async Task<InspectionOrder?> GetByIdAsync(int id) =>
-        await _db.InspectionOrders
+        await _db.InspectionOrders.AsNoTracking()
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToGroup).ThenInclude(t => t!.Members).ThenInclude(m => m.User)
@@ -183,7 +150,7 @@ public class InspectionOrderService : IInspectionOrderService
     {
         var myGroupIds = await _db.GroupMembers.Where(m => m.UserId == userId).Select(m => m.GroupId).ToListAsync();
 
-        var query = _db.InspectionOrders
+        var query = _db.InspectionOrders.AsNoTracking()
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToGroup)
@@ -191,7 +158,7 @@ public class InspectionOrderService : IInspectionOrderService
             .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)));
 
         if (!includeDone)
-            query = query.Where(o => o.Status != "Done" && o.Status != "Cancelled");
+            query = query.Where(o => o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled);
         if (from.HasValue) query = query.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) query = query.Where(o => o.CreatedAt <= to.Value);
 
@@ -200,7 +167,7 @@ public class InspectionOrderService : IInspectionOrderService
 
     public async Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue, string userId)
     {
-        var query = _db.InspectionOrders
+        var query = _db.InspectionOrders.AsNoTracking()
             .Include(o => o.OrderType)
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToGroup)
@@ -230,73 +197,106 @@ public class InspectionOrderService : IInspectionOrderService
         if (overdue)
         {
             var today = DateTime.UtcNow.Date;
-            query = query.Where(o => o.Status != "Done" && o.Status != "Cancelled" && o.DueDate != null && o.DueDate < today);
+            query = query.Where(o => o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled && o.DueDate != null && o.DueDate < today);
         }
 
         return await query.OrderByDescending(o => o.CreatedAt).Take(500).ToListAsync();
     }
 
-    public async Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, string updatedByUserId)
+    /// <summary>The one place an inspection item's outcome is recorded. A "Defective" outcome
+    /// spawns the tracking Work Order here, inside this method's own transaction - the two used to
+    /// be separate commits in each caller (controller + AI tool), so a failure in the second left a
+    /// committed Work Order (and an asset already flipped to Defective) with no item pointing at
+    /// it. Returns the new Work Order's id, or null when none was created.</summary>
+    public async Task<int?> UpdateInspectionItemAsync(int itemId, string outcome, int? actionTypeId, int? causeId, string? notes, string updatedByUserId)
     {
         var item = await _db.InspectionRunAssets.FindAsync(itemId)
             ?? throw new InvalidOperationException("Inspection item not found.");
-        if (outcome == "Pending" || !InspectionRunAsset.Outcomes.Contains(outcome))
+        if (outcome == InspectionOutcomes.Pending || !InspectionRunAsset.Outcomes.Contains(outcome))
             throw new InvalidOperationException("Invalid outcome.");
 
-        var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
-            .Select(r => r.InspectionOrderId).FirstAsync();
-        var order = await _db.InspectionOrders.Include(o => o.OrderType).FirstOrDefaultAsync(o => o.Id == orderId)
-            ?? throw new InvalidOperationException("Inspection order not found.");
-        // A scope narrowed/added after the order was assigned must not lock the legitimate
-        // assignee/group member out of reporting on their own already-assigned work — scope
-        // restricts new discovery, not access already legitimately granted (same exemption as
-        // MaintenanceOrderService.CompleteAsync). A manager reporting on someone else's order (via
-        // the AI assistant or a direct call) still gets the strict check.
-        var isAssigneeOrGroupMember = order.AssignedToUserId == updatedByUserId
-            || (order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, updatedByUserId));
-        if (!isAssigneeOrGroupMember && !await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), updatedByUserId)).AnyAsync(a => a.Id == item.AssetId))
-            throw new InvalidOperationException("Inspection item not found.");
-        if (order.Status is "Done" or "PendingApproval" or "Cancelled")
+        var order = await LoadOrderForItemAsync(item, includeOrderType: true);
+        await EnsureItemActionableAsync(order, item, updatedByUserId);
+        if (order.Status is OrderStatuses.Done or OrderStatuses.PendingApproval or OrderStatuses.Cancelled)
             throw new InvalidOperationException("This inspection order is already closed.");
+        // Types that TracksDefectOutcome require Action Type + Cause; other types still spawn a
+        // Work Order for tracking, with both left null.
+        if (outcome == InspectionOutcomes.Defective && (order.OrderType?.TracksDefectOutcome ?? false)
+            && (actionTypeId == null || causeId == null))
+            throw new InvalidOperationException("Action Type and Cause are required to report a defect.");
 
         // Everything below runs inside one transaction so a concurrent Cancel racing this method
-        // rolls the whole thing back — not just the final status flip — instead of leaving the
-        // item's Outcome saved against an order that ended up Cancelled. Same race class
-        // CancelAsync/ReassignAsync already guard against, extended to cover this method too (a
-        // cancelled order's assignee could otherwise still report outcomes and silently flip the
-        // order back to Done — confirmed live).
+        // rolls the whole thing back - the item's outcome, the order's status flip, and the Work
+        // Order the defect spawned.
         await using var tx = await _db.Database.BeginTransactionAsync();
 
-        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "PendingApproval" && o.Status != "Cancelled")
-            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, o => o.Status == "Open" ? "InProgress" : o.Status));
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == order.Id && o.Status != OrderStatuses.Done && o.Status != OrderStatuses.PendingApproval && o.Status != OrderStatuses.Cancelled)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, o => o.Status == OrderStatuses.Open ? OrderStatuses.InProgress : o.Status));
         if (claimed == 0) throw new InvalidOperationException("This inspection order is already closed.");
+
+        int? workOrderId = null;
+        if (outcome == InspectionOutcomes.Defective)
+        {
+            var tracks = order.OrderType?.TracksDefectOutcome ?? false;
+            var wo = await _workOrders.ReportAsync(new WorkOrder
+            {
+                AssetId = item.AssetId,
+                ActionTypeId = tracks ? actionTypeId : null,
+                CauseId = tracks ? causeId : null,
+                Notes = notes,
+                RequiresVendorResponse = order.OrderType?.RequiresVendor ?? false,
+            }, updatedByUserId);
+            workOrderId = wo.Id;
+        }
 
         item.Outcome = outcome;
         item.InspectedByUserId = updatedByUserId;
         item.InspectedAt = DateTime.UtcNow;
         item.WorkOrderId = workOrderId;
 
-        // Maintenance actions are recorded and saved entirely through the standalone Maintenance
-        // button/UpdateMaintenanceActionsAsync now — this method never touches them, so confirming
-        // OK/Defective can't silently wipe out actions already logged for this item (it used to
-        // unconditionally delete-and-replace them here, which zeroed them out on every outcome
-        // confirmation unless the same selection happened to be resubmitted alongside it).
+        // Maintenance actions belong to UpdateMaintenanceActionsAsync alone - confirming an outcome
+        // must not wipe actions already logged for this item.
         await _db.SaveChangesAsync();
 
         var runId = item.InspectionRunId;
-        var stillPending = await _db.InspectionRunAssets.AnyAsync(i => i.InspectionRunId == runId && i.Outcome == "Pending");
+        var stillPending = await _db.InspectionRunAssets.AnyAsync(i => i.InspectionRunId == runId && i.Outcome == InspectionOutcomes.Pending);
         if (!stillPending)
         {
             var requiresApproval = order.OrderType?.RequiresApproval ?? false;
-            var newStatus = requiresApproval ? "PendingApproval" : "Done";
+            var newStatus = requiresApproval ? OrderStatuses.PendingApproval : OrderStatuses.Done;
             var closedAt = requiresApproval ? (DateTime?)null : DateTime.UtcNow;
-            var claimedFinal = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "PendingApproval" && o.Status != "Cancelled")
+            var claimedFinal = await _db.InspectionOrders.Where(o => o.Id == order.Id && o.Status != OrderStatuses.Done && o.Status != OrderStatuses.PendingApproval && o.Status != OrderStatuses.Cancelled)
                 .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, newStatus).SetProperty(o => o.ClosedAt, closedAt));
             if (claimedFinal == 0) throw new InvalidOperationException("This inspection order is already closed.");
         }
 
         await tx.CommitAsync();
         await _audit.LogAsync("UpdateInspectionItem", "InspectionRunAsset", itemId.ToString(), updatedByUserId, newValue: outcome);
+        return workOrderId;
+    }
+
+    private async Task<InspectionOrder> LoadOrderForItemAsync(InspectionRunAsset item, bool includeOrderType)
+    {
+        var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
+            .Select(r => r.InspectionOrderId).FirstAsync();
+        var query = _db.InspectionOrders.AsQueryable();
+        if (includeOrderType) query = query.Include(o => o.OrderType);
+        return await query.FirstOrDefaultAsync(o => o.Id == orderId)
+            ?? throw new InvalidOperationException("Inspection order not found.");
+    }
+
+    /// <summary>The shared assignee/scope gate for both per-item write paths (outcome and
+    /// maintenance actions). A scope narrowed/added after the order was assigned must not lock the
+    /// legitimate assignee/group member out of their own already-assigned work; anyone else -
+    /// a manager acting on someone else's order, the AI assistant - gets the strict scope check.</summary>
+    private async Task EnsureItemActionableAsync(InspectionOrder order, InspectionRunAsset item, string userId)
+    {
+        var isAssigneeOrGroupMember = order.AssignedToUserId == userId
+            || (order.AssignedToGroupId.HasValue && await _groups.IsMemberAsync(order.AssignedToGroupId.Value, userId));
+        if (isAssigneeOrGroupMember) return;
+        if (!await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), userId)).AnyAsync(a => a.Id == item.AssetId))
+            throw new InvalidOperationException("Inspection item not found.");
+        await EnsureOrderInScopeAsync(order.Id, userId);
     }
 
     // Details (round 12) blocks a scoped user from even viewing an out-of-scope Inspection Order,
@@ -318,11 +318,13 @@ public class InspectionOrderService : IInspectionOrderService
     {
         var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
         await EnsureOrderInScopeAsync(orderId, managerUserId);
-        if (order.Status != "PendingApproval") throw new InvalidOperationException("This order isn't awaiting approval.");
-        order.Status = "Done";
-        order.ClosedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-        await _audit.LogAsync("Approve", "InspectionOrder", order.Id.ToString(), managerUserId, oldValue: "PendingApproval", newValue: "Done");
+        if (order.Status != OrderStatuses.PendingApproval) throw new InvalidOperationException("This order isn't awaiting approval.");
+        // Claim atomically - a load/check/save would let a concurrent Cancel be overwritten to Done.
+        var closedAt = DateTime.UtcNow;
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status == OrderStatuses.PendingApproval)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatuses.Done).SetProperty(o => o.ClosedAt, closedAt));
+        if (claimed == 0) throw new InvalidOperationException("This order isn't awaiting approval.");
+        await _audit.LogAsync("Approve", "InspectionOrder", order.Id.ToString(), managerUserId, oldValue: OrderStatuses.PendingApproval, newValue: OrderStatuses.Done);
     }
 
     public async Task UpdateMaintenanceActionsAsync(int itemId, List<int>? maintenanceActionTypeIds, string updatedByUserId)
@@ -331,11 +333,13 @@ public class InspectionOrderService : IInspectionOrderService
             ?? throw new InvalidOperationException("Inspection item not found.");
         await EnsureMaintenanceActionTypesExistAsync(maintenanceActionTypeIds);
 
-        var orderId = await _db.InspectionRuns.Where(r => r.Id == item.InspectionRunId)
-            .Select(r => r.InspectionOrderId).FirstAsync();
-        var order = await _db.InspectionOrders.FindAsync(orderId)
-            ?? throw new InvalidOperationException("Inspection order not found.");
-        if (order.Status is "Done" or "Cancelled")
+        var order = await LoadOrderForItemAsync(item, includeOrderType: false);
+        // Same assignee/scope gate the outcome path uses - this had none at all, so any signed-in
+        // user could log maintenance actions on any item by id.
+        await EnsureItemActionableAsync(order, item, updatedByUserId);
+        // Aligned with the outcome path: once every item is reported the order is frozen, whether
+        // it went to PendingApproval or straight to Done.
+        if (order.Status is OrderStatuses.Done or OrderStatuses.PendingApproval or OrderStatuses.Cancelled)
             throw new InvalidOperationException("This inspection order is already closed.");
 
         // Deliberately does not touch Outcome/InspectedByUserId/InspectedAt/WorkOrderId, or the
@@ -361,7 +365,7 @@ public class InspectionOrderService : IInspectionOrderService
         var order = await _db.InspectionOrders.FindAsync(orderId)
             ?? throw new InvalidOperationException("Inspection order not found.");
         await EnsureOrderInScopeAsync(orderId, userId);
-        if (order.Status is "Done" or "Cancelled")
+        if (order.Status is OrderStatuses.Done or OrderStatuses.Cancelled)
             throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
         var oldStatus = order.Status;
 
@@ -371,18 +375,18 @@ public class InspectionOrderService : IInspectionOrderService
         // and whichever SaveChanges lands last silently overwrites the other's result. Same race
         // class MaintenanceOrderService.CancelAsync/CompleteAsync already guard against.
         var closedAt = DateTime.UtcNow;
-        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "Cancelled")
-            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, "Cancelled").SetProperty(o => o.ClosedAt, closedAt));
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatuses.Cancelled).SetProperty(o => o.ClosedAt, closedAt));
         if (claimed == 0) throw new InvalidOperationException("A completed or already-cancelled inspection order cannot be cancelled.");
 
-        await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: oldStatus, newValue: "Cancelled", details: reason);
+        await _audit.LogAsync("Cancel", "InspectionOrder", orderId.ToString(), userId, oldValue: oldStatus, newValue: OrderStatuses.Cancelled, details: reason);
     }
 
     public async Task ReassignAsync(int orderId, string? assignedToUserId, int? assignedToGroupId, string managerUserId)
     {
         var order = await _db.InspectionOrders.FindAsync(orderId) ?? throw new InvalidOperationException("Inspection order not found.");
         await EnsureOrderInScopeAsync(orderId, managerUserId);
-        if (order.Status is "Done" or "Cancelled") throw new InvalidOperationException("A closed inspection order can't be reassigned.");
+        if (order.Status is OrderStatuses.Done or OrderStatuses.Cancelled) throw new InvalidOperationException("A closed inspection order can't be reassigned.");
         var hasUser = !string.IsNullOrWhiteSpace(assignedToUserId);
         var hasGroup = assignedToGroupId.HasValue;
         if (hasUser == hasGroup) throw new InvalidOperationException("Select exactly one assignee — a single employee or a Group.");
@@ -401,7 +405,7 @@ public class InspectionOrderService : IInspectionOrderService
         // someone who never touched it. Same race class Cancel/Complete already guard against.
         var newAssignedToUserId = hasUser ? assignedToUserId : null;
         var newAssignedToGroupId = hasGroup ? assignedToGroupId : null;
-        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != "Done" && o.Status != "Cancelled")
+        var claimed = await _db.InspectionOrders.Where(o => o.Id == orderId && o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.AssignedToUserId, newAssignedToUserId)
                 .SetProperty(o => o.AssignedToGroupId, newAssignedToGroupId));
@@ -412,7 +416,7 @@ public class InspectionOrderService : IInspectionOrderService
 
     public async Task<byte[]> ExportToExcelAsync(string userId)
     {
-        var query = _db.InspectionOrders
+        var query = _db.InspectionOrders.AsNoTracking()
             .Include(o => o.AssignedToUser)
             .Include(o => o.AssignedToGroup)
             .Include(o => o.InspectionRun!).ThenInclude(r => r.Items)
@@ -441,7 +445,7 @@ public class InspectionOrderService : IInspectionOrderService
             ws.Cells[row, 2].Value = o.Status;
             ws.Cells[row, 3].Value = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"Group: {o.AssignedToGroup.Name}" : "");
             ws.Cells[row, 4].Value = items.Count;
-            ws.Cells[row, 5].Value = items.Count(i => i.Outcome != "Pending");
+            ws.Cells[row, 5].Value = items.Count(i => i.Outcome != InspectionOutcomes.Pending);
             ws.Cells[row, 6].Value = o.DueDate?.ToString("yyyy-MM-dd");
             ws.Cells[row, 7].Value = o.CreatedAt.ToString("yyyy-MM-dd");
             row++;
