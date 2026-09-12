@@ -24,6 +24,24 @@ public class OrderCreateVm
     public int AssetId { get; set; }
     /// <summary>Used when the type's AllowsMultipleAssets is true.</summary>
     public List<int>? AssetIds { get; set; }
+
+    /// <summary>Everything the form needs to render itself - typed, so the view doesn't cast
+    /// half a dozen ViewBag entries. Never bound from the request; repopulated on every render.</summary>
+    public OrderCreateOptions Options { get; set; } = new();
+}
+
+/// <summary>Lookup data and pre-resolved labels for Views/Orders/Create.cshtml.</summary>
+public sealed class OrderCreateOptions
+{
+    public List<ShiftFlow.Domain.Entities.OrderType> OrderTypes { get; set; } = [];
+    public List<ShiftFlow.Domain.Entities.Group> Groups { get; set; } = [];
+    public List<ShiftFlow.Domain.Entities.AssetCategory> Categories { get; set; } = [];
+    public List<ShiftFlow.Domain.Entities.LocationCategory> LocationCategories { get; set; } = [];
+    /// <summary>Per-type flags the client script reads to show/hide fields.</summary>
+    public string OrderTypeMetaJson { get; set; } = "{}";
+    public string? SelectedAssetLabel { get; set; }
+    public List<AssetChip> SelectedAssetChips { get; set; } = [];
+    public string? SelectedEmployeeLabel { get; set; }
 }
 
 /// <summary>Row shape for the Profile page's "recent orders" list — unrelated to the
@@ -47,9 +65,11 @@ public sealed class InspectionOrderRow
 /// be three separate pages (My Tasks / My Maintenance Orders / My Assigned Work Orders).</summary>
 public sealed class MyWorkOrderRow
 {
-    /// <summary>"Inspection" | "Maintenance" | "WorkOrder" — internal routing bucket only (drives
-    /// which controller "View" links to); NOT what's shown to the user any more, see OrderTypeLabel/Color.</summary>
+    /// <summary>"Inspection" | "Maintenance" | "WorkOrder" — routing bucket (drives which
+    /// controller "View" links to) and the badge colour on the Dashboard / My Orders lists.</summary>
     public string Category { get; init; } = "";
+    /// <summary>Human-readable form of Category, rendered as a badge on the Dashboard's recent-orders
+    /// feed and the My Orders page. The Orders list shows OrderTypeLabel instead.</summary>
     public string CategoryLabel { get; init; } = "";
     /// <summary>The actual OrderType this order was created with — null for Work Orders, which
     /// aren't created via an OrderType. Drives the Orders list's per-type filter tab and row badge.</summary>
@@ -80,4 +100,50 @@ public sealed class MyHistoryMonthRow
     public int InspectionCount { get; init; }
     public int MaintenanceCount { get; init; }
     public int WorkOrderCount { get; init; }
+}
+
+/// <summary>One row of the unified Orders list. Projected straight out of SQL (no entity graphs,
+/// no Includes) — the display-only fields below are filled in afterwards, since none of them can be
+/// translated in the database.</summary>
+public sealed class OrderListRow
+{
+    /// <summary>"Inspection" | "Maintenance" — which controller Details links to.</summary>
+    public string Category { get; init; } = "";
+    public int Id { get; init; }
+    public string OrderNumber { get; init; } = "";
+    public int? OrderTypeId { get; init; }
+    public string? OrderTypeName { get; init; }
+    public string? OrderTypeNameAr { get; init; }
+    public string OrderTypeColor { get; init; } = "#6c757d";
+    /// <summary>Inspection orders only — how many assets the run covers.</summary>
+    public int AssetCount { get; init; }
+    /// <summary>Maintenance orders only.</summary>
+    public string? AssetTag { get; init; }
+    public string Status { get; init; } = "";
+    public DateTime? DueDate { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string? AssignedToUserName { get; init; }
+    public string? AssignedToGroupName { get; init; }
+
+    // Filled in by the controller after the query, in the request's language.
+    public string OrderTypeLabel { get; set; } = "";
+    public string? AssetLabel { get; set; }
+    public string? AssignedToLabel { get; set; }
+}
+
+/// <summary>Turns a stored status/stage token into something readable — "PendingApproval" was
+/// rendered raw on the Orders list. Splits camel case; the caller still runs it through Loc.</summary>
+public static class StatusDisplay
+{
+    public static string Label(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return "";
+        var sb = new System.Text.StringBuilder(status.Length + 4);
+        for (var i = 0; i < status.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(status[i]) && !char.IsUpper(status[i - 1]) && status[i - 1] != ' ') sb.Append(' ');
+            sb.Append(status[i]);
+        }
+        return sb.ToString();
+    }
 }

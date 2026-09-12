@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Localization;
 using ShiftFlow.Web.ViewModels;
@@ -18,14 +19,14 @@ public static class MyWorkOrderRowBuilder
 
         var inspectionQuery = db.InspectionOrders.AsNoTracking()
             .Where(o => o.AssignedToUserId == userId || (o.AssignedToGroupId != null && myGroupIds.Contains(o.AssignedToGroupId.Value)));
-        if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != "Done" && o.Status != "Cancelled");
+        if (!showAll) inspectionQuery = inspectionQuery.Where(o => o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled);
         if (from.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt >= from.Value);
         if (to.HasValue) inspectionQuery = inspectionQuery.Where(o => o.CreatedAt <= to.Value);
         var inspectionRowsRaw = await inspectionQuery
             .Select(o => new
             {
                 o.Id, o.OrderNumber, o.Status, o.DueDate, o.CreatedAt,
-                Done = o.InspectionRun!.Items.Count(i => i.Outcome != "Pending"),
+                Done = o.InspectionRun!.Items.Count(i => i.Outcome != InspectionOutcomes.Pending),
                 Total = o.InspectionRun!.Items.Count,
             })
             .ToListAsync();
@@ -38,7 +39,7 @@ public static class MyWorkOrderRowBuilder
 
         var maintenanceQuery = db.MaintenanceOrders.AsNoTracking().Include(m => m.Asset)
             .Where(m => m.AssignedToUserId == userId || (m.AssignedToGroupId != null && myGroupIds.Contains(m.AssignedToGroupId.Value)));
-        if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == "Open");
+        if (!showAll) maintenanceQuery = maintenanceQuery.Where(m => m.Status == OrderStatuses.Open);
         if (from.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate >= from.Value);
         if (to.HasValue) maintenanceQuery = maintenanceQuery.Where(m => m.CreatedDate <= to.Value);
         var maintenanceRows = await maintenanceQuery
@@ -50,7 +51,7 @@ public static class MyWorkOrderRowBuilder
             .ToListAsync();
 
         var workOrderQuery = db.WorkOrders.AsNoTracking().Include(w => w.Asset).Where(w => w.AssignedToUserId == userId);
-        if (!showAll) workOrderQuery = workOrderQuery.Where(w => w.Stage != "Closed");
+        if (!showAll) workOrderQuery = workOrderQuery.Where(w => w.Stage != WorkOrderStages.Closed);
         if (from.HasValue) workOrderQuery = workOrderQuery.Where(w => w.CreatedDate >= from.Value);
         if (to.HasValue) workOrderQuery = workOrderQuery.Where(w => w.CreatedDate <= to.Value);
         var workOrderRows = await workOrderQuery

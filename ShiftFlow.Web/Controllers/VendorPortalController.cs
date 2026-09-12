@@ -42,7 +42,7 @@ public class VendorPortalController : Controller
         q = SearchQuery.Cap(q);
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var query = _db.WorkOrders.Include(w => w.Asset).Where(w => w.VendorId == vendorId);
+        var query = _db.WorkOrders.AsNoTracking().Include(w => w.Asset).Where(w => w.VendorId == vendorId);
         if (!string.IsNullOrWhiteSpace(stage)) query = query.Where(w => w.Stage == stage);
         if (!string.IsNullOrWhiteSpace(q)) query = query.Where(w => w.WorkOrderNumber.Contains(q) || (w.Asset != null && w.Asset.AssetTag.Contains(q)));
         ViewBag.Stage = stage;
@@ -57,7 +57,7 @@ public class VendorPortalController : Controller
     {
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var workOrders = await _db.WorkOrders
+        var workOrders = await _db.WorkOrders.AsNoTracking()
             .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Where(w => w.VendorId == vendorId && w.Asset!.Zone!.Latitude != null && w.Asset.Zone.Longitude != null)
             .Select(w => new
@@ -75,20 +75,18 @@ public class VendorPortalController : Controller
     {
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var wo = await _db.WorkOrders
+        // VendorId is part of the predicate, so another vendor's work order is never loaded (with
+        // its eight Includes) in the first place; a miss is NotFound either way, which also keeps
+        // "exists, not mine" indistinguishable from "doesn't exist".
+        var wo = await _db.WorkOrders.AsNoTracking()
             .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Include(w => w.Asset).ThenInclude(a => a!.Category)
             .Include(w => w.ActionType).Include(w => w.Cause)
             .Include(w => w.BlockReason).Include(w => w.Parts).Include(w => w.Attachments)
-            .FirstOrDefaultAsync(w => w.Id == id);
+            .FirstOrDefaultAsync(w => w.Id == id && w.VendorId == vendorId);
         if (wo == null) return NotFound();
-        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
-        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
-        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
-        // tenants' record count/IDs), even though the actual content was already correctly blocked.
-        if (wo.VendorId != vendorId) return NotFound();
 
-        ViewBag.BlockReasons = await _db.WorkOrderBlockReasons.Where(r => r.IsActive).OrderBy(r => r.Name).ToListAsync();
+        ViewBag.BlockReasons = await _db.WorkOrderBlockReasons.AsNoTracking().Where(r => r.IsActive).OrderBy(r => r.Name).ToListAsync();
         return View(wo);
     }
 
@@ -97,13 +95,9 @@ public class VendorPortalController : Controller
     {
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var wo = await _db.WorkOrders.FindAsync(id);
-        if (wo == null) return NotFound();
-        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
-        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
-        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
-        // tenants' record count/IDs), even though the actual content was already correctly blocked.
-        if (wo.VendorId != vendorId) return NotFound();
+        // Ownership is part of the predicate; NotFound either way so "exists, not mine" stays
+        // indistinguishable from "doesn't exist".
+        if (!await _db.WorkOrders.AnyAsync(w => w.Id == id && w.VendorId == vendorId)) return NotFound();
 
         // Parsed directly off the raw form as a defensive belt-and-braces measure alongside
         // vm.CompletionDate — a custom-format DateTime.ToString (as this app's TempData retention
@@ -141,13 +135,9 @@ public class VendorPortalController : Controller
     {
         var vendorId = await GetMyVendorIdAsync();
         if (vendorId == null) return Forbid();
-        var wo = await _db.WorkOrders.FindAsync(id);
-        if (wo == null) return NotFound();
-        // NotFound, not Forbid, when the work order exists but belongs to a different vendor —
-        // Forbid's distinct "Access Denied" response let any vendor session distinguish "exists,
-        // not mine" from "doesn't exist" by ID alone (an IDOR side-channel for enumerating other
-        // tenants' record count/IDs), even though the actual content was already correctly blocked.
-        if (wo.VendorId != vendorId) return NotFound();
+        // Ownership is part of the predicate; NotFound either way so "exists, not mine" stays
+        // indistinguishable from "doesn't exist".
+        if (!await _db.WorkOrders.AnyAsync(w => w.Id == id && w.VendorId == vendorId)) return NotFound();
 
         var userId = _userManager.GetUserId(User)!;
         try { await _workOrderService.VendorBlockAsync(id, blockReasonId, detail, userId); TempData["Success"] = _loc.T("Reported as blocked."); }

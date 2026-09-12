@@ -96,6 +96,23 @@ public class MaintenanceOrdersController : Controller
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    /// <summary>The way back out of PendingApproval - sends the order to the employee to redo
+    /// instead of approving it, clearing the reported cost/parts and returning their stock.</summary>
+    [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
+    public async Task<IActionResult> RejectApproval(int id, string? reason)
+    {
+        try
+        {
+            await _orders.RejectApprovalAsync(id, reason, CurrentUserId);
+            TempData["Success"] = "Maintenance order returned to Open.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     [HttpPost, ValidateAntiForgeryToken, Authorize(Policy = PermissionCatalog.MaintenanceOrderManage)]
     public async Task<IActionResult> Cancel(int id, string? reason)
     {
