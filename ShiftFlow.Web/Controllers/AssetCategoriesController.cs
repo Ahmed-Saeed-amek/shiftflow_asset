@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
 using ShiftFlow.Web.Services;
@@ -13,9 +14,13 @@ namespace ShiftFlow.Web.Controllers;
 [Authorize]
 public class AssetCategoriesController : Controller
 {
+    private readonly ILookupCache _lookups;
     private readonly ApplicationDbContext _db;
     private readonly ILanguageService _loc;
-    public AssetCategoriesController(ApplicationDbContext db, ILanguageService loc) { _db = db; _loc = loc; }
+    public AssetCategoriesController(ApplicationDbContext db, ILanguageService loc, ILookupCache lookups)
+    { _db = db; _loc = loc;
+        _lookups = lookups;
+    }
 
     [Authorize(Policy = PermissionCatalog.AssetView)]
     public async Task<IActionResult> Index()
@@ -53,6 +58,7 @@ public class AssetCategoriesController : Controller
         _db.AssetCategories.Add(new AssetCategory { Name = vm.Name, NameAr = vm.NameAr, ParentCategoryId = vm.ParentCategoryId, CreatedDate = DateTime.UtcNow });
         await _db.SaveChangesAsync();
         ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateCategories();
         TempData["Success"] = _loc.T("Asset category created.");
         return RedirectToAction(nameof(Index));
     }
@@ -97,6 +103,7 @@ public class AssetCategoriesController : Controller
         category.Name = vm.Name; category.NameAr = vm.NameAr; category.ParentCategoryId = vm.ParentCategoryId;
         await _db.SaveChangesAsync();
         ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateCategories();
         TempData["Success"] = _loc.T("Asset category updated.");
         return RedirectToAction(nameof(Index));
     }

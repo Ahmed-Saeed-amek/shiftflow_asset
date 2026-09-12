@@ -131,7 +131,9 @@ public static class PdfReportHelper
     public static void AddHeader(Document doc, string title, string? subtitle = null)
     {
         doc.Add(new Paragraph(Shape(title)).SetFontColor(Foreground).SetBold().SetFontSize(22).SetMarginBottom(2));
-        var sub = subtitle ?? DateTime.Today.ToString("dddd, dd MMMM yyyy");
+        // UtcNow, matching the data every report renders — DateTime.Today could print a
+        // different day than the rows beneath it near midnight UTC.
+        var sub = subtitle ?? DateTime.UtcNow.ToString("dddd, dd MMMM yyyy");
         doc.Add(new Paragraph(Shape(sub)).SetFontColor(MutedText).SetFontSize(10).SetMarginBottom(6));
         // Thin primary-blue rule under the title — the same accent color used for links, active
         // nav items and icons throughout the app, standing in for a literal logo/branding mark.

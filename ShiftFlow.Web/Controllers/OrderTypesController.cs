@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShiftFlow.Domain.Entities;
+using ShiftFlow.Application.Services;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
 using ShiftFlow.Web.Services;
@@ -16,7 +17,8 @@ namespace ShiftFlow.Web.Controllers;
 public class OrderTypesController : Controller
 {
     private readonly ApplicationDbContext _db;
-    public OrderTypesController(ApplicationDbContext db) => _db = db;
+    private readonly ILookupCache _lookups;
+    public OrderTypesController(ApplicationDbContext db, ILookupCache lookups) { _db = db; _lookups = lookups; }
 
     public async Task<IActionResult> Index()
     {
@@ -69,6 +71,7 @@ public class OrderTypesController : Controller
         });
         await _db.SaveChangesAsync();
         ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type created.";
         return RedirectToAction(nameof(Index));
     }
@@ -139,6 +142,7 @@ public class OrderTypesController : Controller
         type.RequiresApproval = vm.RequiresApproval;
         await _db.SaveChangesAsync();
         ModalRedisplay.Clear(TempData);
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type updated.";
         return RedirectToAction(nameof(Index));
     }
@@ -162,6 +166,7 @@ public class OrderTypesController : Controller
 
         _db.OrderTypes.Remove(type);
         await _db.SaveChangesAsync();
+        _lookups.InvalidateOrderTypes();
         TempData["Success"] = "Order type deleted.";
         return RedirectToAction(nameof(Index));
     }

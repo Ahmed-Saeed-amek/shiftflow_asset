@@ -18,7 +18,7 @@
                 @foreach (var r in Model)
                 {
                     <tr class="cursor-pointer" onclick="location.href='@Url.Action("Edit", new { id = r.Id })'">
-                        <td>@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</td>
+                        <td><a asp-action="Edit" asp-route-id="@r.Id" class="text-decoration-none fw-medium" onclick="event.stopPropagation()">@(r.OrderType != null ? Loc.LocalizedName(r.OrderType.Name, r.OrderType.NameAr) : "—")</a></td>
                         <td class="small">@r.AssetLinks.Count</td>
                         <td class="small d-none d-md-table-cell">
                             @(r.AssignedToUser?.FullName ?? (r.AssignedToGroup != null ? Loc.T("Group") + ": " + r.AssignedToGroup.Name : "—"))
@@ -28,7 +28,7 @@
                             }
                         </td>
                         <td class="small d-none d-lg-table-cell">@Loc.T(r.Cadence)</td>
-                        <td class="small d-none d-lg-table-cell">@r.StartDate.ToString("yyyy-MM-dd")@(r.EndDate.HasValue ? " – " + r.EndDate.Value.ToString("yyyy-MM-dd") : "")</td>
+                        <td class="small d-none d-lg-table-cell">@Loc.TDate(r.StartDate.ToString("dd/MM/yyyy"))@(r.EndDate.HasValue ? " – " + Loc.TDate(r.EndDate.Value.ToString("dd/MM/yyyy")) : "")</td>
                         <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(r.IsActive ? "Active" : "Inactive")" /></td>
                         <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
                     </tr>

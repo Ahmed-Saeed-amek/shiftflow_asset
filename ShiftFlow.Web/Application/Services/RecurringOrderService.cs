@@ -80,10 +80,8 @@ public class RecurringOrderService : IRecurringOrderService
         var retiredTags = await _db.Assets.Where(a => assetIds.Contains(a.Id) && a.Status == "Retired").Select(a => a.AssetTag).ToListAsync();
         if (retiredTags.Count > 0)
             throw new InvalidOperationException("These assets are retired and can't be scheduled for new orders: " + string.Join(", ", retiredTags));
-        // Same UserAssetScope enforcement round 11 added to manual Order creation — without it, a
-        // scoped OrderType.Manage holder could schedule a recurring order against an asset they can't
-        // even view via AssetsController, and the scheduler would then keep auto-generating real
-        // orders against it indefinitely.
+        // Same UserAssetScope enforcement manual Order creation applies: a scoped OrderType.Manage
+        // holder must not schedule recurring orders against assets they can't even view.
         var scopedIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsQueryable(), actingUserId)).Select(a => a.Id).ToListAsync();
         if (assetIds.Except(scopedIds).Any())
             throw new InvalidOperationException("One or more selected assets were not found.");

@@ -18,13 +18,9 @@ public class RecurringOrderSchedulerService : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(5);
 
-    // Same blast-radius protection PreventiveMaintenanceSchedulerService has (round 26/27): a schedule
-    // whose StartDate is far in the past combined with a short cadence and many linked assets can have
-    // hundreds or thousands of occurrences already "due" the very first tick after it's created or
-    // reactivated. Each one is a real order + AuditLog insert, so cap how many one schedule generates
-    // per tick (across all its linked assets combined, same as the PM scheduler's per-contract cap) and
-    // let the idempotent re-derivation above catch up the rest over subsequent ticks instead of
-    // generating everything synchronously in one pass.
+    // Same blast-radius cap as PreventiveMaintenanceSchedulerService: a schedule starting far in the
+    // past with a short cadence and many assets has thousands of occurrences due on its first tick.
+    // Generation is idempotent, so the remainder is simply picked up by later ticks.
     private const int MaxOccurrencesGeneratedPerSchedulePerTick = 200;
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -60,6 +56,7 @@ public class RecurringOrderSchedulerService : BackgroundService
         var inspectionOrders = scope.ServiceProvider.GetRequiredService<IInspectionOrderService>();
         var maintenanceOrders = scope.ServiceProvider.GetRequiredService<IMaintenanceOrderService>();
         var workOrders = scope.ServiceProvider.GetRequiredService<IWorkOrderService>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditService>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         var today = DateTime.UtcNow.Date;
@@ -75,8 +72,26 @@ public class RecurringOrderSchedulerService : BackgroundService
         string? systemUserId = (await userManager.GetUsersInRoleAsync("Admin")).FirstOrDefault()?.Id;
         if (systemUserId is null)
         {
-            _logger.LogWarning("Recurring Order scheduler: no Admin-role user found, skipping this tick.");
+            // Nothing at all can be generated in this state, so it is an error, not a warning.
+            _logger.LogError("Recurring Order scheduler: no Admin-role user found — no occurrences can be generated this tick.");
             return;
+        }
+
+        // A generation failure used to leave only a log line nobody reads. Every failure below is
+        // also written to the audit log against the schedule, so it is visible on the Audit Logs
+        // screen (filter EntityType = RecurringOrder) without shell access to the server.
+        async Task ReportFailureAsync(int scheduleId, string message)
+        {
+            _logger.LogError("Recurring Order: schedule {ScheduleId} failed to generate an occurrence: {Message}", scheduleId, message);
+            try
+            {
+                await audit.LogAsync("GenerationFailed", "RecurringOrder", scheduleId.ToString(), systemUserId, details: message);
+            }
+            catch (Exception auditEx)
+            {
+                // Never let audit logging itself break the tick.
+                _logger.LogError(auditEx, "Recurring Order: could not write the failure audit row for schedule {ScheduleId}.", scheduleId);
+            }
         }
 
         foreach (var schedule in schedules)
@@ -93,7 +108,7 @@ public class RecurringOrderSchedulerService : BackgroundService
             // work order with no vendor.
             if (routesToVendor && schedule.VendorId == null)
             {
-                _logger.LogWarning("Recurring Order: schedule {ScheduleId} requires a vendor but has none set — skipping.", schedule.Id);
+                await ReportFailureAsync(schedule.Id, "This schedule's order type requires a vendor but the schedule has none set.");
                 continue;
             }
             var effectiveEnd = schedule.EndDate ?? today;
@@ -120,7 +135,25 @@ public class RecurringOrderSchedulerService : BackgroundService
                         .ToListAsync(ct))
                         .Select(g => (g.AssetId, g.ScheduledDate!.Value.Date)).ToHashSet();
 
-            var creatorUserId = schedule.CreatedByUserId is { Length: > 0 } ? schedule.CreatedByUserId : systemUserId;
+            // Occurrences are generated on behalf of the schedule, not of whoever happened to
+            // create it: if that user has since been deactivated or had their asset scope narrowed,
+            // the downstream services would reject every asset on the schedule. Fall back to the
+            // system (Admin) account in that case so an administrative change to one employee never
+            // silently stops a schedule. See NOTES-data.md for the system-context create signature
+            // this should use once InspectionOrderService/MaintenanceOrderService expose one.
+            var creator = schedule.CreatedByUserId is { Length: > 0 } ? schedule.CreatedByUserId : null;
+            var creatorIsUsable = creator != null && await db.Users.AnyAsync(u => u.Id == creator && u.IsActive, ct);
+            if (creator != null && !creatorIsUsable)
+                await ReportFailureAsync(schedule.Id, $"The employee who created this schedule ({creator}) is inactive — generating as the system account instead.");
+            var creatorUserId = creatorIsUsable ? creator! : systemUserId;
+
+            // An assignee that has since been deactivated makes every occurrence unassignable.
+            if (schedule.AssignedToUserId is { Length: > 0 } assignee
+                && !await db.Users.AnyAsync(u => u.Id == assignee && u.IsActive, ct))
+            {
+                await ReportFailureAsync(schedule.Id, "This schedule's assigned employee is no longer active — reassign the schedule to resume generating orders.");
+                continue;
+            }
             var generatedThisTick = 0;
             foreach (var link in schedule.AssetLinks)
             {
@@ -157,17 +190,16 @@ public class RecurringOrderSchedulerService : BackgroundService
                     {
                         // Filtered unique index on (SourceRecurringOrderId, [AssetId,] ScheduledDate)
                         // rejects a duplicate — the safety net for a multi-instance deployment racing
-                        // on the same tick.
+                        // on the same tick. Expected, so this one stays a warning.
                         _logger.LogWarning(ex, "Recurring Order: occurrence for schedule {ScheduleId}, asset {AssetId}, due {DueDate} was not created (likely already generated).",
                             schedule.Id, link.AssetId, dueDate);
                     }
                     catch (InvalidOperationException ex)
                     {
-                        // e.g. the asset was retired after being linked to this schedule — log and move
-                        // on rather than letting one bad asset link block every other link's occurrences
-                        // this tick (and every tick thereafter).
-                        _logger.LogWarning(ex, "Recurring Order: occurrence for schedule {ScheduleId}, asset {AssetId}, due {DueDate} failed: {Message}",
-                            schedule.Id, link.AssetId, dueDate, ex.Message);
+                        // e.g. the asset was retired after being linked to this schedule — surfaced,
+                        // then skipped, so one bad link can't block the rest of the schedule forever.
+                        await ReportFailureAsync(schedule.Id,
+                            $"Asset {link.AssetId}, due {dueDate:yyyy-MM-dd}: {ex.Message}");
                     }
                 }
             }

@@ -17,13 +17,13 @@ public class GroupService : IGroupService
 
     public async Task<List<Group>> GetAllAsync(bool includeInactive = false)
     {
-        var query = _db.Groups.Include(t => t.Members).ThenInclude(m => m.User).AsQueryable();
+        var query = _db.Groups.AsNoTracking().Include(t => t.Members).ThenInclude(m => m.User).AsQueryable();
         if (!includeInactive) query = query.Where(t => t.IsActive);
         return await query.OrderBy(t => t.Name).ToListAsync();
     }
 
     public async Task<Group?> GetByIdAsync(int id) =>
-        await _db.Groups.Include(t => t.Members).ThenInclude(m => m.User)
+        await _db.Groups.AsNoTracking().Include(t => t.Members).ThenInclude(m => m.User)
             .Include(t => t.CreatedByUser)
             .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -31,18 +31,11 @@ public class GroupService : IGroupService
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Group name is required.");
-        // Unlike every other named catalog entity in this app (AssetCategories, Zones,
-        // MaintenanceActionTypes, OrderTypes, Vendors...), Group has no uniqueness check at all —
-        // app-level or DB-level — so two groups with the identical name were trivially creatable
-        // (confirmed live: two sequential Create posts with the same name both succeeded). Assigning
-        // work by group name then has no way to tell which underlying group (and members) got picked.
+        // Group names must be unique — assigning work by group name is ambiguous otherwise.
         if (await _db.Groups.AnyAsync(t => t.Name == name))
             throw new InvalidOperationException($"A group named '{name}' already exists.");
-        // A stale multi-select value or a raw/tampered POST with a non-existent user id otherwise
-        // hits the DB's FK constraint on GroupMembers.UserId and raises an unhandled
-        // DbUpdateException — Edit already guards the equivalent path (SetMembersAsync) with a
-        // try/catch, per its own comment acknowledging this exact failure mode; Create had no such
-        // check at all.
+        // A stale or tampered member id otherwise hits GroupMembers' FK constraint as an
+        // unhandled DbUpdateException.
         var distinctMemberIds = initialMemberUserIds.Distinct().ToList();
         if (distinctMemberIds.Count > 0 && await _db.Users.CountAsync(u => distinctMemberIds.Contains(u.Id)) != distinctMemberIds.Count)
             throw new InvalidOperationException("One or more selected members were not found.");
@@ -93,15 +86,9 @@ public class GroupService : IGroupService
     private async Task<string?> NameOfAsync(string? uid) => uid == null ? null
         : await _db.Users.Where(u => u.Id == uid).Select(u => u.FullName).FirstOrDefaultAsync();
 
-    // Unlike every other caller that touches GroupMembers (Create's initial-members check, Edit's
-    // SetMembersAsync), these two had no existence check on either id at all — the only caller is
-    // the AI assistant tool (addGroupMember/removeGroupMember in AiInspectionToolFunctions), which
-    // passes a groupId/memberUserId resolved from model output (or a stale/hallucinated one) straight
-    // through. A non-existent groupId or userId hits GroupMembers' FK constraints and raises an
-    // unhandled DbUpdateException that DispatchToolAsync's catch (InvalidOperationException only)
-    // does not catch, aborting the whole AI turn with a hard 500 instead of the graceful in-chat
-    // "not found" message every other AI tool gives back (confirmed live via direct SQL: inserting
-    // a bogus GroupId/UserId trips FK_GroupMembers_Groups_GroupId / FK_GroupMembers_AspNetUsers_UserId).
+    // Called by the AI assistant tools with ids resolved from model output, so both are checked
+    // here: an unknown id would otherwise trip a GroupMembers FK constraint as an unhandled 500
+    // rather than the graceful in-chat "not found" every other AI tool returns.
     public async Task AddMemberAsync(int groupId, string userId, string actingUserId)
     {
         if (!await _db.Groups.AnyAsync(t => t.Id == groupId))
@@ -135,9 +122,7 @@ public class GroupService : IGroupService
     /// originalMemberUserIds is the snapshot the edit form was loaded with (carried as hidden
     /// fields) — if it no longer matches what's actually in the DB, someone else changed this
     /// group's membership in between, and blindly diffing against the live set would silently
-    /// discard their change (confirmed live: two admins editing the same group concurrently, the
-    /// second submit erased the first's just-added member with no error or warning). Rejecting the
-    /// stale submit instead forces a reload, same as a real concurrency-token check would.</summary>
+    /// discard their change. Rejecting the stale submit forces a reload instead.</summary>
     public async Task SetMembersAsync(int groupId, List<string> memberUserIds, List<string> originalMemberUserIds, string actingUserId)
     {
         var current = await _db.GroupMembers.Where(m => m.GroupId == groupId).ToListAsync();

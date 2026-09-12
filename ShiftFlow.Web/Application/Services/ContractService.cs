@@ -116,12 +116,8 @@ public class ContractService : IContractService
     {
         var existing = await _db.Contracts.Include(c => c.AssetLinks).FirstOrDefaultAsync(c => c.Id == contract.Id)
             ?? throw new InvalidOperationException("Contract not found.");
-        // Same lost-update race rounds 19-20 fixed for Group membership and RBAC permissions: this
-        // diffs the posted asset list against whatever is live in ContractAssets right now, with no
-        // check that the editor's page snapshot is still current — a concurrent edit's asset link
-        // gets silently deleted by an unrelated save (confirmed live: Admin B's Notes-only edit
-        // erased an asset Admin A had just added). originalAssetIds is the snapshot the edit form
-        // was loaded with; reject the submit if it no longer matches what's actually linked.
+        // Lost-update guard, same as Group membership: originalAssetIds is the snapshot the edit
+        // form was loaded with, so a concurrent edit is rejected rather than silently overwritten.
         var currentAssetIds = existing.AssetLinks.Select(l => l.AssetId).ToHashSet();
         if (!currentAssetIds.SetEquals(originalAssetIds.Distinct()))
             throw new InvalidOperationException("This contract's linked assets were changed by someone else since you opened this page. Reload and try again.");
@@ -268,7 +264,7 @@ public class ContractService : IContractService
             PdfReportHelper.ApplyPageBackground(pdf);
             var doc = new Document(pdf);
             doc.SetFont(PdfReportHelper.GetFont(_loc.IsRTL));
-            PdfReportHelper.AddHeader(doc, _loc.T("Contracts"), _loc.TDate(DateTime.Today.ToString("dddd, dd MMMM yyyy")));
+            PdfReportHelper.AddHeader(doc, _loc.T("Contracts"), _loc.TDate(DateTime.UtcNow.ToString("dddd, dd MMMM yyyy")));
 
             var today = DateTime.UtcNow.Date;
             var expiringSoon = contracts.Count(c => c.EndDate != null && c.EndDate >= today && c.EndDate <= today.AddDays(30));
