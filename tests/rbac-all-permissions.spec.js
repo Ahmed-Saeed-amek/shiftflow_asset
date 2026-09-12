@@ -28,7 +28,7 @@ async function login(page, { email, password }) {
     await page.goto(`${BASE_URL}/Account/Login`);
     await page.fill('input[name="Email"]', email);
     await page.fill('input[name="Password"]', password);
-    await page.locator('form:has(input[name="Email"]) button[type="submit"]').click();
+    await page.locator('form:has(input[name="Email"]:not([type="hidden"])) button[type="submit"]').click();
     await page.waitForLoadState('domcontentloaded');
 }
 
@@ -59,8 +59,10 @@ async function isPermissionGranted(adminPage, roleId, permission) {
 const RW_PAIR_INFO = {
     'User.View':                  { readPermission: 'User.View',                  role: 'read'  },
     'User.Manage':                 { readPermission: 'User.View',                  role: 'write' },
-    'Schedule.Template.View':     { readPermission: 'Schedule.Template.View',     role: 'read'  },
-    'Schedule.Template.Manage':   { readPermission: 'Schedule.Template.View',     role: 'write' },
+    'InspectionOrder.View':       { readPermission: 'InspectionOrder.View',       role: 'read'  },
+    'InspectionOrder.Manage':     { readPermission: 'InspectionOrder.View',       role: 'write' },
+    'Group.View':                 { readPermission: 'Group.View',                 role: 'read'  },
+    'Group.Manage':               { readPermission: 'Group.View',                 role: 'write' },
 };
 
 async function setRwPairPermission(adminPage, permission, granted) {
@@ -154,7 +156,9 @@ const PAGE_CHECKS = [
     { permission: 'WorkOrder.View',           url: '/WorkOrders',                subject: 'Engineer' },
     { permission: 'SparePart.View',           url: '/SpareParts',                subject: 'Engineer' },
     { permission: 'InspectionOrder.View',     url: '/InspectionOrders',          subject: 'Engineer' },
-    { permission: 'MaintenanceOrder.View',    url: '/MaintenanceOrders',         subject: 'Engineer' },
+    // MaintenanceOrder.View only filters the unified Orders list (there is no /MaintenanceOrders index);
+    // the Details page is the one GET gated by a maintenance-order permission.
+    { permission: 'MaintenanceOrder.Report',  url: '/MaintenanceOrders/Details/1', subject: 'Engineer' },
     { permission: 'Group.View',               url: '/Groups',                    subject: 'Engineer' },
     { permission: 'Asset.ScopeManage',        url: '/UserAssetScopes',           subject: 'Engineer' },
     { permission: 'MyWork.View',              url: '/MyHome',                    subject: 'Engineer' },
@@ -183,7 +187,7 @@ const MUTATING_SKIPPED = [
     'Asset.Manage', 'AssetCategory.Manage', 'Asset.ReportAction',
     'Vendor.Manage', 'Contract.Manage',
     'WorkOrder.Manage', 'WorkOrder.Assign',
-    'MaintenanceOrder.Manage', 'MaintenanceOrder.Report',
+    'MaintenanceOrder.Manage',
     'InspectionOrder.Manage', 'InspectionOrder.Report',
     'Group.Manage', 'OrderType.Manage', 'SparePart.Manage',
 ];

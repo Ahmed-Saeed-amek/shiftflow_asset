@@ -429,7 +429,7 @@ function initEmployeePickers(){
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
-        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
+        b.addEventListener('click',function(){clearTimeout(timer);reqSeq++;hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
       });
     }
     function query(){
@@ -471,7 +471,7 @@ function initAssetPickers(){
       }).join('');
       results.classList.remove('d-none');
       results.querySelectorAll('[data-id]').forEach(function(b){
-        b.addEventListener('click',function(){hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
+        b.addEventListener('click',function(){clearTimeout(timer);reqSeq++;hidden.value=b.dataset.id;search.value=b.dataset.label;hide();hidden.dispatchEvent(new Event('change',{bubbles:true}));});
       });
     }
     function query(){
@@ -495,7 +495,7 @@ function initAssetPickers(){
           if(!asset) return;
           // Mirrors clicking a normal search result — scanning previously only filled the
           // visible search text and re-ran the query, leaving the actual hidden AssetId empty.
-          hidden.value=asset.id;
+          clearTimeout(timer);reqSeq++;hidden.value=asset.id;
           search.value=asset.assetTag+' — '+(asset.name||'');
           hide();
           hidden.dispatchEvent(new Event('change',{bubbles:true}));

@@ -36,7 +36,9 @@ test.describe('Vendor Fix attachment validation blocks the whole submission', ()
     const badFile = path.join(os.tmpdir(), `pw-bad-${Date.now()}.sql`);
     fs.writeFileSync(badFile, 'SELECT * FROM Users;');
 
-    await page.fill('textarea[name="Description"]', 'Playwright attempted fix with a bad attachment');
+    // The vendor Fix form has no free-text description field; fill one only if it ever exists.
+    const description = page.locator('textarea[name="Description"], input[name="Description"]');
+    if (await description.count() > 0) await description.fill('Playwright attempted fix with a bad attachment');
     await page.setInputFiles('input[name="Files"]', badFile);
     await page.click('button:has-text("Submit Fix")');
     await page.waitForLoadState('domcontentloaded');

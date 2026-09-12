@@ -165,7 +165,12 @@ test.describe('RTL sanity at 375x667', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, ADMIN);
     await page.goto(`${BASE_URL}/Dashboard`, { waitUntil: 'domcontentloaded' });
-    await page.request.post(`${BASE_URL}/Language/SetLanguage`, { form: { lang: 'ar', returnUrl: '/Dashboard' } });
+    // Switch language through the real sidebar form (the endpoint requires an anti-forgery token);
+    // the sidebar is an off-canvas drawer at this width, so open it first.
+    await page.click('#sidebarToggle');
+    await page.waitForTimeout(350);
+    await page.click('form[action*="/Language/SetLanguage"] button[type="submit"]');
+    await page.waitForLoadState('domcontentloaded');
     await page.goto(`${BASE_URL}/Dashboard`, { waitUntil: 'domcontentloaded' });
     const dir = await page.getAttribute('html', 'dir');
     expect(dir).toBe('rtl');
@@ -178,6 +183,7 @@ test.describe('RTL sanity at 375x667', () => {
     expect(box && viewport && Math.abs((box.x + box.width) - viewport.width) < 5, 'RTL drawer opens flush to the right').toBeTruthy();
 
     // switch back to English so it doesn't leak into other tests via shared dev DB cookie state
-    await page.request.post(`${BASE_URL}/Language/SetLanguage`, { form: { lang: 'en', returnUrl: '/Dashboard' } });
+    await page.click('form[action*="/Language/SetLanguage"] button[type="submit"]');
+    await page.waitForLoadState('domcontentloaded');
   });
 });

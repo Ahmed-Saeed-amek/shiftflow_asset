@@ -233,7 +233,9 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         {
-            PermitLimit = 10,
+            // Relaxed in Development only: the Playwright suite logs in dozens of times a minute
+            // from one IP and would otherwise be throttled into false failures.
+            PermitLimit = builder.Environment.IsDevelopment() ? 1000 : 10,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));

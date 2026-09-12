@@ -37,8 +37,7 @@ test.describe('Review-fix smoke', () => {
     for (const lang of ['en', 'ar']) {
       await context.addCookies([{ name: 'shiftflow_lang', value: lang, url: 'https://localhost:55248' }]);
       for (const url of PAGES) {
-        await page.goto(url);
-        await page.waitForLoadState('domcontentloaded');
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
         expect(page.url(), url).not.toContain('AccessDenied');
         await expect(page.locator('body'), url).not.toContainText('An unhandled exception');
         const html = page.locator('html');
@@ -67,6 +66,8 @@ test.describe('Review-fix smoke', () => {
     // Choose the first order type, then whichever asset picker that type shows.
     const firstType = page.locator('input[name="OrderTypeId"]').first();
     await firstType.check({ force: true });
+    // applyType() swaps the single/multi asset wrappers on change; let it settle before choosing one.
+    await page.waitForTimeout(500);
     const singleVisible = await page.locator('#assetSingleWrap').isVisible();
     const wrap = page.locator(singleVisible ? '#assetSingleWrap' : '#assetMultiWrap');
     const assetInput = wrap.locator(singleVisible ? 'input[type="text"]' : 'input[data-search]').first();
