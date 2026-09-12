@@ -1,0 +1,15 @@
+@model ShiftFlow.Web.ViewModels.ExportButtonsModel
+@* Shared Excel/PDF export pair — use with _PageHeader's Actions (PageHeaderWithActions) so the
+   buttons don't have to be hand-concatenated into an HTML string. *@
+@if (!string.IsNullOrWhiteSpace(Model.ExcelUrl))
+{
+    <a href="@Model.ExcelUrl" class="btn btn-outline-success @Model.SizeCssClass">
+        <i class="bi bi-file-earmark-excel me-1"></i>@Loc.T("Export Excel")
+    </a>
+}
+@if (!string.IsNullOrWhiteSpace(Model.PdfUrl))
+{
+    <a href="@Model.PdfUrl" class="btn btn-outline-primary @Model.SizeCssClass">
+        <i class="bi bi-file-earmark-pdf me-1"></i>@Loc.T("Export PDF")
+    </a>
+}
