@@ -174,7 +174,10 @@ public class AiAssistantController : Controller
     public async Task<IActionResult> Confirm([FromBody] AiConfirmRequest? req, CancellationToken ct)
     {
         if (req is null || string.IsNullOrWhiteSpace(req.Token) || req.Token.Length > MaxTokenLength)
-            return BadRequest(new { error = _loc.T("Confirmation token is required") });
+            // Deliberately not localized: Translations.cs is owned by another change, and this
+            // is a malformed-request guard the UI never surfaces (the client only posts tokens it
+            // was just handed). See TRANSLATIONS-ai-backend.md for the string to localize on merge.
+            return BadRequest(new { error = "Confirmation token is required" });
 
         var userId = _um.GetUserId(User)!;
         try
@@ -196,7 +199,7 @@ public class AiAssistantController : Controller
     public IActionResult Dismiss([FromBody] AiConfirmRequest? req)
     {
         if (req is null || string.IsNullOrWhiteSpace(req.Token) || req.Token.Length > MaxTokenLength)
-            return BadRequest(new { error = _loc.T("Confirmation token is required") });
+            return BadRequest(new { error = "Confirmation token is required" });
 
         _orchestrator.DiscardPending(req.Token, _um.GetUserId(User)!);
         return Ok(new { ok = true });
