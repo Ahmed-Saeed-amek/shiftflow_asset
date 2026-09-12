@@ -15,8 +15,10 @@ public class OrderCreateVm
     public DateTime? DueDate { get; set; }
 
     /// <summary>"User" or "Group" — which side of the toggle is active when AssignmentMode=="Either".
-    /// Ignored (server re-derives from OrderType.AssignmentMode) when the mode is EmployeeOnly/GroupOnly.</summary>
-    public string AssigneeType { get; set; } = "Group";
+    /// Ignored (server re-derives from OrderType.AssignmentMode) when the mode is EmployeeOnly/GroupOnly.
+    /// Defaults to "User": assigning one named employee is the common case, and the old "Group"
+    /// default opened a fresh Create form on the rarer branch with an empty group picker.</summary>
+    public string AssigneeType { get; set; } = "User";
     public string? AssignedToUserId { get; set; }
     public int? AssignedToGroupId { get; set; }
 

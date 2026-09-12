@@ -1,6 +1,9 @@
 @model WorkOrderViewModel
 @{ ViewData["Title"] = Loc.T("New Work Order"); }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Work Order")})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+    Title = Loc.T("New Work Order"),
+    Subtitle = Loc.T("Raise a repair job against one asset"),
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Work Orders"), Url.Action("Index")), (Loc.T("New Work Order"), null) } })" />
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
@@ -9,14 +12,14 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Asset")</label>
+                    <label class="form-label required">@Loc.T("Asset")</label>
                     <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
                         Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
                         SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
                     <span asp-validation-for="AssetId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="Priority" class="form-label small">@Loc.T("Priority")</label>
+                    <label asp-for="Priority" class="form-label required">@Loc.T("Priority")</label>
                     <select asp-for="Priority" class="form-select">
                         @foreach (var p in (string[])ViewBag.Priorities)
                         {
@@ -25,23 +28,23 @@
                     </select>
                 </div>
                 <div class="col-12">
-                    <label asp-for="Description" class="form-label small">@Loc.T("Description")</label>
+                    <label asp-for="Description" class="form-label">@Loc.T("Description")</label>
                     <textarea asp-for="Description" class="form-control" rows="3"></textarea>
                     <span asp-validation-for="Description" class="text-danger small"></span>
                 </div>
                 <div class="col-12">
-                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
+                    <label asp-for="Notes" class="form-label">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="2"></textarea>
                     <span asp-validation-for="Notes" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small">@Loc.T("Assigned Employee")</label>
+                    <label class="form-label">@Loc.T("Assigned Employee")</label>
                     <partial name="_EmployeePicker" model='new EmployeePickerModel {
                         Name = "AssignedToUserId", SelectedId = Model.AssignedToUserId,
                         Placeholder = Loc.T("Search by name or email…") }' />
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="VendorId" class="form-label small">@Loc.T("Vendor")</label>
+                    <label asp-for="VendorId" class="form-label">@Loc.T("Vendor")</label>
                     <select asp-for="VendorId" class="form-select">
                         <option value="">@Loc.T("— None (create as New) —")</option>
                         @foreach (var v in (List<Vendor>)ViewBag.AllVendors)
@@ -54,12 +57,12 @@
                 <div class="col-12">
                     <div class="form-check">
                         <input asp-for="RequiresVendorResponse" class="form-check-input" type="checkbox" />
-                        <label asp-for="RequiresVendorResponse" class="form-check-label small">@Loc.T("Requires vendor response")</label>
+                        <label asp-for="RequiresVendorResponse" class="form-check-label">@Loc.T("Requires vendor response")</label>
                         <div class="form-text">@Loc.T("When off, a manager or the assigned employee can advance this work order past \"Sent to Vendor\" without waiting on the vendor.")</div>
                     </div>
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions d-flex flex-wrap gap-2 mt-4">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
                 <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

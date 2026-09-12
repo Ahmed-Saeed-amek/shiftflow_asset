@@ -481,6 +481,60 @@ public static class DbSeeder
                 new MaintenanceActionType { Name = "Calibration Check", NameAr = "فحص المعايرة" });
             await db.SaveChangesAsync();
         }
+
+        await SeedOrderTypesAsync(db);
+    }
+
+    /// <summary>The three order types every install starts with. They were originally inserted by
+    /// the Phase36 migration, so this is an idempotent "add what is missing by Name" top-up rather
+    /// than a first-run-only seed — plus a one-time fix-up (below) for the dev/demo databases that
+    /// got them from that migration with no Arabic name and the wrong cardinality/direct-fix flags.</summary>
+    private static async Task SeedOrderTypesAsync(ApplicationDbContext db)
+    {
+        var seedOrderTypes = new (string Name, string NameAr, string Prefix, bool TracksDefectOutcome, bool IsDirectFix, bool AllowsMultipleAssets, int SortOrder)[]
+        {
+            // RequiresVendor is false for all three: a vendor job is raised as a Work Order from a
+            // Defective outcome, not by the order type itself.
+            ("Inspection",  "معاينة",       "INS", true,  false, true,  0),
+            ("Quick Check", "فحص سريع",     "QC",  false, false, true,  1),
+            ("Standard",    "صيانة قياسية", "MO",  false, true,  false, 0),
+        };
+
+        var existing = await db.OrderTypes.ToListAsync();
+        var changed = false;
+
+        foreach (var seed in seedOrderTypes)
+        {
+            var row = existing.FirstOrDefault(t => t.Name == seed.Name);
+            if (row == null)
+            {
+                db.OrderTypes.Add(new OrderType
+                {
+                    Name = seed.Name, NameAr = seed.NameAr, Prefix = seed.Prefix,
+                    TracksDefectOutcome = seed.TracksDefectOutcome, RequiresVendor = false,
+                    IsDirectFix = seed.IsDirectFix, AllowsMultipleAssets = seed.AllowsMultipleAssets,
+                    SortOrder = seed.SortOrder, IsActive = true,
+                    Color = OrderTypeColors.NextColor(existing.Select(t => t.Color)),
+                });
+                changed = true;
+                continue;
+            }
+
+            // One-time fix-up, deliberately narrow: only a row with one of these exact English
+            // names AND no Arabic name at all can still be the untouched migration-seeded row, so
+            // this can't overwrite a catalog an admin has since edited (editing it in the UI sets
+            // NameAr). Once NameAr is filled in, this branch never runs for that row again.
+            if (row.NameAr == null)
+            {
+                row.NameAr = seed.NameAr;
+                row.IsDirectFix = seed.IsDirectFix;
+                row.RequiresVendor = false;
+                row.AllowsMultipleAssets = seed.AllowsMultipleAssets;
+                changed = true;
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync();
     }
 
     private static async Task SeedPermissionsAsync(ApplicationDbContext db, RoleManager<ApplicationRole> rm)

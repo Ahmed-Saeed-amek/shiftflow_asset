@@ -3,7 +3,10 @@
     var asset = (Asset)ViewBag.Asset;
     ViewData["Title"] = Loc.T("Report Action");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Report Action"),Subtitle=$"{asset.AssetTag} — {asset.Name}"})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+    Title = Loc.T("Report Action"),
+    Subtitle = $"{asset.AssetTag} — {asset.Name}",
+    Breadcrumbs = new List<(string Label, string? Url)>{ (asset.AssetTag, Url.Action("Details", "Assets", new { id = asset.Id })), (Loc.T("Report Action"), null) } })" />
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
@@ -13,18 +16,18 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Category")</label>
+                    <label class="form-label">@Loc.T("Category")</label>
                     <input type="text" class="form-control" value="@(asset.Category is { } reportCat ? Loc.LocalizedName(reportCat.Name, reportCat.NameAr) : null)" disabled />
                 </div>
                 <div class="col-md-4">
-                    <label for="actionTypeSelect" class="form-label small">@Loc.T("Action Type")</label>
+                    <label for="actionTypeSelect" class="form-label required">@Loc.T("Action Type")</label>
                     <select id="actionTypeSelect" asp-for="ActionTypeId" class="form-select">
                         <option value="">—</option>
                     </select>
                     <span asp-validation-for="ActionTypeId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label for="causeSelect" class="form-label small">@Loc.T("Cause")</label>
+                    <label for="causeSelect" class="form-label required">@Loc.T("Cause")</label>
                     <select id="causeSelect" asp-for="CauseId" class="form-select" disabled>
                         <option value="">—</option>
                     </select>
@@ -34,11 +37,11 @@
                     <div id="reportLoadError" class="alert alert-danger small d-none"></div>
                 </div>
                 <div class="col-12">
-                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
+                    <label asp-for="Notes" class="form-label">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="3" placeholder="@Loc.T("Describe…")"></textarea>
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions d-flex flex-wrap gap-2 mt-4">
                 <button type="submit" class="btn btn-primary">@Loc.T("Report Action")</button>
                 <a href="@(ViewBag.ReturnUrl ?? Url.Action("Details", "Assets", new { id = asset.Id }))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

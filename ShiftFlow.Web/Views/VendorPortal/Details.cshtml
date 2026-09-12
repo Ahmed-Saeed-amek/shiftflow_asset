@@ -4,12 +4,27 @@
     var isSentToVendor = Model.Stage == "Sent to Vendor";
     var blockReasons = ViewBag.BlockReasons as List<WorkOrderBlockReason>;
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.WorkOrderNumber,Subtitle=Model.Asset?.AssetTag})" />
+@* Breadcrumb instead of the Back link that used to sit at the bottom of the left column. *@
+<nav aria-label="@Loc.T("Breadcrumb")" class="mb-2">
+    <ol class="breadcrumb small mb-0">
+        <li class="breadcrumb-item"><a asp-action="Index" class="text-decoration-none">@Loc.T("My Work Orders")</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.WorkOrderNumber</li>
+    </ol>
+</nav>
+
+<div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+    <h1 class="fs-3 fw-bold font-heading mb-0">@Model.WorkOrderNumber</h1>
+    <partial name="_StatusBadge" model="@Model.Stage" />
+    <partial name="_StatusBadge" model="@Model.Priority" />
+</div>
+<p class="text-muted small mb-4">@Model.Asset?.AssetTag@(Model.Asset?.Name is { Length: > 0 } n ? " — " + n : "")</p>
 
 <div class="row g-3">
-    <div class="@(isSentToVendor ? "col-lg-5" : "col-lg-8")">
+    <div class="@(isSentToVendor ? "col-lg-5" : "col-lg-8") order-2 order-lg-1">
         <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white fw-semibold border-0">@Loc.T("Details")</div>
+            <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                <i class="bi bi-info-circle text-primary"></i>@Loc.T("Details")
+            </div>
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
                     <span class="text-muted small">@Loc.T("Type")</span>
@@ -41,11 +56,11 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.Sku))
                         {
-                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("SKU")</span><span class="small font-monospace">@Model.Asset.Sku</span></div>
+                            <div class="d-flex justify-content-between py-1 border-bottom"><span class="text-muted small">@Loc.T("SKU")</span><span class="small">@Model.Asset.Sku</span></div>
                         }
                         @if (!string.IsNullOrWhiteSpace(Model.Asset.SerialNumber))
                         {
-                            <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Serial Number")</span><span class="small font-monospace">@Model.Asset.SerialNumber</span></div>
+                            <div class="d-flex justify-content-between py-1"><span class="text-muted small">@Loc.T("Serial Number")</span><span class="small">@Model.Asset.SerialNumber</span></div>
                         }
                     </div>
                 }
@@ -134,38 +149,42 @@
             </div>
         }
 
-        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">@Loc.T("Back")</a>
     </div>
 
     @if (isSentToVendor)
     {
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Submit Fix")</div>
+        <div class="col-lg-7 order-1 order-lg-2">
+            <div class="card border-0 shadow-sm mb-3 border-start border-4 border-primary">
+                <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-wrench-adjustable text-primary"></i>@Loc.T("Submit Fix")
+                </div>
                 <div class="card-body">
                     <form method="post" asp-action="Fix" asp-route-id="@Model.Id" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         <div class="row g-2 mb-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Completion Date")</label>
-                                <input type="date" name="CompletionDate" class="form-control form-control-sm" />
+                                <label for="vendorCompletionDate" class="form-label">@Loc.T("Completion Date")</label>
+                                <input type="date" id="vendorCompletionDate" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
                         <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="partsList"})" />
-                        <label class="form-label small d-block mt-2">@Loc.T("Attachments")</label>
-                        <input type="file" name="Files" class="form-control form-control-sm mb-2" multiple />
+                        <label for="vendorFixFiles" class="form-label d-block mt-2">@Loc.T("Attachments")</label>
+                        <input type="file" id="vendorFixFiles" name="Files" class="form-control form-control-sm" multiple aria-describedby="vendorFixFilesHelp" />
+                        <div id="vendorFixFilesHelp" class="form-text mb-2">@Loc.T("Photos or documents — a rejected file is named back to you with the reason.")</div>
                         <button type="submit" class="btn btn-sm btn-primary w-100">@Loc.T("Submit Fix")</button>
                     </form>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white fw-semibold border-0">@Loc.T("Submit Block")</div>
+            <div class="card border-0 shadow-sm border-start border-4 border-danger">
+                <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-sign-stop text-danger"></i>@Loc.T("Submit Block")
+                </div>
                 <div class="card-body">
                     <form method="post" asp-action="Block" asp-route-id="@Model.Id">
                         @Html.AntiForgeryToken()
-                        <label class="form-label small">@Loc.T("Block Reason")</label>
-                        <select name="blockReasonId" class="form-select form-select-sm mb-2" required>
+                        <label for="vendorBlockReason" class="form-label required">@Loc.T("Block Reason")</label>
+                        <select id="vendorBlockReason" name="blockReasonId" class="form-select form-select-sm mb-2" required>
                             <option value="" selected disabled>@Loc.T("Select a reason…")</option>
                             @if (blockReasons != null)
                             {
@@ -175,8 +194,8 @@
                                 }
                             }
                         </select>
-                        <label class="form-label small">@Loc.T("Block Detail")</label>
-                        <textarea name="detail" class="form-control form-control-sm mb-2" rows="2"></textarea>
+                        <label for="vendorBlockDetail" class="form-label">@Loc.T("Block Detail")</label>
+                        <textarea id="vendorBlockDetail" name="detail" class="form-control form-control-sm mb-2" rows="2"></textarea>
                         <button type="submit" class="btn btn-sm btn-outline-danger w-100">@Loc.T("Submit Block")</button>
                     </form>
                 </div>

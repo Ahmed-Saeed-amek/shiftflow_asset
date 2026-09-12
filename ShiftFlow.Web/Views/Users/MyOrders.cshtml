@@ -1,76 +1,93 @@
 @model List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>
+@using Microsoft.AspNetCore.Html
+@using ShiftFlow.Web.ViewModels
 @{
     ViewData["Title"] = Loc.T("My Orders");
     bool showAll = ViewBag.ShowAll is true;
     var range = (ViewBag.SelectedRange as string) ?? "month";
     var category = ViewBag.Category as string;
+    // "range" only narrows the history view; the open-work view deliberately ignores it (see
+    // UsersController.MyOrders), which is why it is not counted as an active filter here.
+    var anyFilter = showAll || !string.IsNullOrEmpty(category);
 
+    Func<object?, IHtmlContent> headerActions = @<text>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="MyHistory"><i class="bi bi-clock-history me-1"></i>@Loc.T("History")</a>
+    </text>;
+
+    // Category colours match the Dashboard badges so a category reads the same everywhere.
     string CategoryBadgeClass(string c) => c switch
     {
-        "Inspection" => "bg-primary-subtle text-primary-emphasis",
-        "Maintenance" => "bg-warning-subtle text-warning-emphasis",
-        _ => "bg-info-subtle text-info-emphasis",
+        "Inspection" => "bg-primary-subtle text-primary-emphasis border-primary-subtle",
+        "Maintenance" => "bg-warning-subtle text-warning-emphasis border-warning-subtle",
+        _ => "bg-info-subtle text-info-emphasis border-info-subtle",
     };
 }
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+    Title = Loc.T("My Orders"),
+    Subtitle = Loc.T("Every inspection, maintenance, and work order assigned to you or your groups, in one place"),
+    Actions = headerActions(null) })" />
 
-<div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
-    <div>
-        <h4 class="mb-1 fw-bold"><i class="bi bi-list-check me-2 text-primary"></i>@Loc.T("My Orders")</h4>
-        <div class="text-muted small">@Loc.T("Every inspection, maintenance, and work order assigned to you or your groups, in one place")</div>
-    </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <div class="btn-group btn-group-sm" role="group">
-            <a class="btn @(range == "month" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="month" asp-route-category="@category">@Loc.T("This month")</a>
-            <a class="btn @(range == "all" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="all" asp-route-category="@category">@Loc.T("All time")</a>
-        </div>
-        <div class="btn-group btn-group-sm" role="group">
-            <a class="btn @(!showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="false" asp-route-range="@range" asp-route-category="@category">@Loc.T("Open")</a>
-            <a class="btn @(showAll ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="true" asp-route-range="@range" asp-route-category="@category">@Loc.T("All")</a>
-        </div>
-        <a class="btn btn-sm btn-outline-secondary" asp-action="MyHistory"><i class="bi bi-clock-history me-1"></i>@Loc.T("History")</a>
-    </div>
-</div>
+@* The three header toggles (period / open-or-all / category) were three separate link groups that
+   each had to carry the other two-s state in every link. One GET form does the same job. *@
+<form method="get" class="filter-bar d-flex flex-wrap align-items-center gap-2 mb-3">
+    <label for="myOrdersStatus" class="visually-hidden">@Loc.T("Status")</label>
+    <select id="myOrdersStatus" name="showAll" class="form-select form-select-sm w-auto">
+        <option value="false" selected="@(!showAll)">@Loc.T("Open")</option>
+        <option value="true" selected="@showAll">@Loc.T("All")</option>
+    </select>
 
-@* Same unwrapping btn-group issue documented on Orders/Create.cshtml — 4 category labels
-   ("All Categories"/"Maintenance"/etc.) don't fit a narrow phone and a btn-group doesn't wrap
-   its buttons, so without this it drags the whole page into horizontal scroll. *@
-<div class="overflow-x-auto mb-3">
-    <div class="btn-group btn-group-sm text-nowrap" role="group">
-        <a class="btn @(string.IsNullOrEmpty(category) ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range">@Loc.T("All Categories")</a>
-        <a class="btn @(category == "Inspection" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Inspection">@Loc.T("Inspection")</a>
-        <a class="btn @(category == "Maintenance" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="Maintenance">@Loc.T("Maintenance")</a>
-        <a class="btn @(category == "WorkOrder" ? "btn-primary" : "btn-outline-secondary")" asp-action="MyOrders" asp-route-showAll="@showAll" asp-route-range="@range" asp-route-category="WorkOrder">@Loc.T("Work Order")</a>
-    </div>
-</div>
+    <label for="myOrdersRange" class="visually-hidden">@Loc.T("Period")</label>
+    <select id="myOrdersRange" name="range" class="form-select form-select-sm w-auto">
+        <option value="month" selected="@(range == "month")">@Loc.T("This month")</option>
+        <option value="30" selected="@(range == "30")">@Loc.T("Last 30 days")</option>
+        <option value="90" selected="@(range == "90")">@Loc.T("Last 90 days")</option>
+        <option value="all" selected="@(range == "all")">@Loc.T("All time")</option>
+    </select>
+
+    <label for="myOrdersCategory" class="visually-hidden">@Loc.T("Category")</label>
+    <select id="myOrdersCategory" name="category" class="form-select form-select-sm w-auto">
+        <option value="">@Loc.T("All Categories")</option>
+        <option value="Inspection" selected="@(category == "Inspection")">@Loc.T("Inspection")</option>
+        <option value="Maintenance" selected="@(category == "Maintenance")">@Loc.T("Maintenance")</option>
+        <option value="WorkOrder" selected="@(category == "WorkOrder")">@Loc.T("Work Order")</option>
+    </select>
+
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (anyFilter)
+    {
+        <a class="btn btn-link btn-sm" href="@Url.Action("MyOrders")">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small ms-auto">@Model.Count @Loc.T("records")</span>
+</form>
 
 <div class="card border-0 shadow-sm">
     @if (Model.Count == 0)
     {
-        <div class="card-body text-center text-muted py-5">
-            <i class="bi bi-check2-circle fs-1 d-block mb-2 opacity-25"></i>
-            @(showAll ? Loc.T("No orders assigned to you.") : Loc.T("No open orders — you're all caught up."))
-        </div>
+        <partial name="_EmptyState" model="@(new EmptyStateModel{
+            Icon = "bi-check2-circle",
+            Title = showAll ? Loc.T("No orders assigned to you.") : Loc.T("No open orders — you're all caught up."),
+            Text = showAll ? Loc.T("Try a wider period or a different category.") : Loc.T("Anything assigned to you or your groups shows up here.") })" />
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
                 <thead class="table-light">
                     <tr>
-                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th class="d-none d-sm-table-cell">@Loc.T("Asset")</th>
-                        <th>@Loc.T("Status")</th><th class="d-none d-md-table-cell">@Loc.T("Due Date")</th><th class="text-end"></th>
+                        <th>@Loc.T("Category")</th><th>@Loc.T("Order #")</th><th>@Loc.T("Asset")</th>
+                        <th>@Loc.T("Status")</th><th>@Loc.T("Due Date")</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var o in Model)
                     {
-                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", o.DetailsController, new { id = o.Id })'">
-                            <td><span class="badge @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
-                            <td class="fw-semibold">@o.OrderNumber</td>
-                            <td class="small d-none d-sm-table-cell">@(o.AssetLabel ?? "—")</td>
-                            <td><partial name="_StatusBadge" model="@o.Status" /></td>
-                            <td class="d-none d-md-table-cell">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
-                            <td class="text-end"><i class="bi bi-chevron-right text-muted small"></i></td>
+                        <tr class="row-link" data-href="@Url.Action("Details", o.DetailsController, new { id = o.Id })">
+                            <td data-label="@Loc.T("Category")"><span class="badge border @CategoryBadgeClass(o.Category)">@Loc.T(o.CategoryLabel)</span></td>
+                            @* A real anchor as well as the row click — keyboard and new-tab users need one. *@
+                            <td data-label="@Loc.T("Order #")"><a asp-action="Details" asp-controller="@o.DetailsController" asp-route-id="@o.Id" class="fw-semibold text-decoration-none">@o.OrderNumber</a></td>
+                            <td class="small" data-label="@Loc.T("Asset")">@(o.AssetLabel ?? "—")</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@StatusDisplay.Label(o.Status)" /></td>
+                            <td data-label="@Loc.T("Due Date")">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
                         </tr>
                     }
                 </tbody>

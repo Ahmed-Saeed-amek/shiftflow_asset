@@ -10,7 +10,10 @@
     var orderTypes = options.OrderTypes;
     var orderTypeMetaJson = options.OrderTypeMetaJson;
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Order"),Subtitle=Loc.T("Create an inspection survey or a direct-fix maintenance order")})" />
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+    Title = Loc.T("New Order"),
+    Subtitle = Loc.T("Create an inspection survey or a direct-fix maintenance order"),
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Orders"), Url.Action("Index")), (Loc.T("New Order"), null) } })" />
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
@@ -27,7 +30,7 @@
 
             <div class="row g-3">
                 <div class="col-12">
-                    <label class="form-label d-block">@Loc.T("Order Type")</label>
+                    <label class="form-label required d-block">@Loc.T("Order Type")</label>
                     @* A btn-group doesn't wrap (Bootstrap joins its buttons into one row with
                        connected borders) — with 6-8 order types that overflowed past a narrow
                        viewport and dragged the WHOLE page into horizontal scroll. Scope the
@@ -61,7 +64,7 @@
                    longer a reason to duplicate these blocks per style (as the old
                    inspectionFields/maintenanceFields split did). *@
                 <div class="col-12">
-                    <label class="form-label d-block">@Loc.T("Assign To")</label>
+                    <label class="form-label required d-block">@Loc.T("Assign To")</label>
                     <div class="btn-group btn-group-sm mb-2" role="group" id="assigneeToggle">
                         <input type="radio" class="btn-check" name="AssigneeType" id="assigneeUser" value="User" checked="@(Model.AssigneeType == "User")" />
                         <label class="btn btn-outline-secondary" for="assigneeUser">@Loc.T("Employee")</label>
@@ -87,7 +90,7 @@
                 <div class="col-12"><hr /></div>
 
                 <div class="col-12">
-                    <label class="form-label d-block">@Loc.T("Assets")</label>
+                    <label class="form-label required d-block" id="assetFieldLabel">@Loc.T("Assets")</label>
                     <div id="assetSingleWrap">
                         <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
                             Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
@@ -99,7 +102,7 @@
                 </div>
             </div>
 
-            <div class="mt-4">
+            <div class="form-actions d-flex flex-wrap gap-2 mt-4">
                 <button type="submit" class="btn btn-primary" @(orderTypes.Count == 0 ? "disabled" : "")><i class="bi bi-check-lg me-1"></i>@Loc.T("Create Order")</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>
@@ -120,6 +123,11 @@
     const userHidden = userRow.querySelector('[data-ep-value]');
     const groupSelect = groupRow.querySelector('select[name="AssignedToGroupId"]');
 
+    const assetFieldLabel = document.getElementById("assetFieldLabel");
+    // The field is one asset or many depending on the selected type's cardinality — the label has
+    // to say which, or a single-asset type still reads as "pick as many as you like".
+    const assetLabelSingular = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Asset")));
+    const assetLabelPlural = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Assets")));
     const assetSingleWrap = document.getElementById('assetSingleWrap');
     const assetMultiWrap = document.getElementById('assetMultiWrap');
     const assetSingleHidden = assetSingleWrap.querySelector('[data-ap-value]');
@@ -139,6 +147,7 @@
     }
 
     function applyCardinality(allowsMultiple) {
+        if (assetFieldLabel) assetFieldLabel.textContent = allowsMultiple ? assetLabelPlural : assetLabelSingular;
         assetSingleWrap.classList.toggle('d-none', allowsMultiple);
         assetMultiWrap.classList.toggle('d-none', !allowsMultiple);
         // Clear whichever picker is now hidden, same reasoning as assignment above — a multi-picker

@@ -1,54 +1,51 @@
 @model List<ShiftFlow.Web.ViewModels.MyHistoryMonthRow>
+@using ShiftFlow.Web.ViewModels
 @{
     ViewData["Title"] = Loc.T("History");
     var culture = new System.Globalization.CultureInfo(Loc.IsRTL ? "ar" : "en-US");
 }
-
-<div class="mb-3">
-    <h4 class="mb-1 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>@Loc.T("History")</h4>
-    <div class="text-muted small">@Loc.T("Your past orders, grouped by month")</div>
-</div>
+<partial name="_PageHeader" model="@(new PageHeaderWithBreadcrumbs{
+    Title = Loc.T("History"),
+    Subtitle = Loc.T("Your past orders, grouped by month"),
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("My Orders"), Url.Action("MyOrders")), (Loc.T("History"), null) } })" />
 
 <div class="card border-0 shadow-sm">
     @if (Model.Count == 0)
     {
-        <div class="card-body text-center text-muted py-5">
-            <i class="bi bi-clock-history fs-1 d-block mb-2 opacity-25"></i>
-            @Loc.T("No records found")
-        </div>
+        <partial name="_EmptyState" model="@(new EmptyStateModel{
+            Icon = "bi-clock-history",
+            Title = Loc.T("No records found"),
+            Text = Loc.T("Months you had orders in show up here.") })" />
     }
     else
     {
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
                 <thead class="table-light">
                     <tr>
                         <th>@Loc.T("Month")</th>
                         <th>@Loc.T("Inspection")</th>
                         <th>@Loc.T("Maintenance Order")</th>
                         <th>@Loc.T("Work Order")</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var m in Model)
                     {
                         var monthDate = new DateTime(m.Year, m.Month, 1);
-                        <tr>
-                            <td class="fw-semibold">@monthDate.ToString("MMMM yyyy", culture)</td>
-                            <td>@m.InspectionCount</td>
-                            <td>@m.MaintenanceCount</td>
-                            <td>@m.WorkOrderCount</td>
-                            <td class="text-end">
-                                @* toDate is the first day of the NEXT month, not the last day of this one at
-                                   midnight — CreatedAt/CreatedDate carry a time component, so a date-only
-                                   "last day at 00:00" bound silently dropped every record from later that
-                                   same day (in practice, most of the current, still-in-progress month). *@
-                                <a asp-controller="Users" asp-action="MyOrders" asp-route-showAll="true"
-                                   asp-route-fromDate="@monthDate.ToString("yyyy-MM-dd")"
-                                   asp-route-toDate="@monthDate.AddMonths(1).ToString("yyyy-MM-dd")"
-                                   class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
-                            </td>
+                        @* toDate is the first day of the NEXT month, not the last day of this one at
+                           midnight — CreatedAt/CreatedDate carry a time component, so a date-only
+                           "last day at 00:00" bound silently dropped every record from later that
+                           same day (in practice, most of the current, still-in-progress month). *@
+                        var monthUrl = Url.Action("MyOrders", "Users", new {
+                            showAll = true,
+                            fromDate = monthDate.ToString("yyyy-MM-dd"),
+                            toDate = monthDate.AddMonths(1).ToString("yyyy-MM-dd") });
+                        <tr class="row-link" data-href="@monthUrl">
+                            <td data-label="@Loc.T("Month")"><a href="@monthUrl" class="fw-semibold text-decoration-none">@monthDate.ToString("MMMM yyyy", culture)</a></td>
+                            <td data-label="@Loc.T("Inspection")">@m.InspectionCount</td>
+                            <td data-label="@Loc.T("Maintenance Order")">@m.MaintenanceCount</td>
+                            <td data-label="@Loc.T("Work Order")">@m.WorkOrderCount</td>
                         </tr>
                     }
                 </tbody>

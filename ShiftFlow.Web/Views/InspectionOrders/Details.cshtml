@@ -12,19 +12,104 @@
     var isManager = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
     var isOpen = Model.Status is "Open" or "InProgress";
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.OrderNumber,Subtitle=Loc.T("Assigned to") + ": " + assignedTo})" />
+@* Breadcrumb instead of a bottom Back button — it says where this page sits and works no
+   matter how the page was reached. Orders is the combined list both order kinds live on. *@
+<nav aria-label="@Loc.T("Breadcrumb")" class="mb-2">
+    <ol class="breadcrumb small mb-0">
+        <li class="breadcrumb-item">
+            @if (canViewOrderList)
+            {
+                <a asp-controller="Orders" asp-action="Index" class="text-decoration-none">@Loc.T("Orders")</a>
+            }
+            else
+            {
+                <a asp-controller="Users" asp-action="MyOrders" class="text-decoration-none">@Loc.T("My Orders")</a>
+            }
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.OrderNumber</li>
+    </ol>
+</nav>
 
-<div class="d-flex align-items-center gap-2 mb-3">
-    <partial name="_StatusBadge" model="@Model.Status" />
-    @if (Model.DueDate.HasValue)
-    {
-        <span class="text-muted small">@Loc.T("Due") @Model.DueDate.Value.ToString("dd/MM/yyyy")</span>
-    }
-    @if (!string.IsNullOrWhiteSpace(Model.Description))
-    {
-        <span class="text-muted small">— @Model.Description</span>
-    }
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-3">
+    <div>
+        @* The status badge sits with the title instead of floating on its own row below it. *@
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+            <h1 class="fs-3 fw-bold font-heading mb-0">@Model.OrderNumber</h1>
+            <partial name="_StatusBadge" model="@StatusDisplay.Label(Model.Status)" />
+        </div>
+        <div class="text-muted small d-flex align-items-center flex-wrap column-gap-3 row-gap-1">
+            <span><i class="bi bi-person me-1"></i>@Loc.T("Assigned to"): @assignedTo</span>
+            @if (Model.DueDate.HasValue)
+            {
+                <span><i class="bi bi-calendar3 me-1"></i>@Loc.T("Due") @Loc.TDate(Model.DueDate.Value.ToString("dd/MM/yyyy"))</span>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p class="text-muted small mt-1 mb-0">@Model.Description</p>
+        }
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-self-start align-self-lg-auto flex-shrink-0">
+        @if (Model.Status is not ("Done" or "Cancelled") && isManager)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#reassignPanel" aria-controls="reassignPanel">
+                <i class="bi bi-person-gear me-1"></i>@Loc.T("Reassign")
+            </button>
+        }
+        @if (isOpen && isManager)
+        {
+            <div class="dropdown d-inline-block">
+                @* auto-close="outside" keeps the menu open while the reason is typed. *@
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    @Loc.T("More")
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="min-width:19rem">
+                    <li><h6 class="dropdown-header">@Loc.T("Cancel Inspection Order")</h6></li>
+                    <li><div class="px-3 small text-muted">@Loc.T("Stops this order — recorded outcomes are kept, nothing further can be reported.")</div></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" asp-action="Cancel" asp-route-id="@Model.Id" class="px-3 pb-2">
+                            @Html.AntiForgeryToken()
+                            <label for="cancelReason" class="visually-hidden">@Loc.T("Reason (optional)")</label>
+                            <input type="text" id="cancelReason" name="reason" class="form-control form-control-sm mb-2" placeholder="@Loc.T("Reason (optional)")" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100" data-confirm="@Loc.T("Cancel this inspection order?")">
+                                <i class="bi bi-x-octagon me-1"></i>@Loc.T("Cancel Inspection Order")
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        }
+    </div>
 </div>
+
+@if (Model.Status is not ("Done" or "Cancelled") && isManager)
+{
+    <div class="collapse mb-3" id="reassignPanel">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold border-0 d-flex align-items-center gap-2">
+                <i class="bi bi-person-gear text-primary"></i>@Loc.T("Reassign")
+            </div>
+            <div class="card-body">
+                <div class="form-text mb-2">@Loc.T("Use this if the current assignee's account has been deactivated and the order needs to move to someone else.")</div>
+                <form method="post" asp-action="Reassign" asp-route-id="@Model.Id" class="d-flex gap-2 flex-wrap">
+                    @Html.AntiForgeryToken()
+                    <div style="min-width:220px" class="flex-grow-1">
+                        <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
+                    </div>
+                    <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px" aria-label="@Loc.T("— or select a group —")">
+                        <option value="">@Loc.T("— or select a group —")</option>
+                        @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">@Loc.T("Reassign")</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
 
 @* The antiforgery token for the fetch calls below - a hidden holder, not an empty <form>. *@
 <div hidden>@Html.AntiForgeryToken()</div>
@@ -36,7 +121,7 @@
             <thead>
                 <tr>
                     <th>@Loc.T("Asset Tag")</th>
-                    <th>@Loc.T("Location")</th>
+                    <th>@Loc.T("Zone")</th>
                     <th>@Loc.T("Outcome")</th>
                     <th>@Loc.T("Maintenance Actions")</th>
                     <th></th>
@@ -53,7 +138,7 @@
                                and blow out the whole table's width instead of wrapping. *@
                             <div class="text-muted text-break">@item.Asset.Name</div>
                         </td>
-                        <td class="small" data-label="@Loc.T("Location")">
+                        <td class="small" data-label="@Loc.T("Zone")">
                             @if (item.Asset.Zone != null)
                             {
                                 <a asp-controller="Zones" asp-action="Details" asp-route-id="@item.Asset.ZoneId">@Loc.LocalizedName(item.Asset.Zone.Name, item.Asset.Zone.NameAr)</a>
@@ -92,10 +177,10 @@
                                 </button>
                             }
                         </td>
-                        <td>
+                        <td data-label="@Loc.T("Record outcome")">
                             @if (item.Outcome == "Pending")
                             {
-                                <div class="d-flex flex-wrap gap-2 gap-sm-3 outcome-actions">
+                                <div class="d-flex flex-wrap gap-2 outcome-actions">
                                     <button type="button" class="btn btn-sm btn-outline-success outcome-btn" data-outcome="OK">@Loc.T("OK")</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger outcome-btn" data-outcome="Defective">@Loc.T("Defective")</button>
                                     <button type="button" class="btn btn-sm btn-outline-primary maintenance-only-btn" data-item-id="@item.Id">@Loc.T("Maintenance")</button>
@@ -179,66 +264,13 @@
     </div>
 }
 
-@if (Model.Status is not ("Done" or "Cancelled") && isManager)
-{
-    <div class="text-end mb-3">
-        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#reassignCollapse">
-            <i class="bi bi-person-gear me-1"></i>@Loc.T("Reassign")
-        </button>
-        <div class="collapse mt-2" id="reassignCollapse">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-start">
-                    <div class="form-text mb-2">@Loc.T("Use this if the current assignee's account has been deactivated and the order needs to move to someone else.")</div>
-                    <form method="post" asp-action="Reassign" asp-route-id="@Model.Id" class="d-flex gap-2 flex-wrap">
-                        @Html.AntiForgeryToken()
-                        <div style="min-width:220px" class="flex-grow-1">
-                            <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="assignedToUserId",Placeholder=Loc.T("Search by name or email…")})" />
-                        </div>
-                        <select name="assignedToGroupId" class="form-select form-select-sm" style="max-width:200px">
-                            <option value="">@Loc.T("— or select a group —")</option>
-                            @foreach (var t in (List<Group>)(ViewBag.Groups ?? new List<Group>()))
-                            {
-                                <option value="@t.Id">@t.Name</option>
-                            }
-                        </select>
-                        <button type="submit" class="btn btn-sm btn-outline-primary flex-shrink-0">@Loc.T("Reassign")</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-@if (isOpen && isManager)
-{
-    <div class="text-end mb-3">
-        <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#cancelCollapse">
-            <i class="bi bi-x-octagon me-1"></i>@Loc.T("Cancel Inspection Order")
-        </button>
-        <div class="collapse mt-2" id="cancelCollapse">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body text-start">
-                    <form method="post" asp-action="Cancel" asp-route-id="@Model.Id"
-                          onsubmit="return confirm('@Loc.T("Cancel this inspection order?")')"
-                          class="d-flex gap-2">
-                        @Html.AntiForgeryToken()
-                        <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
-                        <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Cancel Inspection Order")</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-@if (canViewOrderList)
-{
-    <a asp-action="Index" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
-}
-else
-{
-    <a asp-controller="Users" asp-action="MyOrders" class="btn btn-outline-secondary btn-sm mt-3">@Loc.T("Back")</a>
-}
+@* Outcome buttons are the one control a phone user taps all day — 44px minimum and equal
+   widths, so OK/Defective/Maintenance read as one set of three rather than three loose links. *@
+<style>
+    @@media (max-width: 575.98px) {
+        .outcome-actions .btn { min-height: 44px; flex: 1 1 8rem; }
+    }
+</style>
 
 @section Scripts {
 <script>
