@@ -6,15 +6,6 @@
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Model.WorkOrderNumber,Subtitle=Model.Asset?.AssetTag})" />
 
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger small">@TempData["Error"]</div>
-}
-@if (TempData["Success"] != null)
-{
-    <div class="alert alert-success small">@TempData["Success"]</div>
-}
-
 <div class="row g-3">
     <div class="@(isSentToVendor ? "col-lg-5" : "col-lg-8")">
         <div class="card border-0 shadow-sm mb-3">

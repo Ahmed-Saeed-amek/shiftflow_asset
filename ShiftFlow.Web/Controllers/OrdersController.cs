@@ -7,6 +7,7 @@ using ShiftFlow.Domain.Entities;
 using ShiftFlow.Infrastructure.Data;
 using ShiftFlow.Web.Authorization;
 using ShiftFlow.Web.Localization;
+using ShiftFlow.Web.Services;
 using ShiftFlow.Web.ViewModels;
 
 namespace ShiftFlow.Web.Controllers;
@@ -20,72 +21,114 @@ namespace ShiftFlow.Web.Controllers;
 [Authorize]
 public class OrdersController : Controller
 {
-    private readonly IInspectionOrderService _inspectionOrders;
-    private readonly IMaintenanceOrderService _maintenanceOrders;
-    private readonly IWorkOrderService _workOrders;
+    private readonly IOrderCreationService _orderCreation;
     private readonly IGroupService _groups;
+    private readonly IAssetScopeService _scope;
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILanguageService _loc;
 
-    public OrdersController(IInspectionOrderService inspectionOrders, IMaintenanceOrderService maintenanceOrders,
-        IWorkOrderService workOrders, IGroupService groups, ApplicationDbContext db, UserManager<ApplicationUser> userManager,
-        ILanguageService loc)
+    public OrdersController(IOrderCreationService orderCreation, IGroupService groups, IAssetScopeService scope,
+        ApplicationDbContext db, UserManager<ApplicationUser> userManager, ILanguageService loc)
     {
-        _inspectionOrders = inspectionOrders; _maintenanceOrders = maintenanceOrders;
-        _workOrders = workOrders; _groups = groups; _db = db; _userManager = userManager; _loc = loc;
+        _orderCreation = orderCreation; _groups = groups; _scope = scope;
+        _db = db; _userManager = userManager; _loc = loc;
     }
 
     private string CurrentUserId => _userManager.GetUserId(User)!;
+    private const int PageSize = 25;
 
-    public async Task<IActionResult> Index(string? status, string? search, int? orderTypeId, bool overdue = false)
+    public async Task<IActionResult> Index(string? status, string? search, int? orderTypeId, bool overdue = false, int page = 1)
     {
         var canViewInspection = (await AuthZ(PermissionCatalog.InspectionOrderView)).Succeeded;
         var canViewMaintenance = (await AuthZ(PermissionCatalog.MaintenanceOrderView)).Succeeded;
         if (!canViewInspection && !canViewMaintenance) return Forbid();
+        if (page < 1) page = 1;
+        search = SearchQuery.Cap(search);
 
-        var rows = new List<MyWorkOrderRow>();
+        // A scoped user must not even see rows they'd be 404'd out of on Details.
+        List<int>? scopedAssetIds = null;
+        if (await _scope.HasScopeAsync(CurrentUserId))
+            scopedAssetIds = await (await _scope.ApplyScopeAsync(_db.Assets.AsNoTracking(), CurrentUserId)).Select(a => a.Id).ToListAsync();
+
+        // Both halves are filtered, ordered and truncated in SQL - only the page's worth of rows
+        // from each side is ever materialised, then merged.
+        var take = page * PageSize;
+        var rows = new List<OrderListRow>();
+        var totalCount = 0;
 
         if (canViewInspection)
         {
-            var orders = await _inspectionOrders.GetAllAsync(status, search, overdue, CurrentUserId);
-            rows.AddRange(orders.Select(o => new MyWorkOrderRow
+            var q = _db.InspectionOrders.AsNoTracking().AsQueryable();
+            if (scopedAssetIds != null) q = q.Where(o => o.InspectionRun!.Items.All(i => scopedAssetIds.Contains(i.AssetId)));
+            if (!string.IsNullOrWhiteSpace(status)) q = q.Where(o => o.Status == status);
+            if (!string.IsNullOrWhiteSpace(search)) q = q.Where(o => o.OrderNumber.Contains(search));
+            if (orderTypeId.HasValue) q = q.Where(o => o.OrderTypeId == orderTypeId);
+            if (overdue)
             {
-                Category = "Inspection", CategoryLabel = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
-                OrderTypeId = o.OrderTypeId,
-                OrderTypeLabel = o.OrderType != null ? _loc.LocalizedName(o.OrderType.Name, o.OrderType.NameAr) : _loc.T("Inspection"),
-                OrderTypeColor = o.OrderType?.Color ?? "#6c757d",
-                AssetLabel = $"{o.InspectionRun?.Items.Count ?? 0} " + ((o.InspectionRun?.Items.Count ?? 0) == 1 ? _loc.T("asset") : _loc.T("assets")),
-                Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt, DetailsController = "InspectionOrders",
-                AssignedToLabel = o.AssignedToUser?.FullName ?? (o.AssignedToGroup != null ? $"{_loc.T("Group")}: {o.AssignedToGroup.Name}" : null),
-            }));
+                var today = DateTime.UtcNow.Date;
+                q = q.Where(o => o.Status != OrderStatuses.Done && o.Status != OrderStatuses.Cancelled && o.DueDate != null && o.DueDate < today);
+            }
+            totalCount += await q.CountAsync();
+            rows.AddRange(await q.OrderByDescending(o => o.CreatedAt).Take(take)
+                .Select(o => new OrderListRow
+                {
+                    Category = "Inspection", Id = o.Id, OrderNumber = o.OrderNumber,
+                    OrderTypeName = o.OrderType!.Name, OrderTypeNameAr = o.OrderType.NameAr,
+                    OrderTypeColor = o.OrderType.Color, OrderTypeId = o.OrderTypeId,
+                    AssetCount = o.InspectionRun!.Items.Count,
+                    Status = o.Status, DueDate = o.DueDate, CreatedAt = o.CreatedAt,
+                    AssignedToUserName = o.AssignedToUser!.FullName, AssignedToGroupName = o.AssignedToGroup!.Name,
+                }).ToListAsync());
         }
         // overdue is an Inspection-only concept (DueDate + Status != Done) - a request for the
-        // overdue view suppresses Maintenance rows entirely rather than silently mixing in
-        // non-overdue Maintenance rows under a filter name that doesn't apply to them.
+        // overdue view suppresses Maintenance rows rather than mixing in non-overdue ones.
         if (canViewMaintenance && !overdue)
         {
-            var orders = await _maintenanceOrders.GetAllAsync(status, search, CurrentUserId);
-            rows.AddRange(orders.Select(m => new MyWorkOrderRow
-            {
-                Category = "Maintenance", CategoryLabel = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
-                OrderTypeId = m.OrderTypeId,
-                OrderTypeLabel = m.OrderType != null ? _loc.LocalizedName(m.OrderType.Name, m.OrderType.NameAr) : _loc.T("Maintenance"),
-                OrderTypeColor = m.OrderType?.Color ?? "#6c757d",
-                AssetLabel = m.Asset?.AssetTag, Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
-                DetailsController = "MaintenanceOrders",
-                AssignedToLabel = m.AssignedToUser?.FullName ?? (m.AssignedToGroup != null ? $"{_loc.T("Group")}: {m.AssignedToGroup.Name}" : null),
-            }));
+            var q = _db.MaintenanceOrders.AsNoTracking().AsQueryable();
+            if (scopedAssetIds != null) q = q.Where(m => scopedAssetIds.Contains(m.AssetId));
+            if (!string.IsNullOrWhiteSpace(status)) q = q.Where(m => m.Status == status);
+            if (!string.IsNullOrWhiteSpace(search)) q = q.Where(m => m.OrderNumber.Contains(search) || m.Asset!.AssetTag.Contains(search));
+            if (orderTypeId.HasValue) q = q.Where(m => m.OrderTypeId == orderTypeId);
+            totalCount += await q.CountAsync();
+            rows.AddRange(await q.OrderByDescending(m => m.CreatedDate).Take(take)
+                .Select(m => new OrderListRow
+                {
+                    Category = "Maintenance", Id = m.Id, OrderNumber = m.OrderNumber,
+                    OrderTypeName = m.OrderType!.Name, OrderTypeNameAr = m.OrderType.NameAr,
+                    OrderTypeColor = m.OrderType.Color, OrderTypeId = m.OrderTypeId,
+                    AssetTag = m.Asset!.AssetTag,
+                    Status = m.Status, DueDate = m.DueDate, CreatedAt = m.CreatedDate,
+                    AssignedToUserName = m.AssignedToUser!.FullName, AssignedToGroupName = m.AssignedToGroup!.Name,
+                }).ToListAsync());
         }
 
-        if (orderTypeId.HasValue) rows = rows.Where(r => r.OrderTypeId == orderTypeId).ToList();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        if (page > totalPages) page = totalPages;
+        var pageRows = rows.OrderByDescending(r => r.CreatedAt).Skip((page - 1) * PageSize).Take(PageSize).ToList();
+        foreach (var r in pageRows) Localize(r);
 
         ViewBag.Status = status; ViewBag.Search = search; ViewBag.OrderTypeId = orderTypeId; ViewBag.Overdue = overdue;
-        // Every active Order Type, each carrying its own auto-assigned color - drives the Orders
-        // list's per-type filter chips (see Views/Orders/Index.cshtml), replacing the old static
-        // All/Inspection/Maintenance tabs now that each type has its own distinct identity.
-        ViewBag.ActiveOrderTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
-        return View(rows.OrderByDescending(r => r.CreatedAt).ToList());
+        ViewBag.Pagination = new PaginationModel { Page = page, TotalPages = totalPages };
+        ViewBag.TotalCount = totalCount;
+        // Every active Order Type, each carrying its own auto-assigned color - drives the per-type
+        // filter chips on the list.
+        ViewBag.ActiveOrderTypes = await _db.OrderTypes.AsNoTracking().Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
+        return View(pageRows);
+    }
+
+    /// <summary>Display text that needs the request's language - applied after the rows come back
+    /// from SQL, since none of it can be translated in the database.</summary>
+    private void Localize(OrderListRow r)
+    {
+        r.OrderTypeLabel = r.OrderTypeName != null
+            ? _loc.LocalizedName(r.OrderTypeName, r.OrderTypeNameAr)
+            : _loc.T(r.Category == "Inspection" ? "Inspection" : "Maintenance");
+        r.AssetLabel = r.Category == "Inspection"
+            ? $"{r.AssetCount} " + (r.AssetCount == 1 ? _loc.T("asset") : _loc.T("assets"))
+            : r.AssetTag;
+        r.AssignedToLabel = r.AssignedToUserName
+            ?? (r.AssignedToGroupName != null ? $"{_loc.T("Group")}: {r.AssignedToGroupName}" : null);
     }
 
     public async Task<IActionResult> Create(int? assetId, int? orderTypeId)
@@ -94,24 +137,14 @@ public class OrdersController : Controller
         var canManageMaintenance = (await AuthZ(PermissionCatalog.MaintenanceOrderManage)).Succeeded;
         if (!canManageInspection && !canManageMaintenance) return Forbid();
 
-        await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance);
-        var offered = (List<OrderType>)ViewBag.OrderTypes;
         var vm = new OrderCreateVm
         {
-            OrderTypeId = offered.FirstOrDefault(t => t.Id == orderTypeId)?.Id ?? offered.FirstOrDefault()?.Id ?? 0,
             AssetId = assetId ?? 0,
             AssetIds = assetId.HasValue ? new List<int> { assetId.Value } : null,
         };
-        if (assetId.HasValue)
-        {
-            var asset = await _db.Assets.FindAsync(assetId.Value);
-            if (asset != null)
-            {
-                var label = $"{asset.AssetTag} — {asset.Name}";
-                ViewBag.SelectedAssetLabel = label;
-                ViewBag.SelectedAssetChips = new List<AssetChip> { new() { Id = asset.Id, Label = label } };
-            }
-        }
+        await PopulateOptionsAsync(vm, canManageInspection, canManageMaintenance);
+        vm.OrderTypeId = vm.Options.OrderTypes.FirstOrDefault(t => t.Id == orderTypeId)?.Id
+            ?? vm.Options.OrderTypes.FirstOrDefault()?.Id ?? 0;
         return View(vm);
     }
 
@@ -121,147 +154,51 @@ public class OrdersController : Controller
         var canManageInspection = (await AuthZ(PermissionCatalog.InspectionOrderManage)).Succeeded;
         var canManageMaintenance = (await AuthZ(PermissionCatalog.MaintenanceOrderManage)).Succeeded;
 
-        var orderType = await _db.OrderTypes.FirstOrDefaultAsync(t => t.Id == vm.OrderTypeId && t.IsActive);
-        if (orderType == null)
-        {
-            ModelState.AddModelError("", "Invalid order type.");
-            await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-            return View(vm);
-        }
+        var orderType = await _orderCreation.GetActiveOrderTypeAsync(vm.OrderTypeId);
+        if (orderType == null) return await CreateFailedAsync(vm, canManageInspection, canManageMaintenance, "Invalid order type.");
         // Never trust the client-side toggle for which branch to take - re-derive server-side.
         if (orderType.IsDirectFix && !canManageMaintenance) return Forbid();
         if (!orderType.IsDirectFix && !canManageInspection) return Forbid();
 
-        // Asset cardinality and assignment mode are now independent of IsDirectFix (OrderType's own
-        // AllowsMultipleAssets/AssignmentMode) — resolve which posted fields actually apply here,
-        // server-side, rather than trusting whichever inputs the client happened to enable/disable.
-        var assetIds = orderType.AllowsMultipleAssets
-            ? (vm.AssetIds ?? []).Distinct().ToList()
-            : (vm.AssetId > 0 ? [vm.AssetId] : []);
-
-        string? assignedToUserId = orderType.AssignmentMode == "GroupOnly" ? null : vm.AssignedToUserId;
-        int? assignedToGroupId = orderType.AssignmentMode == "EmployeeOnly" ? null : vm.AssignedToGroupId;
-        if (orderType.AssignmentMode == "Either")
+        OrderCreationResult result;
+        try
         {
-            if (vm.AssigneeType == "User") assignedToGroupId = null; else assignedToUserId = null;
+            result = await _orderCreation.CreateAsync(new OrderCreationRequest
+            {
+                OrderTypeId = vm.OrderTypeId, DueDate = vm.DueDate, AssigneeType = vm.AssigneeType,
+                AssignedToUserId = vm.AssignedToUserId, AssignedToGroupId = vm.AssignedToGroupId,
+                AssetId = vm.AssetId, AssetIds = vm.AssetIds,
+            }, CurrentUserId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return await CreateFailedAsync(vm, canManageInspection, canManageMaintenance, ex.Message);
         }
 
-        if (!orderType.IsDirectFix)
+        if (result.Count > 1)
         {
-            try
-            {
-                var order = await _inspectionOrders.CreateAsync(orderType.Id, null,
-                    assignedToUserId, assignedToGroupId, assetIds, vm.DueDate, CurrentUserId);
-                TempData["Success"] = $"Order {order.OrderNumber} created.";
-                return RedirectToAction("Details", "InspectionOrders", new { id = order.Id });
-            }
-            catch (InvalidOperationException ex)
-            {
-                ModelState.AddModelError("", ex.Message);
-                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                return View(vm);
-            }
+            TempData["Success"] = result.Kind == OrderCreationKind.WorkOrder
+                ? $"{result.Count} work orders created — this order type requires a vendor."
+                : $"{result.Count} orders created.";
+            return RedirectToAction(nameof(Index));
         }
-        else
+        TempData["Success"] = result.Kind == OrderCreationKind.WorkOrder
+            ? $"Work order {result.FirstOrderNumber} created — this order type requires a vendor."
+            : $"Order {result.FirstOrderNumber} created.";
+        var controller = result.Kind switch
         {
-            if (assetIds.Count == 0)
-            {
-                ModelState.AddModelError("", "Select at least one asset.");
-                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                return View(vm);
-            }
-            var retiredTags = await _db.Assets.Where(a => assetIds.Contains(a.Id) && a.Status == "Retired")
-                .Select(a => a.AssetTag).ToListAsync();
-            if (retiredTags.Count > 0)
-            {
-                // Naming the offending asset(s) instead of a generic "one or more" message — with the
-                // multi-asset picker's chips showing only labels, not status, a manager had no way to
-                // tell which of several selected assets was the retired one without removing them
-                // one at a time to re-submit and see which removal made the error go away.
-                ModelState.AddModelError("", "These assets are retired and can't have new orders opened against them: " + string.Join(", ", retiredTags));
-                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                return View(vm);
-            }
-            try
-            {
-                // Preserves the original single-asset branch's behavior exactly: a RequiresVendor
-                // OrderType produces a WorkOrder instead of a MaintenanceOrder. For
-                // AllowsMultipleAssets, one order is created per selected asset (no shared "batch"
-                // row exists in the schema) — redirect to the single order's Details page for the
-                // common single-asset case, or the Orders list with a count for a real batch.
-                if (orderType.RequiresVendor)
-                {
-                    // WorkOrder has no group-assignment concept (unlike InspectionOrder/
-                    // MaintenanceOrder) — a GroupOnly/Either type that resolves to a group here would
-                    // otherwise silently create an unassigned work order with the group picked in the
-                    // UI simply discarded. Require an employee instead of letting that happen quietly.
-                    if (string.IsNullOrWhiteSpace(assignedToUserId))
-                    {
-                        ModelState.AddModelError("", "This order type requires a vendor, which needs an individual employee assignee — group assignment isn't supported for vendor-routed work orders yet.");
-                        await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                        return View(vm);
-                    }
-                    // Each iteration's CreateAsync issues its own SaveChangesAsync — without an
-                    // enclosing transaction, an out-of-scope/retired/otherwise-invalid asset
-                    // later in the list (a raw/tampered POST can submit any ID; the retired check
-                    // above only covers that one case) throws mid-loop, but every order already
-                    // created for the assets before it stays committed. The catch below then
-                    // reports the whole submission as failed — which it visibly wasn't, since the
-                    // asset's status was also flipped to Defective by the surviving order(s). One
-                    // transaction across the whole batch makes "any asset in the list is invalid"
-                    // fail all-or-nothing, matching what the error message on failure already implies.
-                    WorkOrder? first = null;
-                    await using (var tx = await _db.Database.BeginTransactionAsync())
-                    {
-                        foreach (var assetId in assetIds)
-                        {
-                            var wo = await _workOrders.CreateAsync(new WorkOrder
-                            {
-                                AssetId = assetId,
-                                AssignedToUserId = assignedToUserId,
-                                OrderTypeId = orderType.Id,
-                                Description = null, RequiresVendorResponse = true,
-                            }, CurrentUserId);
-                            first ??= wo;
-                        }
-                        await tx.CommitAsync();
-                    }
-                    if (assetIds.Count == 1)
-                    {
-                        TempData["Success"] = $"Work order {first!.WorkOrderNumber} created — this order type requires a vendor.";
-                        return RedirectToAction("Details", "WorkOrders", new { id = first!.Id });
-                    }
-                    TempData["Success"] = $"{assetIds.Count} work orders created — this order type requires a vendor.";
-                    return RedirectToAction(nameof(Index));
-                }
-                // Same all-or-nothing reasoning as the WorkOrder loop above — one transaction
-                // across every asset in the batch, not one commit per asset.
-                MaintenanceOrder? firstOrder = null;
-                await using (var tx = await _db.Database.BeginTransactionAsync())
-                {
-                    foreach (var assetId in assetIds)
-                    {
-                        var order = await _maintenanceOrders.CreateAsync(assetId, assignedToUserId, assignedToGroupId,
-                            null, vm.DueDate, CurrentUserId, orderType.Id);
-                        firstOrder ??= order;
-                    }
-                    await tx.CommitAsync();
-                }
-                if (assetIds.Count == 1)
-                {
-                    TempData["Success"] = $"Order {firstOrder!.OrderNumber} created.";
-                    return RedirectToAction("Details", "MaintenanceOrders", new { id = firstOrder!.Id });
-                }
-                TempData["Success"] = $"{assetIds.Count} orders created.";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (InvalidOperationException ex)
-            {
-                ModelState.AddModelError("", ex.Message);
-                await PopulateCreateViewBagAsync(canManageInspection, canManageMaintenance, vm);
-                return View(vm);
-            }
-        }
+            OrderCreationKind.Inspection => "InspectionOrders",
+            OrderCreationKind.WorkOrder => "WorkOrders",
+            _ => "MaintenanceOrders",
+        };
+        return RedirectToAction("Details", controller, new { id = result.FirstOrderId });
+    }
+
+    private async Task<IActionResult> CreateFailedAsync(OrderCreateVm vm, bool canManageInspection, bool canManageMaintenance, string message)
+    {
+        ModelState.AddModelError("", message);
+        await PopulateOptionsAsync(vm, canManageInspection, canManageMaintenance);
+        return View(vm);
     }
 
     private async Task<Microsoft.AspNetCore.Authorization.AuthorizationResult> AuthZ(string policy) =>
@@ -269,40 +206,35 @@ public class OrdersController : Controller
             .AuthorizeAsync(User, policy);
 
     // Filtered per-permission: a Manage-Maintenance-only user only ever sees IsDirectFix=true
-    // types on this picker; a Manage-Inspection-only user only sees IsDirectFix=false ones;
-    // someone with both sees everything. Avoids a manager clicking through options they can't
-    // actually use.
-    private async Task PopulateCreateViewBagAsync(bool canManageInspection, bool canManageMaintenance, OrderCreateVm? vm = null)
+    // types on this picker; a Manage-Inspection-only user only sees IsDirectFix=false ones.
+    // ThenBy(Id) breaks SortOrder ties deterministically.
+    private async Task PopulateOptionsAsync(OrderCreateVm vm, bool canManageInspection, bool canManageMaintenance)
     {
-        ViewBag.LocationCategories = await _db.LocationCategories.OrderBy(c => c.Id).ToListAsync();
-        ViewBag.Categories = await _db.AssetCategories.Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
-        ViewBag.Groups = await _groups.GetAllAsync();
+        var o = vm.Options;
+        o.LocationCategories = await _db.LocationCategories.AsNoTracking().OrderBy(c => c.Id).ToListAsync();
+        o.Categories = await _db.AssetCategories.AsNoTracking().Where(c => c.ParentCategoryId == null).OrderBy(c => c.Name).ToListAsync();
+        o.Groups = await _groups.GetAllAsync();
 
-        // ThenBy(Id) breaks ties deterministically - SortOrder alone isn't unique (e.g. the seeded
-        // Inspection and Standard rows both default to 0), and without a tiebreaker the picker's
-        // order could silently shuffle whenever a new same-SortOrder type is added or the query
-        // just re-runs, which is exactly what a fresh-eyes test caught.
-        var allTypes = await _db.OrderTypes.Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
-        var offered = allTypes.Where(t => (t.IsDirectFix && canManageMaintenance) || (!t.IsDirectFix && canManageInspection)).ToList();
-        ViewBag.OrderTypes = offered;
-        ViewBag.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
-            offered.ToDictionary(t => t.Id, t => new { t.IsDirectFix, t.RequiresVendor, t.AllowsMultipleAssets, t.AssignmentMode }),
+        var allTypes = await _db.OrderTypes.AsNoTracking().Where(t => t.IsActive).OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToListAsync();
+        o.OrderTypes = allTypes.Where(t => (t.IsDirectFix && canManageMaintenance) || (!t.IsDirectFix && canManageInspection)).ToList();
+        o.OrderTypeMetaJson = System.Text.Json.JsonSerializer.Serialize(
+            o.OrderTypes.ToDictionary(t => t.Id, t => new { t.IsDirectFix, t.RequiresVendor, t.AllowsMultipleAssets, t.AssignmentMode }),
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
 
-        ViewBag.SelectedAssetChips = vm?.AssetIds is { Count: > 0 }
-            ? await _db.Assets.Where(a => vm.AssetIds.Contains(a.Id))
+        if (vm.AssetIds is { Count: > 0 })
+            o.SelectedAssetChips = await _db.Assets.AsNoTracking().Where(a => vm.AssetIds.Contains(a.Id))
                 .Select(a => new AssetChip { Id = a.Id, Label = a.AssetTag + " — " + a.Name })
-                .ToListAsync()
-            : (ViewBag.SelectedAssetChips as List<AssetChip> ?? new List<AssetChip>());
+                .ToListAsync();
 
-        if (vm != null && vm.AssetId > 0 && ViewBag.SelectedAssetLabel == null)
+        if (vm.AssetId > 0)
         {
-            var asset = await _db.Assets.FindAsync(vm.AssetId);
-            if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
+            var asset = await _db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == vm.AssetId);
+            if (asset != null) o.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
         }
 
-        ViewBag.SelectedEmployeeLabel = !string.IsNullOrEmpty(vm?.AssignedToUserId)
-            ? await _db.Users.Where(u => u.Id == vm.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
+        o.SelectedEmployeeLabel = !string.IsNullOrEmpty(vm.AssignedToUserId)
+            ? await _db.Users.AsNoTracking().Where(u => u.Id == vm.AssignedToUserId).Select(u => u.FullName).FirstOrDefaultAsync()
             : null;
     }
+
 }

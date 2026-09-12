@@ -1,7 +1,8 @@
-@model List<ShiftFlow.Web.ViewModels.MyWorkOrderRow>
+@model List<ShiftFlow.Web.ViewModels.OrderListRow>
 @using Microsoft.AspNetCore.Authorization
 @using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
+@using ShiftFlow.Web.ViewModels
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Loc.T("Orders");
@@ -15,10 +16,8 @@
     var canExportInspection = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderExport)).Succeeded;
     var canExportMaintenance = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderExport)).Succeeded;
     string actionsHtml = "";
-    // InspectionOrders/MaintenanceOrders each still have a working ExportExcel action, but their
-    // own Index pages are no longer linked from the sidebar (superseded by this unified Orders
-    // page) — without a link here, InspectionOrder.Export/MaintenanceOrder.Export had no reachable
-    // UI entry point at all despite being grantable permissions.
+    // InspectionOrders/MaintenanceOrders each still have a working ExportExcel action, but no list
+    // page of their own any more — without a link here their Export permissions have no entry point.
     if (canExportInspection)
         actionsHtml += "<a href='" + Url.Action("ExportExcel", "InspectionOrders") + "' class='btn btn-outline-success btn-sm'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Inspection Orders") + "</a> ";
     if (canExportMaintenance)
@@ -39,6 +38,33 @@
         var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
         return luminance > 0.6 ? "#1a1a1a" : "#fff";
     }
+
+    // Every filter chip carries the whole current filter set — switching type or status used to
+    // silently drop the search text and the overdue flag.
+    Dictionary<string, string?> Filters(string? newStatus = null, int? newOrderTypeId = null,
+        bool clearStatus = false, bool clearType = false, bool clearOverdue = false)
+    {
+        var d = new Dictionary<string, string?>();
+        var s = clearStatus ? null : newStatus ?? status;
+        var t = clearType ? (int?)null : newOrderTypeId ?? orderTypeId;
+        if (!string.IsNullOrEmpty(s)) d["status"] = s;
+        if (t.HasValue) d["orderTypeId"] = t.Value.ToString();
+        if (!string.IsNullOrWhiteSpace(search)) d["search"] = search;
+        if (overdue && !clearOverdue) d["overdue"] = "true";
+        return d;
+    }
+    // "PendingApproval" was rendered raw here — spaced and localized like every other label.
+    // _StatusBadge keys off the unspaced token, so the badge colour is resolved here instead of
+    // handing the partial a label it wouldn't recognise.
+    string StatusLabel(string s) => Loc.T(StatusDisplay.Label(s));
+    string StatusBadgeClass(string s) => s switch
+    {
+        "Done" => "bg-success-subtle text-success-emphasis border-success-subtle",
+        "Open" => "bg-danger-subtle text-danger-emphasis border-danger-subtle",
+        "InProgress" => "bg-info-subtle text-info-emphasis border-info-subtle",
+        "PendingApproval" => "bg-warning-subtle text-warning-emphasis border-warning-subtle",
+        _ => "bg-secondary-subtle text-secondary-emphasis border-secondary-subtle",
+    };
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Orders"),Subtitle=Loc.T("Inspection surveys and direct-fix maintenance orders, in one place"),ActionsHtml=actionsHtml})" />
 
@@ -46,51 +72,46 @@
 {
     <div class="alert alert-warning small d-flex justify-content-between align-items-center">
         <span><i class="bi bi-alarm me-1"></i>@Loc.T("Showing overdue inspection orders only")</span>
-        <a asp-action="Index" class="text-decoration-none">@Loc.T("Clear")</a>
+        @* Clearing the overdue banner keeps whatever type/status/search filter is also applied. *@
+        <a asp-action="Index" asp-all-route-data="@Filters(clearOverdue: true)" class="text-decoration-none">@Loc.T("Clear")</a>
     </div>
 }
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
     <div class="overflow-x-auto">
         <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <a class="btn @(orderTypeId == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-status="@status">@Loc.T("All")</a>
+            <a class="btn @(orderTypeId == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(clearType: true)">@Loc.T("All")</a>
             @foreach (var t in activeOrderTypes)
             {
                 var isActive = orderTypeId == t.Id;
                 // Every chip carries its type's color, even unselected — otherwise there's no way
-                // to visually pattern-match a chip to its row badges below (confirmed by a
-                // fresh-eyes pass: only the active chip had any color at all). Selected = solid
-                // fill; unselected = colored outline/text on a plain background.
+                // to visually pattern-match a chip to its row badges below. Selected = solid fill;
+                // unselected = colored outline/text on a plain background.
                 <a class="btn" style="@(isActive ? $"background-color:{t.Color};color:{ReadableTextColor(t.Color)};border-color:{t.Color}" : $"color:{t.Color};border-color:{t.Color}")"
-                   asp-action="Index" asp-route-status="@status" asp-route-orderTypeId="@t.Id">@Loc.LocalizedName(t.Name, t.NameAr)</a>
+                   asp-action="Index" asp-all-route-data="@Filters(newOrderTypeId: t.Id)">@Loc.LocalizedName(t.Name, t.NameAr)</a>
             }
         </div>
     </div>
-    @* Same unwrapping btn-group issue as the Order Type chips above (see comment on
-       Orders/Create.cshtml) — 4 status labels ("All Statuses"/"In Progress"/etc.) don't fit a
-       narrow phone width and a btn-group doesn't wrap its buttons, so without this it dragged
-       the whole page into horizontal scroll instead of just this control. *@
+    @* A btn-group doesn't wrap its buttons, so the status labels would drag the whole page into
+       horizontal scroll on a narrow phone without this scroll container. *@
     <div class="overflow-x-auto">
         <div class="btn-group btn-group-sm text-nowrap" role="group">
-            <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId">@Loc.T("All Statuses")</a>
-            <a class="btn @(status == "Open" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Open">@Loc.T("Open")</a>
-            <a class="btn @(status == "InProgress" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="InProgress">@Loc.T("In Progress")</a>
-            @* PendingApproval and Cancelled are both real, reachable statuses (InspectionOrder/
-               MaintenanceOrder.Statuses) with no filter chip here — status was still a working
-               query-string filter server-side (OrdersController.Index passes it straight through),
-               just with no way to reach it from this UI, making e.g. every cancelled order
-               invisible to a manager reviewing cancellations. *@
-            <a class="btn @(status == "PendingApproval" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="PendingApproval">@Loc.T("PendingApproval")</a>
-            <a class="btn @(status == "Done" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Done">@Loc.T("Done")</a>
-            <a class="btn @(status == "Cancelled" ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-orderTypeId="@orderTypeId" asp-route-status="Cancelled">@Loc.T("Cancelled")</a>
+            <a class="btn @(string.IsNullOrEmpty(status) ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(clearStatus: true)">@Loc.T("All Statuses")</a>
+            @foreach (var s in InspectionOrder.Statuses)
+            {
+                <a class="btn @(status == s ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-all-route-data="@Filters(newStatus: s)">@StatusLabel(s)</a>
+            }
         </div>
     </div>
     <form method="get" class="d-flex gap-2">
         <input type="hidden" name="orderTypeId" value="@orderTypeId" />
         <input type="hidden" name="status" value="@status" />
-        <input type="text" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:220px" />
+        <input type="hidden" name="overdue" value="@(overdue ? "true" : "false")" />
+        <label for="orderSearch" class="visually-hidden">@Loc.T("Search")</label>
+        <input type="text" id="orderSearch" name="search" value="@search" class="form-control form-control-sm" placeholder="@Loc.T("Search by order #...")" style="min-width:220px" />
         <button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button>
     </form>
+    <div class="ms-auto text-muted small align-self-center">@ViewBag.TotalCount @Loc.T("records")</div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -115,15 +136,17 @@
                 <tbody>
                     @foreach (var o in Model)
                     {
-                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", o.DetailsController, new { id = o.Id })'">
+                        var detailsController = o.Category == "Inspection" ? "InspectionOrders" : "MaintenanceOrders";
+                        <tr class="cursor-pointer" onclick="location.href='@Url.Action("Details", detailsController, new { id = o.Id })'">
                             <td><span class="badge" style="background-color:@o.OrderTypeColor;color:@ReadableTextColor(o.OrderTypeColor)">@o.OrderTypeLabel</span></td>
-                            <td class="fw-semibold">@o.OrderNumber</td>
+                            @* A real link as well as the row click — keyboard and new-tab users need an anchor. *@
+                            <td class="fw-semibold"><a asp-action="Details" asp-controller="@detailsController" asp-route-id="@o.Id" class="text-decoration-none">@o.OrderNumber</a></td>
                             <td class="small d-none d-sm-table-cell">@(o.AssetLabel ?? "—")</td>
                             <td>@(o.AssignedToLabel ?? "—")</td>
-                            <td><partial name="_StatusBadge" model="@o.Status" /></td>
+                            <td><span class="badge border @StatusBadgeClass(o.Status)">@StatusLabel(o.Status)</span></td>
                             <td class="d-none d-md-table-cell">@(o.DueDate?.ToString("dd/MM/yyyy") ?? "—")</td>
                             <td class="d-none d-xl-table-cell">@o.CreatedAt.ToString("dd/MM/yyyy")</td>
-                            <td class="text-end"><a asp-action="Details" asp-controller="@o.DetailsController" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
+                            <td class="text-end"><a asp-action="Details" asp-controller="@detailsController" asp-route-id="@o.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a></td>
                         </tr>
                     }
                 </tbody>
@@ -131,3 +154,4 @@
         </div>
     }
 </div>
+<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />

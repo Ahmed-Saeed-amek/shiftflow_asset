@@ -16,12 +16,11 @@ public class WorkOrdersController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly IWorkOrderService _workOrderService;
-    private readonly IContractService _contractService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAssetScopeService _scope;
-    public WorkOrdersController(ApplicationDbContext db, IWorkOrderService workOrderService, IContractService contractService, UserManager<ApplicationUser> userManager, IAssetScopeService scope)
+    public WorkOrdersController(ApplicationDbContext db, IWorkOrderService workOrderService, UserManager<ApplicationUser> userManager, IAssetScopeService scope)
     {
-        _db = db; _workOrderService = workOrderService; _contractService = contractService; _userManager = userManager; _scope = scope;
+        _db = db; _workOrderService = workOrderService; _userManager = userManager; _scope = scope;
     }
 
     private const int PageSize = 25;
@@ -32,7 +31,7 @@ public class WorkOrdersController : Controller
         if (page < 1) page = 1;
         q = SearchQuery.Cap(q);
         var userId = _userManager.GetUserId(User)!;
-        var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
+        var query = _db.WorkOrders.AsNoTracking().Include(w => w.Asset).Include(w => w.Vendor).Include(w => w.AssignedToUser).AsQueryable();
         // Details (round 12) 404s a scoped user out of an out-of-scope Work Order — this list must
         // hide the same rows, or a scoped user sees every work order exist in the list and only
         // gets blocked one click later on Details.
@@ -60,7 +59,7 @@ public class WorkOrdersController : Controller
     [Authorize(Policy = PermissionCatalog.WorkOrderView)]
     public async Task<IActionResult> Details(int id)
     {
-        var wo = await _db.WorkOrders
+        var wo = await _db.WorkOrders.AsNoTracking()
             .Include(w => w.Asset).ThenInclude(a => a!.Zone).ThenInclude(z => z!.LocationCategory)
             .Include(w => w.Asset).ThenInclude(a => a!.Category)
             .Include(w => w.Vendor).Include(w => w.CreatedByUser).Include(w => w.AssignedToUser)
@@ -79,7 +78,7 @@ public class WorkOrdersController : Controller
         // work; scope restricts new discovery, not access already legitimately granted.
         var userId = _userManager.GetUserId(User)!;
         if (wo.AssignedToUserId != userId && wo.Asset != null && !await _scope.IsInScopeAsync(wo.Asset, userId)) return NotFound();
-        ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+        ViewBag.AllVendors = await _db.Vendors.AsNoTracking().Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.CurrentUserId = userId;
         return View(wo);
     }
@@ -101,7 +100,7 @@ public class WorkOrdersController : Controller
             }
         }
         ViewBag.Priorities = WorkOrder.Priorities;
-        ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+        ViewBag.AllVendors = await _db.Vendors.AsNoTracking().Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
         ViewBag.ReturnUrl = Url.IsLocalUrl(Request.Headers.Referer.ToString()) ? Request.Headers.Referer.ToString() : Url.Action("Index");
         return View(new WorkOrderViewModel { AssetId = assetId ?? 0 });
     }
@@ -117,7 +116,7 @@ public class WorkOrdersController : Controller
                 if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
             }
             ViewBag.Priorities = WorkOrder.Priorities;
-            ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+            ViewBag.AllVendors = await _db.Vendors.AsNoTracking().Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
             return View(vm);
         }
         var userId = _userManager.GetUserId(User)!;
@@ -140,7 +139,7 @@ public class WorkOrdersController : Controller
                 if (asset != null) ViewBag.SelectedAssetLabel = $"{asset.AssetTag} — {asset.Name}";
             }
             ViewBag.Priorities = WorkOrder.Priorities;
-            ViewBag.AllVendors = await _db.Vendors.Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
+            ViewBag.AllVendors = await _db.Vendors.AsNoTracking().Where(v => v.Status == "Active").OrderBy(v => v.Name).ToListAsync();
             return View(vm);
         }
 
@@ -265,12 +264,10 @@ public class WorkOrdersController : Controller
         var completionDate = ShiftFlow.Web.Services.FixFormRetainer.ParseCompletionDate(Request.Form);
 
         var userId = _userManager.GetUserId(User)!;
-        var isManager = (await HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Authorization.IAuthorizationService>()
-            .AuthorizeAsync(User, PermissionCatalog.WorkOrderManage)).Succeeded;
         try
         {
             var parts = (vm.SparePartIds ?? []).Zip(vm.PartQuantities ?? [], (spId, q) => (SparePartId: spId, Quantity: q)).ToList();
-            await _workOrderService.AdvanceWithoutVendorAsync(id, completionDate, parts, userId, isManager);
+            await _workOrderService.AdvanceWithoutVendorAsync(id, completionDate, parts, userId);
             TempData["Success"] = "Work order advanced without waiting on the vendor.";
         }
         catch (InvalidOperationException ex) { ShiftFlow.Web.Services.FixFormRetainer.Stash(TempData, vm, completionDate); TempData["Error"] = ex.Message; }
@@ -358,7 +355,7 @@ public class WorkOrdersController : Controller
     [Authorize]
     public async Task<IActionResult> DownloadAttachment(int attachmentId)
     {
-        var attachment = await _db.WorkOrderAttachments.Include(a => a.WorkOrder).ThenInclude(w => w!.Asset)
+        var attachment = await _db.WorkOrderAttachments.AsNoTracking().Include(a => a.WorkOrder).ThenInclude(w => w!.Asset)
             .FirstOrDefaultAsync(a => a.Id == attachmentId);
         if (attachment?.WorkOrder == null) return NotFound();
 

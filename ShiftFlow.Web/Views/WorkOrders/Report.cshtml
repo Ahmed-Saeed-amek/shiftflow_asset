@@ -17,21 +17,24 @@
                     <input type="text" class="form-control" value="@(asset.Category is { } reportCat ? Loc.LocalizedName(reportCat.Name, reportCat.NameAr) : null)" disabled />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Action Type")</label>
+                    <label for="actionTypeSelect" class="form-label small">@Loc.T("Action Type")</label>
                     <select id="actionTypeSelect" asp-for="ActionTypeId" class="form-select">
                         <option value="">—</option>
                     </select>
                     <span asp-validation-for="ActionTypeId" class="text-danger small"></span>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">@Loc.T("Cause")</label>
+                    <label for="causeSelect" class="form-label small">@Loc.T("Cause")</label>
                     <select id="causeSelect" asp-for="CauseId" class="form-select" disabled>
                         <option value="">—</option>
                     </select>
                     <span asp-validation-for="CauseId" class="text-danger small"></span>
                 </div>
                 <div class="col-12">
-                    <label class="form-label small">@Loc.T("Notes")</label>
+                    <div id="reportLoadError" class="alert alert-danger small d-none"></div>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Notes" class="form-label small">@Loc.T("Notes")</label>
                     <textarea asp-for="Notes" class="form-control" rows="3" placeholder="@Loc.T("Describe…")"></textarea>
                 </div>
             </div>
@@ -64,16 +67,42 @@
         sel.disabled = items.length === 0;
     }
 
+    const errorBox = document.getElementById('reportLoadError');
+    const loadFailedText = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Loc.T("Couldn't load the options - check your connection and reload the page.")));
+
+    function showLoadError() {
+        errorBox.textContent = loadFailedText;
+        errorBox.classList.remove('d-none');
+    }
+
+    // Both lookups are dropdown-populating fetches: a failure used to leave an empty, permanently
+    // disabled select with no explanation at all.
+    async function getJson(url) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return await resp.json();
+    }
+
     async function loadActionTypes() {
-        const types = await (await fetch(`/AssetActionTypes/ByCategory?categoryId=${categoryId}`)).json();
-        fillSelect(actionTypeSel, types, selectedActionTypeId);
-        if (selectedActionTypeId) await loadCauses(selectedActionTypeId, selectedCauseId);
+        try {
+            const types = await getJson(`/AssetActionTypes/ByCategory?categoryId=${categoryId}`);
+            errorBox.classList.add('d-none');
+            fillSelect(actionTypeSel, types, selectedActionTypeId);
+            if (selectedActionTypeId) await loadCauses(selectedActionTypeId, selectedCauseId);
+        } catch {
+            showLoadError();
+        }
     }
 
     async function loadCauses(actionTypeId, preselectCauseId) {
         if (!actionTypeId) { fillSelect(causeSel, [], null); return; }
-        const causes = await (await fetch(`/AssetActionTypes/CausesByActionType?actionTypeId=${actionTypeId}`)).json();
-        fillSelect(causeSel, causes, preselectCauseId);
+        try {
+            const causes = await getJson(`/AssetActionTypes/CausesByActionType?actionTypeId=${actionTypeId}`);
+            errorBox.classList.add('d-none');
+            fillSelect(causeSel, causes, preselectCauseId);
+        } catch {
+            showLoadError();
+        }
     }
 
     actionTypeSel.addEventListener('change', () => loadCauses(actionTypeSel.value ? Number(actionTypeSel.value) : null, null));

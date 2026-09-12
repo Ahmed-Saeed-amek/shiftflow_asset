@@ -3,11 +3,12 @@
 @using ShiftFlow.Web.ViewModels
 @{
     ViewData["Title"] = Loc.T("New Order");
-    var groups = (List<Group>)ViewBag.Groups;
-    var categories = (List<AssetCategory>)ViewBag.Categories;
-    var locationCategories = (List<LocationCategory>)ViewBag.LocationCategories;
-    var orderTypes = (List<OrderType>)ViewBag.OrderTypes;
-    var orderTypeMetaJson = (string)ViewBag.OrderTypeMetaJson;
+    var options = Model.Options;
+    var groups = options.Groups;
+    var categories = options.Categories;
+    var locationCategories = options.LocationCategories;
+    var orderTypes = options.OrderTypes;
+    var orderTypeMetaJson = options.OrderTypeMetaJson;
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Order"),Subtitle=Loc.T("Create an inspection survey or a direct-fix maintenance order")})" />
 
@@ -69,7 +70,7 @@
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6" id="assigneeUserRow">
-                            <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=ViewBag.SelectedEmployeeLabel as string,Placeholder=Loc.T("Search by name or email…")})" />
+                            <partial name="_EmployeePicker" model="@(new EmployeePickerModel{Name="AssignedToUserId",SelectedId=Model.AssignedToUserId,SelectedLabel=options.SelectedEmployeeLabel,Placeholder=Loc.T("Search by name or email…")})" />
                         </div>
                         <div class="col-md-6" id="assigneeGroupRow">
                             <select asp-for="AssignedToGroupId" class="form-select">
@@ -90,10 +91,10 @@
                     <div id="assetSingleWrap">
                         <partial name="_AssetSinglePicker" model='new AssetSinglePickerModel {
                             Name = "AssetId", SelectedId = Model.AssetId > 0 ? Model.AssetId : null,
-                            SelectedLabel = ViewBag.SelectedAssetLabel as string }' />
+                            SelectedLabel = options.SelectedAssetLabel }' />
                     </div>
                     <div id="assetMultiWrap">
-                        <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=(List<AssetChip>)ViewBag.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
+                        <partial name="_AssetMultiPicker" model="@(new AssetMultiPickerModel{Name="AssetIds",Selected=options.SelectedAssetChips,Placeholder=Loc.T("Search by asset tag or name…"),Categories=categories,LocationCategories=locationCategories})" />
                     </div>
                 </div>
             </div>

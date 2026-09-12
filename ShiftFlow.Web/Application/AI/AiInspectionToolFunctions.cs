@@ -11,18 +11,16 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
     private readonly IInspectionOrderService _orders;
     private readonly IGroupService _groups;
     private readonly IDashboardService _dashboard;
-    private readonly IWorkOrderService _workOrders;
     private readonly ApplicationDbContext _db;
     private readonly IPermissionService _permissions;
     private readonly IAssetScopeService _scope;
 
     public AiInspectionToolFunctions(IInspectionOrderService orders, IGroupService groups,
-        IDashboardService dashboard, IWorkOrderService workOrders, ApplicationDbContext db, IPermissionService permissions, IAssetScopeService scope)
+        IDashboardService dashboard, ApplicationDbContext db, IPermissionService permissions, IAssetScopeService scope)
     {
         _orders = orders;
         _groups = groups;
         _dashboard = dashboard;
-        _workOrders = workOrders;
         _db = db;
         _permissions = permissions;
         _scope = scope;
@@ -188,23 +186,9 @@ public class AiInspectionToolFunctions : IAiInspectionToolFunctions
         if (!isManager && !isAssignee && !isGroupMember)
             throw new InvalidOperationException("This inspection order isn't assigned to you.");
 
-        int? workOrderId = null;
-        if (outcome == "Defective")
-        {
-            if (actionTypeId == null || causeId == null)
-                throw new InvalidOperationException("Action Type and Cause are required to report a defect.");
-            // Mirrors InspectionOrdersController.UpdateItem — without this, a defect reported via the
-            // AI assistant creates a Work Order that bypasses vendor confirmation even when the
-            // order's OrderType.RequiresVendor is set, unlike the identical action through the UI.
-            var wo = await _workOrders.ReportAsync(new WorkOrder
-            {
-                AssetId = item.AssetId, ActionTypeId = actionTypeId, CauseId = causeId, Notes = notes,
-                RequiresVendorResponse = order.OrderType?.RequiresVendor ?? false,
-            }, userId);
-            workOrderId = wo.Id;
-        }
-
-        await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, userId);
+        // The "Defective spawns a Work Order" rule lives in the service, inside its own
+        // transaction, so this path and the UI path can't diverge.
+        var workOrderId = await _orders.UpdateInspectionItemAsync(itemId, outcome, actionTypeId, causeId, notes, userId);
         return new { success = true, outcome, workOrderId };
     }
 

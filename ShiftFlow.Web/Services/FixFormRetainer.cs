@@ -6,13 +6,9 @@ namespace ShiftFlow.Web.Services;
 
 /// <summary>Preserves a submitted Report/Submit Fix form's typed values across the
 /// redirect-on-error round trip (e.g. a rejected attachment) so the vendor/employee doesn't have
-/// to reselect the parts they'd already entered — only the file input (browsers won't let JS
-/// repopulate that) and, currently, the completion date specifically still need re-entering:
-/// confirmed via direct instrumentation that the parsed DateTime is correct going into TempData
-/// and immediately readable back out in the same request, yet comes back empty once actually
-/// rendered after the redirect, while every other stashed key in the same dictionary survives
-/// that same round trip — an isolated TempData-persistence quirk for this one value that a
-/// deeper dive didn't resolve.</summary>
+/// to reselect the parts they'd already entered. The file input can't be repopulated (browsers
+/// won't allow it) and the completion date doesn't survive the redirect either, so both still
+/// need re-entering.</summary>
 public static class FixFormRetainer
 {
     public static DateTime? ParseCompletionDate(IFormCollection form) =>

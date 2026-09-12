@@ -14,7 +14,12 @@
     var allVendors = ViewBag.AllVendors as List<Vendor>;
     var currentUserId = ViewBag.CurrentUserId as string;
     var canReportFixMyself = Model.VendorId == null && Model.AssignedToUserId == currentUserId && isNew;
-    var canAdvanceWithoutVendor = Model.Stage == "Sent to Vendor" && (canManage || Model.AssignedToUserId == currentUserId);
+    // RequiresVendorResponse is enforced in the service now, so the button must not be offered
+    // when it would only ever be rejected - Force Close is the way out in that case.
+    var canAdvanceWithoutVendor = Model.Stage == "Sent to Vendor" && !Model.RequiresVendorResponse
+        && (canManage || Model.AssignedToUserId == currentUserId);
+    var vendorResponseRequired = Model.Stage == "Sent to Vendor" && Model.RequiresVendorResponse
+        && (canManage || Model.AssignedToUserId == currentUserId);
     var hasSpecs = Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku));
 }
 
@@ -43,11 +48,6 @@
         <i class="bi bi-arrow-left me-1"></i>@Loc.T("Back to Work Orders")
     </a>
 </div>
-
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger small">@TempData["Error"]</div>
-}
 
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
@@ -190,8 +190,8 @@
                     <form method="post" asp-action="Accept" asp-route-id="@Model.Id" class="row g-2">
                         @Html.AntiForgeryToken()
                         <div class="col-12">
-                            <label class="form-label small">@Loc.T("Choose Vendor")</label>
-                            <select name="vendorId" class="form-select form-select-sm">
+                            <label for="chooseVendor" class="form-label small">@Loc.T("Choose Vendor")</label>
+                            <select id="chooseVendor" name="vendorId" class="form-select form-select-sm">
                                 <option value="">@Loc.T("— No vendor (employee only) —")</option>
                                 @foreach (var v in allVendors ?? new())
                                 {
@@ -263,8 +263,8 @@
                         @Html.AntiForgeryToken()
                         <div class="row g-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Completion Date")</label>
-                                <input type="date" name="CompletionDate" class="form-control form-control-sm" />
+                                <label for="employeeFixCompletionDate" class="form-label small">@Loc.T("Completion Date")</label>
+                                <input type="date" id="employeeFixCompletionDate" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
                         <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="employeeFixPartsList"})" />
@@ -298,8 +298,8 @@
                         @Html.AntiForgeryToken()
                         <div class="row g-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Completion Date")</label>
-                                <input type="date" name="CompletionDate" class="form-control form-control-sm" />
+                                <label for="advanceCompletionDate" class="form-label small">@Loc.T("Completion Date")</label>
+                                <input type="date" id="advanceCompletionDate" name="CompletionDate" class="form-control form-control-sm" />
                             </div>
                         </div>
                         <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="advanceWithoutVendorPartsList"})" />
@@ -308,6 +308,14 @@
                         </button>
                     </form>
                 </div>
+            </div>
+        }
+
+        @if (vendorResponseRequired)
+        {
+            <div class="alert alert-info small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-shield-lock fs-5"></i>
+                <span>@Loc.T("This work order requires the vendor's own response — only their Fix or Block action can move it forward.")</span>
             </div>
         }
 
@@ -461,7 +469,7 @@
     .wo-timeline-item:last-child { padding-bottom: 0; }
     .wo-timeline-dot {
         position: absolute; inset-inline-start: -1.35rem; top: .2rem;
-        width: .6rem; height: .6rem; border-radius: 50%; background: #0EA5E9;
+        width: .6rem; height: .6rem; border-radius: 50%; background: hsl(var(--primary));
         box-shadow: 0 0 0 3px hsl(var(--card));
     }
 </style>

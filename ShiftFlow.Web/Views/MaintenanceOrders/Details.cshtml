@@ -10,6 +10,8 @@
     var canViewOrderList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.MaintenanceOrderView)).Succeeded;
     var isAssignee = (bool)ViewBag.IsAssignee;
     var isOpen = Model.Status == "Open";
+    // PendingApproval is cancellable too now, matching inspection orders.
+    var canCancel = Model.Status is "Open" or "PendingApproval";
     var canReportFix = isOpen && isAssignee;
     var hasSpecs = Model.Asset != null && (!string.IsNullOrWhiteSpace(Model.Asset.Manufacturer) || !string.IsNullOrWhiteSpace(Model.Asset.Model) || !string.IsNullOrWhiteSpace(Model.Asset.SerialNumber) || !string.IsNullOrWhiteSpace(Model.Asset.Sku));
 }
@@ -31,7 +33,7 @@
             {
                 <span><i class="bi bi-geo-alt me-1"></i>@Loc.LocalizedName(zone.Name, zone.NameAr)</span>
             }
-            <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedDate.ToString("yyyy-MM-dd")</span>
+            <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedDate.ToString("dd/MM/yyyy")</span>
         </div>
     </div>
     @if (canViewOrderList)
@@ -48,11 +50,6 @@
     }
 </div>
 
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger small">@TempData["Error"]</div>
-}
-
 <div class="row g-3">
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm mb-3">
@@ -68,7 +65,7 @@
                     @if (Model.DueDate.HasValue)
                     {
                         <dt class="col-5 text-muted fw-normal">@Loc.T("Due Date")</dt>
-                        <dd class="col-7 text-end mb-0">@Model.DueDate.Value.ToString("yyyy-MM-dd")</dd>
+                        <dd class="col-7 text-end mb-0">@Model.DueDate.Value.ToString("dd/MM/yyyy")</dd>
                     }
                 </dl>
                 @if (!string.IsNullOrWhiteSpace(Model.Description))
@@ -123,8 +120,8 @@
                         @Html.AntiForgeryToken()
                         <div class="row g-2">
                             <div class="col-12">
-                                <label class="form-label small">@Loc.T("Completion Date")</label>
-                                <input type="date" name="CompletedDate" class="form-control form-control-sm" />
+                                <label for="completedDate" class="form-label small">@Loc.T("Completion Date")</label>
+                                <input type="date" id="completedDate" name="CompletedDate" class="form-control form-control-sm" />
                             </div>
                         </div>
                         <partial name="_SparePartPicker" model="@(new SparePartPickerModel{AssetId=Model.AssetId, ContainerId="maintenanceFixPartsList"})" />
@@ -152,13 +149,31 @@
                         <div class="fw-semibold"><i class="bi bi-hourglass-split me-1 text-warning"></i>@Loc.T("Pending Approval")</div>
                         <div class="small text-muted">@Loc.T("Review the fix report below, then approve to close this order.")</div>
                     </div>
-                    <form method="post" asp-action="Approve" asp-route-id="@Model.Id"
-                          onsubmit="return confirm('@Loc.T("Approve and close this maintenance order? This can't be undone.")')">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check2-circle me-1"></i>@Loc.T("Approve")
+                    <div class="d-flex gap-2 flex-wrap">
+                        <form method="post" asp-action="Approve" asp-route-id="@Model.Id"
+                              onsubmit="return confirm('@Loc.T("Approve and close this maintenance order? This can't be undone.")')">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check2-circle me-1"></i>@Loc.T("Approve")
+                            </button>
+                        </form>
+                        @* The way back out of PendingApproval - clears the reported cost/parts
+                           (returning their stock) and reopens the order for the assignee. *@
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#returnToOpenCollapse">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>@Loc.T("Return to Open")
                         </button>
-                    </form>
+                    </div>
+                </div>
+                <div class="collapse" id="returnToOpenCollapse">
+                    <div class="card-body border-top">
+                        <div class="form-text mb-2">@Loc.T("Sends this order back to the assignee to redo. The reported cost and parts are cleared and the parts return to stock.")</div>
+                        <form method="post" asp-action="RejectApproval" asp-route-id="@Model.Id" class="d-flex gap-2">
+                            @Html.AntiForgeryToken()
+                            <label for="returnReason" class="visually-hidden">@Loc.T("Reason")</label>
+                            <input type="text" id="returnReason" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">@Loc.T("Return to Open")</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         }
@@ -179,7 +194,7 @@
                 <div class="card-body">
                     <dl class="row small mb-0 gy-2">
                         <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Fix Cost")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.Cost</dd>
-                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.CompletedDate?.ToString("yyyy-MM-dd")</dd>
+                        <dt class="col-5 col-md-4 text-muted fw-normal">@Loc.T("Completion Date")</dt><dd class="col-7 col-md-8 text-end mb-0">@Model.CompletedDate?.ToString("dd/MM/yyyy")</dd>
                     </dl>
                     @if (!string.IsNullOrWhiteSpace(Model.FixDescription))
                     {
@@ -239,7 +254,7 @@
             </div>
         }
 
-        @if (isOpen && isManager)
+        @if (canCancel && isManager)
         {
             <div class="text-end">
                 <button type="button" class="btn btn-sm btn-link text-danger text-decoration-none p-0" data-bs-toggle="collapse" data-bs-target="#cancelCollapse">
@@ -252,7 +267,8 @@
                                   onsubmit="return confirm('@Loc.T("Cancel this maintenance order?")')"
                                   class="d-flex gap-2">
                                 @Html.AntiForgeryToken()
-                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
+                                <label for="cancelReason" class="visually-hidden">@Loc.T("Reason")</label>
+                                <input type="text" id="cancelReason" name="reason" class="form-control form-control-sm" placeholder="@Loc.T("Reason (optional)")" />
                                 <button type="submit" class="btn btn-sm btn-outline-danger flex-shrink-0">@Loc.T("Cancel Maintenance Order")</button>
                             </form>
                         </div>

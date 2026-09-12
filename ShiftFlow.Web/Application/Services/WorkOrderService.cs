@@ -17,7 +17,19 @@ public class WorkOrderService : IWorkOrderService
     private readonly ISparePartService _spareParts;
     private readonly IAssetScopeService _scope;
     private readonly ILanguageService _loc;
-    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IAssetScopeService scope, ILanguageService loc) { _db = db; _audit = audit; _spareParts = spareParts; _scope = scope; _loc = loc; }
+    private readonly IPermissionService _permissions;
+    public WorkOrderService(ApplicationDbContext db, IAuditService audit, ISparePartService spareParts, IAssetScopeService scope, ILanguageService loc, IPermissionService permissions)
+    { _db = db; _audit = audit; _spareParts = spareParts; _scope = scope; _loc = loc; _permissions = permissions; }
+
+    // Manager-ness is resolved here rather than taken as a caller-supplied bool — a controller (or
+    // any other caller) passing `false` must not be able to pick the weaker authorization path.
+    private Task<bool> IsManagerAsync(string userId) =>
+        _permissions.HasPermissionAsync(userId, ShiftFlow.Web.Authorization.PermissionCatalog.WorkOrderManage);
+
+    private static void ValidatePriority(string priority)
+    {
+        if (!WorkOrder.Priorities.Contains(priority)) throw new InvalidOperationException("Invalid priority.");
+    }
 
     // The Assets/Details "New Work Order"/"Report Action" buttons are now hidden for a Retired
     // asset, but that's UI-only — enforce it here too (both CreateAsync and ReportAsync route
@@ -25,7 +37,7 @@ public class WorkOrderService : IWorkOrderService
     // Maintenance branch, can't open new work against equipment that's already decommissioned.
     private async Task EnsureAssetNotRetiredAsync(int assetId)
     {
-        if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == "Retired"))
+        if (await _db.Assets.AnyAsync(a => a.Id == assetId && a.Status == AssetStatuses.Retired))
             throw new InvalidOperationException("This asset is retired and can't have new work orders opened against it.");
     }
 
@@ -71,19 +83,18 @@ public class WorkOrderService : IWorkOrderService
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
         await EnsureAssetInScopeAsync(workOrder.AssetId, userId);
-        // Same gap AssignEmployeeAsync was fixed for: a non-existent/stale AssignedToUserId (a
-        // tampered POST, or OrdersController's vendor-routed batch loop) used to reach an
-        // unhandled FK-constraint DbUpdateException here at SaveWithUniqueNumberRetryAsync,
-        // leaking the raw SQL error and table names to the client (confirmed live via a POST with
-        // a random GUID assignee). Validate up front like AssignEmployeeAsync already does.
+        // Validate the assignee up front so a stale/tampered id surfaces as a friendly error
+        // rather than a raw FK-constraint DbUpdateException on save.
         if (!string.IsNullOrWhiteSpace(workOrder.AssignedToUserId) && !await _db.Users.AnyAsync(u => u.Id == workOrder.AssignedToUserId))
             throw new InvalidOperationException("Selected employee not found.");
-        workOrder.Stage = "New";
+        ValidatePriority(workOrder.Priority);
+        workOrder.Stage = WorkOrderStages.New;
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
-        workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "New", ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
+        workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = WorkOrderStages.New, ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
+        await AssignNumberAsync(workOrder);
         _db.WorkOrders.Add(workOrder);
-        await SaveWithUniqueNumberRetryAsync(workOrder);
+        await _db.SaveChangesAsync();
         await _audit.LogAsync("Create", "WorkOrder", workOrder.Id.ToString(), userId, newValue: workOrder.WorkOrderNumber);
         return workOrder;
     }
@@ -92,74 +103,39 @@ public class WorkOrderService : IWorkOrderService
     {
         await EnsureAssetNotRetiredAsync(workOrder.AssetId);
         await EnsureAssetInScopeAsync(workOrder.AssetId, userId);
-        // A non-existent ActionTypeId/CauseId (e.g. a stale dropdown value) used to reach an
-        // unhandled FK-constraint DbUpdateException at SaveWithUniqueNumberRetryAsync - which,
-        // worse, isn't even a duplicate-key error, so the retry loop there just failed the same
-        // way five times before still leaking the raw SQL error. Validate up front instead.
+        // Validate the action type/cause up front so a stale dropdown value surfaces as a friendly
+        // error rather than a raw FK-constraint DbUpdateException on save.
         if (workOrder.ActionTypeId is { } atId && !await _db.AssetActionTypes.AnyAsync(a => a.Id == atId))
             throw new InvalidOperationException("Selected action type not found.");
         if (workOrder.CauseId is { } cId && !await _db.AssetActionCauses.AnyAsync(a => a.Id == cId))
             throw new InvalidOperationException("Selected cause not found.");
 
-        workOrder.Stage = "Draft";
+        workOrder.Stage = WorkOrderStages.Draft;
         workOrder.CreatedByUserId = userId;
         workOrder.CreatedDate = DateTime.UtcNow;
-        workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = "Draft", ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
+        workOrder.StageEvents.Add(new WorkOrderStageEvent { Stage = WorkOrderStages.Draft, ChangedAt = DateTime.UtcNow, ChangedByUserId = userId });
+        await AssignNumberAsync(workOrder);
         _db.WorkOrders.Add(workOrder);
-        await SetAssetStatusAsync(workOrder.AssetId, "Defective");
-        await SaveWithUniqueNumberRetryAsync(workOrder);
+        await SetAssetStatusAsync(workOrder.AssetId, AssetStatuses.Defective);
+        await _db.SaveChangesAsync();
         await _audit.LogAsync("Report", "WorkOrder", workOrder.Id.ToString(), userId, newValue: workOrder.WorkOrderNumber);
         return workOrder;
     }
 
-    /// <summary>The WorkOrderNumber "WO-{year}-{seq:D4}" was assigned from a plain COUNT-then-use
-    /// query with no atomic guard — two requests confirming a defect (or creating a work order)
-    /// concurrently could compute the same seq and both try to insert the same number, hitting
-    /// the unique index and raising a raw, unhandled DbUpdateException all the way to the client
-    /// (confirmed live: a concurrent InspectionOrders/UpdateItem pair produced exactly this SQL
-    /// exception leak). Worse, COUNT(*) itself goes permanently stale the moment any row for the
-    /// year is ever hard-deleted (or never committed) — it then recomputes the exact same
-    /// already-used number on every retry attempt and can never get past the gap. Base the
-    /// sequence on the highest existing number for the year instead of a count, and advance it by
-    /// the attempt number on retry so a genuine concurrent-insert race still makes progress.</summary>
-    private async Task SaveWithUniqueNumberRetryAsync(WorkOrder workOrder)
-    {
-        var year = workOrder.CreatedDate.Year;
-        var prefix = $"WO-{year}-";
-        var existingNumbers = await _db.WorkOrders
-            .Where(w => w.WorkOrderNumber.StartsWith(prefix))
-            .Select(w => w.WorkOrderNumber)
-            .ToListAsync();
-        var nextSeq = existingNumbers.Count == 0 ? 1
-            : existingNumbers.Select(n => int.TryParse(n.AsSpan(prefix.Length), out var s) ? s : 0).Max() + 1;
-
-        for (var attempt = 0; ; attempt++)
-        {
-            workOrder.WorkOrderNumber = $"{prefix}{nextSeq + attempt:D4}";
-            try
-            {
-                await _db.SaveChangesAsync();
-                return;
-            }
-            catch (DbUpdateException) when (attempt < 4)
-            {
-                // Concurrent insert claimed this number first — advance to the next one and retry.
-                // The entity stays tracked as Added after a failed SaveChanges, so the next
-                // attempt just retries the same insert with a new number.
-            }
-        }
-    }
+    /// <summary>Order numbers come from the shared, atomically-claimed OrderNumberSequence
+    /// counter (see OrderNumberGenerator) — allocated before the entity is added so the insert is
+    /// a plain SaveChanges with no duplicate-number retry loop.</summary>
+    private async Task AssignNumberAsync(WorkOrder workOrder) =>
+        workOrder.WorkOrderNumber = await OrderNumberGenerator.NextAsync(_db, OrderNumberPrefixes.WorkOrder, workOrder.CreatedDate.Year);
 
     /// <summary>Keeps Asset.Status in sync with the work order lifecycle so nobody has to flip it by
     /// hand: reporting a defect marks the asset Defective, sending it to a vendor marks it under
     /// Maintenance, and closing the fix returns it to Working (unless another work order on the same
     /// asset is still open, or the asset has been Retired — that status is never overridden).</summary>
-    private static readonly string[] OpenStages = ["Draft", "New", "Sent to Vendor", "Blocked", "Fixed - Pending Confirmation"];
-
     private async Task SetAssetStatusAsync(int assetId, string status)
     {
         var asset = await _db.Assets.FindAsync(assetId);
-        if (asset != null && asset.Status != "Retired") asset.Status = status;
+        if (asset != null && asset.Status != AssetStatuses.Retired) asset.Status = status;
     }
 
     private async Task ValidateVendorAsync(int vendorId)
@@ -173,70 +149,70 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task AcceptAsync(int workOrderId, int? vendorId, string priority, string userId)
     {
+        ValidatePriority(priority);
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Draft") throw new InvalidOperationException("Only a Draft report can be accepted.");
+        if (wo.Stage != WorkOrderStages.Draft) throw new InvalidOperationException("Only a Draft report can be accepted.");
         if (vendorId == null && wo.AssignedToUserId == null)
             throw new InvalidOperationException("Assign a vendor or an employee before accepting this report.");
+        if (vendorId != null) await ValidateVendorAsync(vendorId.Value);
 
+        // No vendor, only an assigned employee — skip the vendor pipeline entirely and go straight
+        // to "New" so the employee's own Report Fix action becomes available.
+        var newStage = vendorId != null ? WorkOrderStages.SentToVendor : WorkOrderStages.New;
+
+        // The stage flip and its history row must commit together: the ExecuteUpdateAsync below is
+        // its own implicit transaction, so without this an exception between them left the work
+        // order advanced with no stage-history entry for how it got there.
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.Draft)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, newStage).SetProperty(w => w.VendorId, w => vendorId ?? w.VendorId).SetProperty(w => w.Priority, priority));
+        if (rows == 0) throw new InvalidOperationException("Only a Draft report can be accepted.");
         wo.Priority = priority;
-        string newStage;
-        if (vendorId != null)
-        {
-            await ValidateVendorAsync(vendorId.Value);
-            newStage = "Sent to Vendor";
-            // Atomically claim the transition — closes the same race as Force Close/EmployeeFix/
-            // ConfirmFix: two concurrent Accept calls could otherwise both pass the Draft check
-            // above and each append its own stage-history row.
-            var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
-                .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, newStage).SetProperty(w => w.VendorId, vendorId).SetProperty(w => w.Priority, priority));
-            if (rows == 0) throw new InvalidOperationException("Only a Draft report can be accepted.");
-            AddStageEvent(wo, "Sent to Vendor", userId);
-        }
-        else
-        {
-            // No vendor, only an assigned employee — skip the vendor pipeline entirely and go
-            // straight to "New" so the employee's own Report Fix action becomes available.
-            newStage = "New";
-            var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
-                .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, newStage).SetProperty(w => w.Priority, priority));
-            if (rows == 0) throw new InvalidOperationException("Only a Draft report can be accepted.");
-            AddStageEvent(wo, "New", userId);
-        }
-        await SetAssetStatusAsync(wo.AssetId, "Maintenance");
+        AddStageEvent(wo, newStage, userId);
+        await SetAssetStatusAsync(wo.AssetId, AssetStatuses.Maintenance);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Accept", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Draft", newValue: newStage);
+        await tx.CommitAsync();
+        await _audit.LogAsync("Accept", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.Draft, newValue: newStage);
     }
 
     public async Task RejectAsync(int workOrderId, string? reason, string userId)
     {
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Draft") throw new InvalidOperationException("Only a Draft report can be rejected.");
+        if (wo.Stage != WorkOrderStages.Draft) throw new InvalidOperationException("Only a Draft report can be rejected.");
         var newNotes = string.IsNullOrWhiteSpace(reason) ? wo.Notes : $"{wo.Notes}\n\nRejected: {reason}".Trim();
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Draft")
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Rejected").SetProperty(w => w.Notes, newNotes));
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.Draft)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, WorkOrderStages.Rejected).SetProperty(w => w.Notes, newNotes));
         if (rows == 0) throw new InvalidOperationException("Only a Draft report can be rejected.");
-        AddStageEvent(wo, "Rejected", userId);
-        await SetAssetStatusAsync(wo.AssetId, "Working");
+        AddStageEvent(wo, WorkOrderStages.Rejected, userId);
+        // Same rule as ConfirmFix/ForceClose — rejecting one report must not clear a defect another
+        // still-open order on the same asset is tracking.
+        if (!await AssetWorkState.HasOtherOpenWorkAsync(_db, wo.AssetId, excludeWorkOrderId: wo.Id))
+            await SetAssetStatusAsync(wo.AssetId, AssetStatuses.Working);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Reject", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Draft", newValue: "Rejected", details: reason);
+        await tx.CommitAsync();
+        await _audit.LogAsync("Reject", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.Draft, newValue: WorkOrderStages.Rejected, details: reason);
     }
 
     public async Task SendToVendorAsync(int workOrderId, int vendorId, string userId)
     {
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "New") throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
+        if (wo.Stage != WorkOrderStages.New) throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
         await ValidateVendorAsync(vendorId);
 
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "New")
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Sent to Vendor").SetProperty(w => w.VendorId, vendorId));
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.New)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, WorkOrderStages.SentToVendor).SetProperty(w => w.VendorId, vendorId));
         if (rows == 0) throw new InvalidOperationException("Only a New work order can be sent to a vendor.");
-        AddStageEvent(wo, "Sent to Vendor", userId);
-        await SetAssetStatusAsync(wo.AssetId, "Maintenance");
+        AddStageEvent(wo, WorkOrderStages.SentToVendor, userId);
+        await SetAssetStatusAsync(wo.AssetId, AssetStatuses.Maintenance);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("SendToVendor", "WorkOrder", wo.Id.ToString(), userId, oldValue: "New", newValue: "Sent to Vendor");
+        await tx.CommitAsync();
+        await _audit.LogAsync("SendToVendor", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.New, newValue: WorkOrderStages.SentToVendor);
     }
 
     // Validates every part is compatible with wo's asset, decrements stock atomically per part
@@ -250,6 +226,10 @@ public class WorkOrderService : IWorkOrderService
     private async Task<decimal> ApplyPartsAsync(WorkOrder wo, List<(int SparePartId, int Quantity)> parts)
     {
         var validParts = parts.Where(p => p.Quantity > 0).ToList();
+        // Re-submitting a fix replaces the previous parts list - return the old rows' quantities to
+        // stock first, inside this same transaction, or the units they consumed are lost forever.
+        foreach (var old in wo.Parts.Where(p => p.SparePartId != null))
+            await _spareParts.IncrementStockAsync(old.SparePartId!.Value, old.Quantity);
         _db.WorkOrderParts.RemoveRange(wo.Parts);
         if (validParts.Count == 0) return 0m;
 
@@ -281,79 +261,77 @@ public class WorkOrderService : IWorkOrderService
     {
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+        if (wo.Stage != WorkOrderStages.SentToVendor) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
         await using var tx = await _db.Database.BeginTransactionAsync();
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.SentToVendor)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.Stage, WorkOrderStages.FixedPendingConfirmation)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
         wo.FixCost = await ApplyPartsAsync(wo, parts);
 
-        AddStageEvent(wo, "Fixed - Pending Confirmation", vendorUserId);
+        AddStageEvent(wo, WorkOrderStages.FixedPendingConfirmation, vendorUserId);
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
-        await _audit.LogAsync("VendorFix", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: "Sent to Vendor", newValue: "Fixed - Pending Confirmation");
+        await _audit.LogAsync("VendorFix", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: WorkOrderStages.SentToVendor, newValue: WorkOrderStages.FixedPendingConfirmation);
     }
 
     public async Task VendorBlockAsync(int workOrderId, int blockReasonId, string? detail, string vendorUserId)
     {
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
-        // A non-existent blockReasonId (e.g. a stale dropdown value) used to reach an unhandled
-        // FK-constraint DbUpdateException at ExecuteUpdateAsync below - same bug class as the
-        // ActionType/Cause/VendorId/employeeUserId FK checks already added elsewhere.
+        if (wo.Stage != WorkOrderStages.SentToVendor) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+        // Friendly error for a stale/tampered block reason instead of a raw FK-constraint failure.
         if (!await _db.WorkOrderBlockReasons.AnyAsync(r => r.Id == blockReasonId))
             throw new InvalidOperationException("Selected block reason not found.");
 
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Blocked").SetProperty(w => w.BlockReasonId, blockReasonId).SetProperty(w => w.BlockDetail, detail));
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.SentToVendor)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, WorkOrderStages.Blocked).SetProperty(w => w.BlockReasonId, blockReasonId).SetProperty(w => w.BlockDetail, detail));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
-        AddStageEvent(wo, "Blocked", vendorUserId);
+        AddStageEvent(wo, WorkOrderStages.Blocked, vendorUserId);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("VendorBlock", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: "Sent to Vendor", newValue: "Blocked", details: detail);
+        await _audit.LogAsync("VendorBlock", "WorkOrder", wo.Id.ToString(), vendorUserId, oldValue: WorkOrderStages.SentToVendor, newValue: WorkOrderStages.Blocked, details: detail);
     }
 
     public async Task ResendToVendorAsync(int workOrderId, string userId)
     {
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Blocked") throw new InvalidOperationException("Only a Blocked work order can be resent.");
+        if (wo.Stage != WorkOrderStages.Blocked) throw new InvalidOperationException("Only a Blocked work order can be resent.");
         if (wo.VendorId == null) throw new InvalidOperationException("This work order has no vendor to resend to.");
 
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Blocked")
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Sent to Vendor").SetProperty(w => w.BlockReasonId, (int?)null).SetProperty(w => w.BlockDetail, (string?)null));
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.Blocked)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, WorkOrderStages.SentToVendor).SetProperty(w => w.BlockReasonId, (int?)null).SetProperty(w => w.BlockDetail, (string?)null));
         if (rows == 0) throw new InvalidOperationException("Only a Blocked work order can be resent.");
-        AddStageEvent(wo, "Sent to Vendor", userId);
+        AddStageEvent(wo, WorkOrderStages.SentToVendor, userId);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("Resend", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Blocked", newValue: "Sent to Vendor");
+        await tx.CommitAsync();
+        await _audit.LogAsync("Resend", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.Blocked, newValue: WorkOrderStages.SentToVendor);
     }
 
     public async Task ConfirmFixAsync(int workOrderId, string userId)
     {
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Fixed - Pending Confirmation") throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
+        if (wo.Stage != WorkOrderStages.FixedPendingConfirmation) throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
 
         // Same race as ForceCloseAsync: two concurrent confirmations could both pass the in-memory
         // check above before either commits. Claim the transition atomically first.
         var closedDate = DateTime.UtcNow;
+        await using var tx = await _db.Database.BeginTransactionAsync();
         var rows = await _db.WorkOrders
-            .Where(w => w.Id == workOrderId && w.Stage == "Fixed - Pending Confirmation")
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, "Closed").SetProperty(w => w.ClosedDate, closedDate));
+            .Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.FixedPendingConfirmation)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.Stage, WorkOrderStages.Closed).SetProperty(w => w.ClosedDate, closedDate));
         if (rows == 0) throw new InvalidOperationException("Only a fix pending confirmation can be confirmed.");
 
-        AddStageEvent(wo, "Closed", userId);
-        // Only restore Working if no other work order or standalone maintenance order on this
-        // asset is still open — a second, unrelated defect shouldn't get silently cleared just
-        // because a different one closed.
-        var hasOtherOpenWork = await _db.WorkOrders.AnyAsync(w => w.AssetId == wo.AssetId && w.Id != wo.Id && OpenStages.Contains(w.Stage))
-            || await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == wo.AssetId && m.Status == "Open");
-        if (!hasOtherOpenWork) await SetAssetStatusAsync(wo.AssetId, "Working");
+        AddStageEvent(wo, WorkOrderStages.Closed, userId);
+        if (!await AssetWorkState.HasOtherOpenWorkAsync(_db, wo.AssetId, excludeWorkOrderId: wo.Id))
+            await SetAssetStatusAsync(wo.AssetId, AssetStatuses.Working);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("ConfirmFix", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Fixed - Pending Confirmation", newValue: "Closed");
+        await tx.CommitAsync();
+        await _audit.LogAsync("ConfirmFix", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.FixedPendingConfirmation, newValue: WorkOrderStages.Closed);
     }
 
     public async Task AssignEmployeeAsync(int workOrderId, string? employeeUserId, string userId)
@@ -361,10 +339,7 @@ public class WorkOrderService : IWorkOrderService
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
         var old = wo.AssignedToUserId;
-        // A non-existent employeeUserId (e.g. a stale/tampered picker value) used to reach an
-        // unhandled FK-constraint DbUpdateException at SaveChangesAsync, leaking the raw SQL
-        // error and database/table names to the client. Validate up front like vendor
-        // assignment already does via ValidateVendorAsync.
+        // Friendly error for a stale/tampered picker value instead of a raw FK-constraint failure.
         if (!string.IsNullOrWhiteSpace(employeeUserId) && !await _db.Users.AnyAsync(u => u.Id == employeeUserId))
             throw new InvalidOperationException("Selected employee not found.");
         // Same invariant AcceptAsync enforces at creation (vendor or employee, never neither) — this
@@ -376,8 +351,7 @@ public class WorkOrderService : IWorkOrderService
         wo.AssignedToUserId = string.IsNullOrWhiteSpace(employeeUserId) ? null : employeeUserId;
         await _db.SaveChangesAsync();
 
-        // Audit values are shown to admins as-is (e.g. on the per-user profile Audit Log tab) —
-        // log the employee's name, not the raw user-id GUID, so the entry is actually readable.
+        // Log the employee's name, not the raw user-id GUID — audit values are shown as-is.
         async Task<string?> NameOf(string? uid) => uid == null ? null
             : await _db.Users.Where(u => u.Id == uid).Select(u => u.FullName).FirstOrDefaultAsync();
         await _audit.LogAsync("AssignEmployee", "WorkOrder", wo.Id.ToString(), userId, oldValue: await NameOf(old), newValue: await NameOf(wo.AssignedToUserId));
@@ -390,24 +364,24 @@ public class WorkOrderService : IWorkOrderService
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.AssignedToUserId != employeeUserId) throw new InvalidOperationException("This work order isn't assigned to you.");
         if (wo.VendorId != null) throw new InvalidOperationException("A vendor is already handling this work order.");
-        if (wo.Stage != "New") throw new InvalidOperationException("This work order isn't awaiting a fix.");
+        if (wo.Stage != WorkOrderStages.New) throw new InvalidOperationException("This work order isn't awaiting a fix.");
 
         // Same race as ForceCloseAsync/ConfirmFixAsync: claim the transition atomically before
         // touching Parts, so two concurrent submissions can't both pass the in-memory check above.
         await using var tx = await _db.Database.BeginTransactionAsync();
         var rows = await _db.WorkOrders
-            .Where(w => w.Id == workOrderId && w.Stage == "New")
+            .Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.New)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.Stage, WorkOrderStages.FixedPendingConfirmation)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a fix.");
 
         wo.FixCost = await ApplyPartsAsync(wo, parts);
 
-        AddStageEvent(wo, "Fixed - Pending Confirmation", employeeUserId);
+        AddStageEvent(wo, WorkOrderStages.FixedPendingConfirmation, employeeUserId);
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
-        await _audit.LogAsync("EmployeeFix", "WorkOrder", wo.Id.ToString(), employeeUserId, oldValue: "New", newValue: "Fixed - Pending Confirmation");
+        await _audit.LogAsync("EmployeeFix", "WorkOrder", wo.Id.ToString(), employeeUserId, oldValue: WorkOrderStages.New, newValue: WorkOrderStages.FixedPendingConfirmation);
         return wo;
     }
 
@@ -418,31 +392,36 @@ public class WorkOrderService : IWorkOrderService
     /// login, or is simply slow to respond). Ends in the same "Fixed - Pending Confirmation" state as
     /// VendorFixAsync/EmployeeFixAsync so ConfirmFixAsync works unchanged regardless of who actually
     /// reported the fix.</summary>
-    public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false)
+    public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId)
     {
-        // A manager acting outside their own scope is still blocked (round 13); the assigned
-        // employee retains access to their own already-assigned work regardless of a scope
-        // narrowed/added afterward (see EnsureWorkOrderActionableAsync).
+        // Manager-ness is resolved here, not handed in by the caller. A manager acting outside
+        // their own scope is still blocked; the assigned employee keeps access to their own
+        // already-assigned work regardless of a scope narrowed/added afterward.
+        var isManager = await IsManagerAsync(userId);
         if (isManager) await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         else await EnsureWorkOrderActionableAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage != "Sent to Vendor") throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
+        if (wo.Stage != WorkOrderStages.SentToVendor) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
         if (!isManager && wo.AssignedToUserId != userId) throw new InvalidOperationException("This work order isn't assigned to you.");
+        // RequiresVendorResponse was stored and displayed but never enforced - when it is set, only
+        // the vendor's own Fix/Block actions may move this work order forward.
+        if (wo.RequiresVendorResponse)
+            throw new InvalidOperationException("This work order requires the vendor's own response - it can't be advanced on their behalf. Force-close it instead if the vendor can't respond.");
 
         await using var tx = await _db.Database.BeginTransactionAsync();
-        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == "Sent to Vendor")
+        var rows = await _db.WorkOrders.Where(w => w.Id == workOrderId && w.Stage == WorkOrderStages.SentToVendor)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(w => w.Stage, "Fixed - Pending Confirmation")
+                .SetProperty(w => w.Stage, WorkOrderStages.FixedPendingConfirmation)
                 .SetProperty(w => w.FixCompletionDate, completionDate));
         if (rows == 0) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
 
         wo.FixCost = await ApplyPartsAsync(wo, parts);
 
-        AddStageEvent(wo, "Fixed - Pending Confirmation", userId);
+        AddStageEvent(wo, WorkOrderStages.FixedPendingConfirmation, userId);
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
-        await _audit.LogAsync("AdvanceWithoutVendor", "WorkOrder", wo.Id.ToString(), userId, oldValue: "Sent to Vendor", newValue: "Fixed - Pending Confirmation");
+        await _audit.LogAsync("AdvanceWithoutVendor", "WorkOrder", wo.Id.ToString(), userId, oldValue: WorkOrderStages.SentToVendor, newValue: WorkOrderStages.FixedPendingConfirmation);
         return wo;
     }
 
@@ -450,7 +429,7 @@ public class WorkOrderService : IWorkOrderService
     {
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage == "Closed") throw new InvalidOperationException("Already closed.");
+        if (wo.Stage == WorkOrderStages.Closed) throw new InvalidOperationException("Already closed.");
         var old = wo.Stage;
         var closedDate = DateTime.UtcNow;
         var newNotes = string.IsNullOrWhiteSpace(reason) ? wo.Notes
@@ -462,20 +441,21 @@ public class WorkOrderService : IWorkOrderService
         // evaluated atomically by the database, so only the first request to actually reach it can
         // match Stage != "Closed" and flip the row; a loser sees 0 rows affected and is turned back
         // with the same "Already closed" error the check above already gives a non-racing caller.
+        await using var tx = await _db.Database.BeginTransactionAsync();
         var rows = await _db.WorkOrders
-            .Where(w => w.Id == workOrderId && w.Stage != "Closed")
+            .Where(w => w.Id == workOrderId && w.Stage != WorkOrderStages.Closed)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(w => w.Stage, "Closed")
+                .SetProperty(w => w.Stage, WorkOrderStages.Closed)
                 .SetProperty(w => w.ClosedDate, closedDate)
                 .SetProperty(w => w.Notes, newNotes));
         if (rows == 0) throw new InvalidOperationException("Already closed.");
 
-        AddStageEvent(wo, "Closed", userId);
-        var hasOtherOpenWork = await _db.WorkOrders.AnyAsync(w => w.AssetId == wo.AssetId && w.Id != wo.Id && OpenStages.Contains(w.Stage))
-            || await _db.MaintenanceOrders.AnyAsync(m => m.AssetId == wo.AssetId && m.Status == "Open");
-        if (!hasOtherOpenWork) await SetAssetStatusAsync(wo.AssetId, "Working");
+        AddStageEvent(wo, WorkOrderStages.Closed, userId);
+        if (!await AssetWorkState.HasOtherOpenWorkAsync(_db, wo.AssetId, excludeWorkOrderId: wo.Id))
+            await SetAssetStatusAsync(wo.AssetId, AssetStatuses.Working);
         await _db.SaveChangesAsync();
-        await _audit.LogAsync("ForceClose", "WorkOrder", wo.Id.ToString(), userId, oldValue: old, newValue: "Closed", details: reason);
+        await tx.CommitAsync();
+        await _audit.LogAsync("ForceClose", "WorkOrder", wo.Id.ToString(), userId, oldValue: old, newValue: WorkOrderStages.Closed, details: reason);
     }
 
     public async Task UpdatePriorityAsync(int workOrderId, string priority, string userId)
@@ -483,7 +463,7 @@ public class WorkOrderService : IWorkOrderService
         if (!WorkOrder.Priorities.Contains(priority)) throw new InvalidOperationException("Invalid priority.");
         await EnsureWorkOrderInScopeAsync(workOrderId, userId);
         var wo = await _db.WorkOrders.FindAsync(workOrderId) ?? throw new InvalidOperationException("Work order not found.");
-        if (wo.Stage is not ("Draft" or "New")) throw new InvalidOperationException("Priority can only be changed before a work order is sent to a vendor.");
+        if (wo.Stage is not (WorkOrderStages.Draft or WorkOrderStages.New)) throw new InvalidOperationException("Priority can only be changed before a work order is sent to a vendor.");
         if (wo.Priority == priority) return;
         var oldPriority = wo.Priority;
         wo.Priority = priority;
@@ -505,17 +485,18 @@ public class WorkOrderService : IWorkOrderService
             VendorId = vendorId,
             SourceContractId = sourceContractId,
             ScheduledDate = scheduledDate.Date,
-            Stage = "Sent to Vendor",
+            Stage = WorkOrderStages.SentToVendor,
             Priority = "Medium",
             Description = $"Preventive Maintenance — due {scheduledDate:yyyy-MM-dd} (Contract {contractLabel})",
             CreatedByUserId = systemUserId,
             CreatedDate = DateTime.UtcNow,
             RequiresVendorResponse = true,
         };
-        wo.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
+        wo.StageEvents.Add(new WorkOrderStageEvent { Stage = WorkOrderStages.SentToVendor, ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
+        await AssignNumberAsync(wo);
         _db.WorkOrders.Add(wo);
-        await SetAssetStatusAsync(assetId, "Maintenance");
-        await SaveWithUniqueNumberRetryAsync(wo);
+        await SetAssetStatusAsync(assetId, AssetStatuses.Maintenance);
+        await _db.SaveChangesAsync();
         await _audit.LogAsync("AutoGeneratePM", "WorkOrder", wo.Id.ToString(), systemUserId,
             newValue: wo.WorkOrderNumber, details: $"Contract #{sourceContractId}, due {scheduledDate:yyyy-MM-dd}");
         return wo;
@@ -534,17 +515,18 @@ public class WorkOrderService : IWorkOrderService
             AssignedToUserId = assignedToUserId,
             SourceRecurringOrderId = sourceRecurringOrderId,
             ScheduledDate = scheduledDate.Date,
-            Stage = "Sent to Vendor",
+            Stage = WorkOrderStages.SentToVendor,
             Priority = "Medium",
             Description = $"Recurring vendor order — due {scheduledDate:yyyy-MM-dd} (Schedule #{sourceRecurringOrderId})",
             CreatedByUserId = systemUserId,
             CreatedDate = DateTime.UtcNow,
             RequiresVendorResponse = true,
         };
-        wo.StageEvents.Add(new WorkOrderStageEvent { Stage = "Sent to Vendor", ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
+        wo.StageEvents.Add(new WorkOrderStageEvent { Stage = WorkOrderStages.SentToVendor, ChangedAt = DateTime.UtcNow, ChangedByUserId = systemUserId });
+        await AssignNumberAsync(wo);
         _db.WorkOrders.Add(wo);
-        await SetAssetStatusAsync(assetId, "Maintenance");
-        await SaveWithUniqueNumberRetryAsync(wo);
+        await SetAssetStatusAsync(assetId, AssetStatuses.Maintenance);
+        await _db.SaveChangesAsync();
         await _audit.LogAsync("AutoGenerateRecurring", "WorkOrder", wo.Id.ToString(), systemUserId,
             newValue: wo.WorkOrderNumber, details: $"Schedule #{sourceRecurringOrderId}, due {scheduledDate:yyyy-MM-dd}");
         return wo;
@@ -552,7 +534,7 @@ public class WorkOrderService : IWorkOrderService
 
     private async Task<List<WorkOrder>> GetExportRowsAsync(string userId)
     {
-        var query = _db.WorkOrders.Include(w => w.Asset).Include(w => w.Vendor).AsQueryable();
+        var query = _db.WorkOrders.AsNoTracking().Include(w => w.Asset).Include(w => w.Vendor).AsQueryable();
         // Same scope enforcement as Details (round 12) — an export must not dump orders the
         // exporting user can't even see in the list, matching round 3's fix for Assets export.
         if (await _scope.HasScopeAsync(userId))

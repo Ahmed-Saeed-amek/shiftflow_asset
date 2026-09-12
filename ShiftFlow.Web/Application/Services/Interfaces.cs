@@ -39,7 +39,9 @@ public interface IInspectionOrderService
     Task<InspectionOrder?> GetByIdAsync(int id);
     Task<List<InspectionOrder>> GetMyOrdersAsync(string userId, bool includeDone = false, DateTime? from = null, DateTime? to = null);
     Task<List<InspectionOrder>> GetAllAsync(string? status, string? search, bool overdue, string userId);
-    Task UpdateInspectionItemAsync(int itemId, string outcome, int? workOrderId, string updatedByUserId);
+    /// <summary>Records an item's outcome and, for "Defective", creates the tracking Work Order in
+    /// the same transaction. Returns the new Work Order's id, or null when none was created.</summary>
+    Task<int?> UpdateInspectionItemAsync(int itemId, string outcome, int? actionTypeId, int? causeId, string? notes, string updatedByUserId);
     /// <summary>Records maintenance actions performed on an asset independent of the OK/Defective
     /// outcome decision � logs what maintenance was done without requiring (or changing) an
     /// outcome, unlike UpdateInspectionItemAsync. Safe to call on an item at any point, including
@@ -177,6 +179,9 @@ public interface ISparePartService
     /// ExecuteUpdateAsync-with-WHERE-guard pattern WorkOrderService uses for stage transitions.
     /// Returns false (0 rows affected) if stock is insufficient.</summary>
     Task<bool> TryDecrementStockAsync(int sparePartId, int quantity);
+    /// <summary>Atomic increment - returns superseded parts to stock when a fix report is
+    /// re-submitted with a different parts list.</summary>
+    Task IncrementStockAsync(int sparePartId, int quantity);
 }
 
 public interface IWorkOrderService
@@ -195,7 +200,7 @@ public interface IWorkOrderService
     /// <summary>The assigned employee's own equivalent of VendorFixAsync � only when no vendor is in play (VendorId == null) and only from Stage "New" (skips the vendor pipeline entirely). FixCost is computed from the parts used, not a manual input.</summary>
     Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Bypasses waiting on the vendor's own response for a work order at Stage="Sent to Vendor" whose RequiresVendorResponse is false � usable by a manager (isManager=true) or the assigned employee. Ends at "Fixed - Pending Confirmation" like VendorFixAsync/EmployeeFixAsync.</summary>
-    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId, bool isManager = false);
+    Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId);
     /// <summary>Admin override � force-closes a work order from any non-Closed stage without waiting on the vendor's or employee's own reply.</summary>
     Task ForceCloseAsync(int workOrderId, string? reason, string userId);
     /// <summary>Vendor submits a fix � Stage="Fixed - Pending Confirmation". FixCost is computed from the parts used, not a manual input.</summary>
@@ -233,7 +238,10 @@ public interface IMaintenanceOrderService
     Task<MaintenanceOrder> CompleteAsync(int orderId, DateTime? completedDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId);
     /// <summary>Manager sign-off for an order whose OrderType.RequiresApproval is true � PendingApproval -> Done.</summary>
     Task ApproveAsync(int orderId, string managerUserId);
-    /// <summary>Admin cancels an Open order � same asset-status restore rule as CompleteAsync.</summary>
+    /// <summary>Manager sends a PendingApproval order back to Open to be redone - clears the
+    /// reported cost/parts (returning their stock) instead of leaving PendingApproval a dead end.</summary>
+    Task RejectApprovalAsync(int orderId, string? reason, string managerUserId);
+    /// <summary>Admin cancels an Open or PendingApproval order - same asset-status restore rule as CompleteAsync.</summary>
     Task CancelAsync(int orderId, string? reason, string userId);
     /// <summary>Manager-only re-assignment to a different employee or Group � the only way to recover
     /// an order whose sole assignee has since been deactivated, since Complete is otherwise gated on

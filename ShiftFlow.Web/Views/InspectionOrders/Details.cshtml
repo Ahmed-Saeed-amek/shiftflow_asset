@@ -26,7 +26,8 @@
     }
 </div>
 
-<form>@Html.AntiForgeryToken()</form>
+@* The antiforgery token for the fetch calls below - a hidden holder, not an empty <form>. *@
+<div hidden>@Html.AntiForgeryToken()</div>
 <div id="inspectAlert"></div>
 
 <div class="card border-0 shadow-sm">
@@ -502,11 +503,19 @@ else
             }
 
             const body = new URLSearchParams({ itemId, outcome, actionTypeId, causeId });
-            const r = await fetch('/InspectionOrders/UpdateItem', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
-                body,
-            });
+            let r;
+            try {
+                r = await fetch('/InspectionOrders/UpdateItem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token },
+                    body,
+                });
+            } catch {
+                // A dropped connection must not look like a silent no-op.
+                btn.disabled = false;
+                alertBox.innerHTML = `<div class="alert alert-danger small">${jsFailed}</div>`;
+                return;
+            }
             btn.disabled = false;
 
             if (!r.ok) {
@@ -514,6 +523,8 @@ else
                 alertBox.innerHTML = `<div class="alert alert-danger small">${err.error || jsFailed}</div>`;
                 return;
             }
+            // Reloaded rather than DOM-patched: a saved outcome can also spawn a Work Order link,
+            // flip the order to Done/PendingApproval and swap the whole action column.
             location.reload();
         });
     });

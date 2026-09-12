@@ -15,30 +15,24 @@ public class InspectionOrdersController : Controller
 {
     private readonly IInspectionOrderService _orders;
     private readonly IGroupService _groups;
-    private readonly IWorkOrderService _workOrderService;
     private readonly ApplicationDbContext _db;
     private readonly IAssetScopeService _scope;
 
-    public InspectionOrdersController(IInspectionOrderService orders, IGroupService groups, IWorkOrderService workOrderService, ApplicationDbContext db, IAssetScopeService scope)
+    public InspectionOrdersController(IInspectionOrderService orders, IGroupService groups, ApplicationDbContext db, IAssetScopeService scope)
     {
         _orders = orders;
         _groups = groups;
-        _workOrderService = workOrderService;
         _db = db;
         _scope = scope;
     }
 
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
+    /// <summary>Superseded by the unified Orders list - redirects with the equivalent filters
+    /// rather than keeping a second, unreachable inspection-only list page alive.</summary>
     [Authorize(Policy = PermissionCatalog.InspectionOrderView)]
-    public async Task<IActionResult> Index(string? status, string? search, bool overdue = false)
-    {
-        var orders = await _orders.GetAllAsync(status, search, overdue, CurrentUserId);
-        ViewBag.Status = status;
-        ViewBag.Search = search;
-        ViewBag.Overdue = overdue;
-        return View(orders);
-    }
+    public IActionResult Index(string? status, string? search, bool overdue = false) =>
+        RedirectToAction("Index", "Orders", new { status, search, overdue });
 
     // "My assigned inspection orders" now lives on the unified Users/MyOrders page (combined
     // with Maintenance Orders and Work Orders) — see UsersController.MyOrders. GetMyOrdersAsync
@@ -97,7 +91,7 @@ public class InspectionOrdersController : Controller
         if (!InspectionRunAsset.Outcomes.Contains(outcome) || outcome == "Pending")
             return BadRequest(new { error = "Invalid outcome." });
 
-        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder).ThenInclude(o => o.OrderType)
+        var item = await _db.InspectionRunAssets.AsNoTracking().Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
             .FirstOrDefaultAsync(i => i.Id == itemId);
         if (item == null) return NotFound();
         var order = item.InspectionRun.InspectionOrder;
@@ -110,25 +104,9 @@ public class InspectionOrdersController : Controller
 
         try
         {
-            int? workOrderId = null;
-            if (outcome == "Defective")
-            {
-                // Types that TracksDefectOutcome require Action Type + Cause; other types (e.g.
-                // Quick Check) still spawn a Work Order for tracking, with both left null.
-                if (order.OrderType!.TracksDefectOutcome && (actionTypeId == null || causeId == null))
-                    return BadRequest(new { error = "Action Type and Cause are required to report a defect." });
-
-                var wo = await _workOrderService.ReportAsync(new WorkOrder
-                {
-                    AssetId = item.AssetId,
-                    ActionTypeId = order.OrderType.TracksDefectOutcome ? actionTypeId : null,
-                    CauseId = order.OrderType.TracksDefectOutcome ? causeId : null,
-                    RequiresVendorResponse = order.OrderType.RequiresVendor,
-                }, CurrentUserId);
-                workOrderId = wo.Id;
-            }
-
-            await _orders.UpdateInspectionItemAsync(itemId, outcome, workOrderId, CurrentUserId);
+            // The "Defective spawns a Work Order" rule lives in the service, inside its own
+            // transaction - this action only binds and forwards.
+            var workOrderId = await _orders.UpdateInspectionItemAsync(itemId, outcome, actionTypeId, causeId, null, CurrentUserId);
             return Ok(new { outcome, workOrderId });
         }
         catch (InvalidOperationException ex)
@@ -144,7 +122,7 @@ public class InspectionOrdersController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateMaintenanceActions(int itemId, List<int>? maintenanceActionTypeIds)
     {
-        var item = await _db.InspectionRunAssets.Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
+        var item = await _db.InspectionRunAssets.AsNoTracking().Include(i => i.InspectionRun).ThenInclude(r => r.InspectionOrder)
             .FirstOrDefaultAsync(i => i.Id == itemId);
         if (item == null) return NotFound();
         var order = item.InspectionRun.InspectionOrder;
