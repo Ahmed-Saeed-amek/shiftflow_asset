@@ -1,6 +1,9 @@
 # ShiftFlow
 
-**ShiftFlow** is an asset-maintenance management system: an ASP.NET Core 8 MVC web application
+> The repository, solution and cookie names stay "ShiftFlow"; the product name shown to users
+> (page titles, login, footer, PDF exports, the AI greeting) is **STEP**.
+
+**ShiftFlow** ("STEP") is an asset-maintenance management system: an ASP.NET Core 8 MVC web application
 for tracking a physical asset register and everything that happens to it — inspections, in-house
 maintenance, vendor work orders, recurring/preventive schedules, spare parts, contracts and
 vendors — with fine-grained role-based access control and a fully bilingual English/Arabic (RTL)
@@ -141,3 +144,9 @@ Environment-variable form uses double underscores, e.g.
   `ShiftFlow.Web/wwwroot/uploads/` at runtime and are git-ignored.
 - EF Core migrations live in `ShiftFlow.Web/Infrastructure/Migrations`; add new ones with
   `dotnet ef migrations add <Name> --project ShiftFlow.Web --output-dir Infrastructure/Migrations`.
+- **UI conventions live in [`NOTES-shared.md`](NOTES-shared.md)** — breadcrumbs, page-header
+  actions, filter bars, clickable rows, mobile table cards, kebab menus, form layout, empty
+  states, role display and status labels, each with a copy-pasteable snippet. Build feature
+  views out of those pieces rather than inventing a local variant.
+- Domain vocabulary: **Zone** and **Zone Category** (never "Asset Location"/"Location
+  Category"/"Location Type"). Dates render as `dd/MM/yyyy` everywhere.
