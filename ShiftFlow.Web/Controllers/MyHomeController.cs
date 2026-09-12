@@ -15,15 +15,19 @@ public class MyHomeController : Controller
     private readonly UserManager<ApplicationUser> _um;
     private readonly ApplicationDbContext _db;
     private readonly ILanguageService _loc;
+    private readonly IAuthorizationService _authZ;
 
-    public MyHomeController(UserManager<ApplicationUser> um, ApplicationDbContext db, ILanguageService loc)
+    public MyHomeController(UserManager<ApplicationUser> um, ApplicationDbContext db, ILanguageService loc, IAuthorizationService authZ)
     {
-        _um = um; _db = db; _loc = loc;
+        _um = um; _db = db; _loc = loc; _authZ = authZ;
     }
 
     public async Task<IActionResult> Index()
     {
         if (User.IsInRole("Vendor")) return RedirectToAction("Index", "VendorPortal");
+        // MyWork.View is checked here rather than as a policy attribute so the Vendor redirect
+        // above still runs. Matches the sidebar, which already gates this link on the permission.
+        if (!(await _authZ.AuthorizeAsync(User, ShiftFlow.Web.Authorization.PermissionCatalog.MyWorkView)).Succeeded) return Forbid();
 
         var user = await _um.GetUserAsync(User);
         var id = user!.Id;
