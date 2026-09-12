@@ -18,31 +18,47 @@
     flex-shrink: 0;
 }
 
+/* Same shell as a Bootstrap .card elsewhere in the app: no inner padding on the card itself,
+   a bordered header strip, then the body. */
 .ai-side-card {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
     box-shadow: 0 2px 16px rgba(17, 24, 39, .06);
-    padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: .9rem;
+    overflow: hidden;
 }
 
-.ai-side-card-header {
+/* Matches .card-header.bg-transparent.border-bottom.py-2.px-3 used across the app. */
+.ai-side-card-header,
+.ai-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 100%;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .5rem 1rem;
+    background: transparent;
+    color: hsl(var(--foreground));
+    border-bottom: 1px solid hsl(var(--border));
+    flex-shrink: 0;
 }
 
-.ai-side-card-header h6 {
+.ai-side-card-header h6,
+.ai-header h6 {
     margin: 0;
     font-family: var(--font-heading);
     font-weight: 600;
     font-size: .9rem;
     color: hsl(var(--foreground));
+}
+
+.ai-side-card-body {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .9rem;
 }
 
 .ai-chat-wrap {
@@ -166,15 +182,16 @@
 .ai-chip {
     padding: .3rem .75rem;
     border-radius: 20px;
-    border: 1px solid hsl(var(--primary) / .45);
+    border: 1px solid hsl(var(--primary) / .35);
     color: hsl(var(--primary));
     font-size: .8rem;
+    line-height: 1.3;
     cursor: pointer;
-    background: hsl(var(--card));
+    background: hsl(var(--primary) / .07);
     transition: background .15s, border-color .15s;
 }
 
-.ai-chip:hover { background: hsl(var(--primary) / .08); border-color: hsl(var(--primary)); }
+.ai-chip:hover { background: hsl(var(--primary) / .15); border-color: hsl(var(--primary)); }
 .ai-chip:focus-visible, .btn-mic:focus-visible, .btn-send:focus-visible, .btn-clear:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
@@ -265,35 +282,23 @@
 /* The send icon points inline-end; in RTL the glyph itself doesn't mirror, so flip it. */
 html[dir="rtl"] .btn-send i { transform: scaleX(-1); }
 
-.ai-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.25rem;
-    background: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
-}
-
-.ai-header h6 {
-    margin: 0;
-    font-family: var(--font-heading);
-    font-weight: 600;
-    font-size: .95rem;
-}
-
-/* White on --primary = 5.93:1. The old amber-on-cyan pairing measured ~1.3:1. */
+/* The header is now a plain card header, so Clear reads as the app's btn-outline-secondary. */
 .btn-clear {
     background: transparent;
-    border: 1px solid hsl(var(--primary-foreground) / .55);
-    color: hsl(var(--primary-foreground));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
     padding: .2rem .6rem;
     border-radius: var(--radius);
     font-size: .75rem;
     cursor: pointer;
-    transition: background .15s;
+    transition: background .15s, color .15s, border-color .15s;
 }
 
-.btn-clear:hover { background: hsl(var(--primary-foreground) / .15); }
+.btn-clear:hover {
+    background: hsl(var(--secondary));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--muted-foreground) / .5);
+}
 
 .ai-avatar-scene {
     position: relative;
@@ -381,6 +386,7 @@ html[dir="rtl"] .btn-send i { transform: scaleX(-1); }
     }
 
     .ai-side-card-header { display: none; }
+    .ai-side-card-body { padding: 0; }
 
     .ai-avatar-scene {
         width: 100%;
@@ -409,4 +415,23 @@ html[dir="rtl"] .btn-send i { transform: scaleX(-1); }
        underneath it. Reserve that same width + gap as inline-end padding so no bubble ever
        extends under it. */
     .ai-messages { padding-inline-end: calc(110px + 1.5rem + .5rem); }
+
+    /* The composer is the one control you always need: keep it pinned to the bottom of the
+       chat panel while the message list scrolls under it. */
+    .ai-input-row {
+        position: sticky;
+        bottom: 0;
+        z-index: 4;
+        padding-inline: .75rem;
+    }
+
+    /* Chips wrap onto as many rows as they need instead of squeezing onto one. */
+    .ai-quick-chips {
+        padding: .5rem .75rem;
+        gap: .375rem;
+        max-height: 5.5rem;
+        overflow-y: auto;
+    }
+
+    .ai-chip { font-size: .75rem; padding: .25rem .6rem; }
 }

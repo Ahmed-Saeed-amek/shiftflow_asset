@@ -7,7 +7,7 @@
             <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label asp-for="GroupId" class="form-label small">@Loc.T("Group")</label>
+                    <label asp-for="GroupId" class="form-label required">@Loc.T("Group")</label>
                     <select asp-for="GroupId" class="form-select">
                         <option value="">@Loc.T("Select a group")</option>
                         @foreach (var g in (List<Group>)ViewBag.Groups)
@@ -18,11 +18,11 @@
                     <span asp-validation-for="GroupId" class="text-danger small"></span>
                 </div>
                 <div class="col-12">
-                    <div class="form-text mb-1">@Loc.T("Pick any combination — whichever are set narrow the visible assets together.")</div>
+                    <div class="help-text form-text mb-1">@Loc.T("Pick any combination — whichever are set narrow the visible assets together.")</div>
                     <span asp-validation-for="ZoneId" class="text-danger small d-block mb-2"></span>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="ZoneId" class="form-label small">@Loc.T("Zone")</label>
+                    <label asp-for="ZoneId" class="form-label">@Loc.T("Zone")</label>
                     <select asp-for="ZoneId" class="form-select">
                         <option value="">@Loc.T("(Any)")</option>
                         @foreach (var z in (List<Zone>)ViewBag.Zones)
@@ -32,7 +32,7 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="LocationCategoryId" class="form-label small">@Loc.T("Location Category")</label>
+                    <label asp-for="LocationCategoryId" class="form-label">@Loc.T("Zone Category")</label>
                     <select asp-for="LocationCategoryId" class="form-select">
                         <option value="">@Loc.T("(Any)")</option>
                         @foreach (var c in (List<LocationCategory>)ViewBag.LocationCategories)
@@ -42,14 +42,14 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="CategoryId" class="form-label small">@Loc.T("Category")</label>
+                    <label asp-for="CategoryId" class="form-label">@Loc.T("Category")</label>
                     <select asp-for="CategoryId" class="form-select">
                         <option value="">@Loc.T("(Any)")</option>
                         <partial name="_CategoryOptions" model="@(new CategoryOptionsModel{Categories=(List<AssetCategory>)ViewBag.Categories})" />
                     </select>
                 </div>
             </div>
-            <div class="mt-4 d-flex gap-2">
+            <div class="form-actions mt-4">
                 <button type="submit" class="btn btn-primary">@Loc.T("Save")</button>
                 <a href="@(ViewBag.ReturnUrl ?? Url.Action("Index"))" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

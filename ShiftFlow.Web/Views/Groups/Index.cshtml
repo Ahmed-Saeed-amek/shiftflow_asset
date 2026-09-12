@@ -6,40 +6,55 @@
     ViewData["Title"] = Loc.T("Groups");
     var canManage = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.GroupManage)).Succeeded;
     string actionsHtml = canManage
-        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New Group") + "</a>"
+        ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm'><i class=\"bi bi-plus-lg me-1\"></i>" + Loc.T("New Group") + "</a>"
         : "";
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Groups"),Subtitle=Loc.T("Reusable groups of employees for inspection orders"),ActionsHtml=actionsHtml})" />
 
-<div class="card border-0 shadow-sm">
-    @if (Model.Count == 0)
-    {
-        <div class="card-body text-center text-muted py-5">
-            <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
-            @Loc.T("No groups yet.")
-        </div>
-    }
-    else
-    {
+@if (Model.Count == 0)
+{
+    <partial name="_EmptyState" model="@(new EmptyStateModel{
+        Icon = "bi-people",
+        Title = Loc.T("No groups yet."),
+        Text = Loc.T("Create a reusable group of employees so you can assign a whole team to an inspection order at once."),
+        ActionUrl = canManage ? Url.Action("Create") : null,
+        ActionLabel = canManage ? Loc.T("New Group") : null })" />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
                 <thead class="table-light">
                     <tr><th>@Loc.T("Name")</th><th>@Loc.T("Members")</th><th>@Loc.T("Status")</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var t in Model)
                     {
-                        <tr>
-                            <td class="fw-semibold">@Loc.LocalizedName(t.Name, t.NameAr)</td>
-                            <td>@t.Members.Count</td>
-                            <td><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
-                            <td class="text-end">
-                                <a asp-action="Details" asp-route-id="@t.Id" class="btn btn-sm btn-outline-primary">@Loc.T("View")</a>
+                        var detailsUrl = Url.Action("Details", new { id = t.Id });
+                        <tr class="row-link" data-href="@detailsUrl">
+                            <td data-label="@Loc.T("Name")"><a href="@detailsUrl" class="fw-semibold">@Loc.LocalizedName(t.Name, t.NameAr)</a></td>
+                            <td data-label="@Loc.T("Members")">@t.Members.Count</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(t.IsActive ? "Active" : "Inactive")" /></td>
+                            <td class="text-end pe-3">
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                                            aria-expanded="false" aria-label="@Loc.T("Actions")">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="@detailsUrl"><i class="bi bi-eye me-2"></i>@Loc.T("View")</a></li>
+                                        @if (canManage)
+                                        {
+                                            <li><a class="dropdown-item" href="@Url.Action("Edit", new { id = t.Id })"><i class="bi bi-pencil me-2"></i>@Loc.T("Edit")</a></li>
+                                        }
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
-    }
-</div>
+    </div>
+}

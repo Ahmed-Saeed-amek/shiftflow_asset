@@ -1,17 +1,18 @@
 @model ShiftFlow.Web.ViewModels.EmployeeProfileViewModel
 @using Microsoft.AspNetCore.Authorization
 @using ShiftFlow.Web.Authorization
+@using ShiftFlow.Web.Services
 @inject IAuthorizationService AuthZ
 @{
     ViewData["Title"] = Model.FullName + " — " + Loc.T("Profile");
     var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
-    var roleLabel = string.Join(", ", Model.Roles.Select(r => Loc.LocalizedName(r, roleNameArByName.GetValueOrDefault(r))));
+    var roleLabel = string.Join(", ", Model.Roles.Select(r => RoleDisplay.Name(r, roleNameArByName.GetValueOrDefault(r), Loc.Lang)));
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
     var canManageUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserManage)).Succeeded;
     // Profile itself is reachable by anyone viewing their own page (a self-view exception on an
-    // otherwise User.View-gated action), but the "Back to Users" button assumes the Users list is
-    // reachable — for a role without User.View (e.g. Engineer viewing their own profile) that link
-    // led to a dead-end Access Denied page. Only show it when the directory is actually reachable.
+    // otherwise User.View-gated action), so the "Users" breadcrumb link only appears when the
+    // directory is actually reachable — for a role without User.View it would dead-end on
+    // Access Denied.
     var canViewUsersList = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
     var canViewOrderDetails = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderView)).Succeeded
         || (await AuthZ.AuthorizeAsync(User, PermissionCatalog.InspectionOrderManage)).Succeeded;
@@ -23,46 +24,65 @@
     // Department/Specialization) is a person-only concept, so skip it for them rather than
     // add yet another blank "—" row to an already sparse company profile.
     var isVendor = Model.Roles.Contains("Vendor");
+    var isSelf = Model.Id == User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var breadcrumbs = new List<(string Label, string? Url)>
+    {
+        (Loc.T("Users"), canViewUsersList ? Url.Action("Index") : null),
+        (Model.FullName, null),
+    };
 }
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <div class="d-flex align-items-center gap-2">
-        @if (canViewUsersList)
-        {
-            <a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i>@Loc.T("Users")
-            </a>
-        }
-        <h4 class="fw-bold mb-0">@Model.FullName</h4>
-        @if (Model.IsActive)
-        {
-            <span class="badge bg-success">@Loc.T("Active")</span>
-        }
-        else
-        {
-            <span class="badge bg-secondary">@Loc.T("Inactive")</span>
-        }
-    </div>
-    <div class="d-flex gap-2">
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = Model.FullName,
+    Subtitle = roleLabel,
+    Breadcrumbs = breadcrumbs })" />
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <partial name="_StatusBadge" model="@(Model.IsActive ? "Active" : "Inactive")" />
+    <div class="d-flex flex-wrap gap-2">
         @if (canManageUsers && !isVendor)
         {
-            <a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-sm btn-outline-secondary">
+            <a href="@Url.Action("Edit", new { id = Model.Id })" class="btn btn-primary btn-sm">
                 <i class="bi bi-pencil me-1"></i>@Loc.T("Edit")
             </a>
-            <form method="post" asp-action="ResetPassword" asp-route-id="@Model.Id"
-                  onsubmit="return confirm('@Loc.T("Reset this user's password? They'll need the new temporary password to log in.")')">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-key me-1"></i>@Loc.T("Reset Password")
-                </button>
-            </form>
         }
         @if (canManagePermissions)
         {
-            <a href="@Url.Action("UserPermissions", "Rbac", new { userId = Model.Id })"
-               class="btn btn-sm btn-outline-primary">
+            <a href="@Url.Action("UserPermissions", "Rbac", new { userId = Model.Id })" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-shield-lock me-1"></i>@Loc.T("Permissions")
             </a>
+        }
+        @if (canManageUsers && !isVendor)
+        {
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
+                    @Loc.T("More")<i class="bi bi-chevron-down ms-1"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form method="post" asp-action="ResetPassword" asp-route-id="@Model.Id">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item"
+                                    data-confirm="@Loc.T("Reset this user's password? They'll need the new temporary password to log in.")">
+                                <i class="bi bi-key me-2"></i>@Loc.T("Reset Password")
+                            </button>
+                        </form>
+                    </li>
+                    @if (!isSelf)
+                    {
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" asp-action="ToggleActive" asp-route-id="@Model.Id">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item @(Model.IsActive ? "text-danger" : null)"
+                                        data-confirm="@(Model.IsActive ? Loc.T("Deactivate {0}?", Model.FullName) : Loc.T("Activate {0}?", Model.FullName))">
+                                    <i class="bi @(Model.IsActive ? "bi-person-dash" : "bi-person-check") me-2"></i>@(Model.IsActive ? Loc.T("Deactivate") : Loc.T("Activate"))
+                                </button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
         }
     </div>
 </div>
@@ -81,7 +101,7 @@
             </div>
             <div class="col-sm-6 col-lg-3">
                 <div class="text-muted small mb-1">@Loc.T("Email")</div>
-                <div class="fw-semibold">@Model.Email</div>
+                <div class="fw-semibold text-break">@Model.Email</div>
             </div>
             <div class="col-sm-6 col-lg-3">
                 <div class="text-muted small mb-1">@Loc.T("Phone")</div>
@@ -120,39 +140,15 @@
 
 @if (canViewOrders)
 {
-<h6 class="fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.08em">@Loc.T("Inspection Orders")</h6>
-<div class="row g-3 mb-4">
-    <div class="col-6 col-sm-4 col-lg-2">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-3">@Model.OrdersAssigned</div>
-            <div class="text-muted small">@Loc.T("Assigned")</div>
-        </div>
+    <h6 class="fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.08em">@Loc.T("Inspection Orders")</h6>
+    @* Same _KpiCard tiles the Dashboard and MyHome use, so the numbers read identically everywhere. *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-xl-2"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Assigned"),Value=Model.OrdersAssigned.ToString(),Icon="bi-clipboard-check",Color="primary"})" /></div>
+        <div class="col-6 col-md-4 col-xl-2"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Done"),Value=Model.OrdersDone.ToString(),Icon="bi-check2-circle",Color="emerald"})" /></div>
+        <div class="col-6 col-md-4 col-xl-2"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Open"),Value=Model.OrdersOpen.ToString(),Icon="bi-folder2-open",Color="amber"})" /></div>
+        <div class="col-6 col-md-4 col-xl-2"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("In Progress"),Value=Model.OrdersInProgress.ToString(),Icon="bi-hourglass-split",Color="violet"})" /></div>
+        <div class="col-6 col-md-4 col-xl-2"><partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Defective"),Value=Model.DefectsFound.ToString(),Icon="bi-exclamation-triangle",Color="red"})" /></div>
     </div>
-    <div class="col-6 col-sm-4 col-lg-2">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-3 text-success">@Model.OrdersDone</div>
-            <div class="text-muted small">@Loc.T("Done")</div>
-        </div>
-    </div>
-    <div class="col-6 col-sm-4 col-lg-2">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-3 text-secondary">@Model.OrdersOpen</div>
-            <div class="text-muted small">@Loc.T("Open")</div>
-        </div>
-    </div>
-    <div class="col-6 col-sm-4 col-lg-2">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-3" style="color:#38bdf8">@Model.OrdersInProgress</div>
-            <div class="text-muted small">@Loc.T("In Progress")</div>
-        </div>
-    </div>
-    <div class="col-6 col-sm-4 col-lg-2">
-        <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fw-bold fs-3 text-danger">@Model.DefectsFound</div>
-            <div class="text-muted small">@Loc.T("Defective")</div>
-        </div>
-    </div>
-</div>
 }
 
 @if (canViewOrders || canViewAudit)
@@ -185,7 +181,7 @@
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
                         <thead class="table-light">
                             <tr>
                                 <th>@Loc.T("Order #")</th><th>@Loc.T("Status")</th>
@@ -195,21 +191,22 @@
                         <tbody>
                             @foreach (var o in Model.Orders)
                             {
-                                <tr>
-                                    <td class="fw-semibold">
-                                        @if (canViewOrderDetails)
+                                var orderUrl = canViewOrderDetails ? Url.Action("Details", "InspectionOrders", new { id = o.OrderId }) : null;
+                                <tr class="@(orderUrl != null ? "row-link" : null)" data-href="@orderUrl">
+                                    <td data-label="@Loc.T("Order #")">
+                                        @if (orderUrl != null)
                                         {
-                                            <a asp-controller="InspectionOrders" asp-action="Details" asp-route-id="@o.OrderId">@o.OrderNumber</a>
+                                            <a href="@orderUrl" class="fw-semibold">@o.OrderNumber</a>
                                         }
                                         else
                                         {
-                                            @o.OrderNumber
+                                            <span class="fw-semibold">@o.OrderNumber</span>
                                         }
                                     </td>
-                                    <td><partial name="_StatusBadge" model="@o.Status" /></td>
-                                    <td>@o.CheckedAssets/@o.TotalAssets</td>
-                                    <td class="small text-nowrap">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
-                                    <td class="small text-muted">@Loc.T(o.AssignedContext)</td>
+                                    <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@o.Status" /></td>
+                                    <td data-label="@Loc.T("Checked")">@o.CheckedAssets/@o.TotalAssets</td>
+                                    <td data-label="@Loc.T("Due Date")" class="small text-nowrap">@(o.DueDate.HasValue ? Loc.TDate(o.DueDate.Value.ToString("dd/MM/yyyy")) : "—")</td>
+                                    <td data-label="@Loc.T("Assigned Via")" class="small text-muted" data-hide-mobile>@Loc.T(o.AssignedContext)</td>
                                 </tr>
                             }
                         </tbody>
@@ -231,7 +228,7 @@
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 table-card-stack">
                         <thead class="table-light">
                             <tr><th>@Loc.T("When")</th><th>@Loc.T("Action")</th><th>@Loc.T("Entity")</th><th>@Loc.T("Details")</th></tr>
                         </thead>
@@ -239,10 +236,10 @@
                             @foreach (var e in Model.AuditLog)
                             {
                                 <tr>
-                                    <td class="small text-nowrap text-muted">@Loc.TDate(e.When.ToString("dd/MM/yyyy")) @e.When.ToString("HH:mm")</td>
-                                    <td><span class="badge bg-light text-dark border">@e.Action</span></td>
-                                    <td class="small text-muted">@e.EntityType</td>
-                                    <td class="small" style="max-width:400px;word-break:break-word">@e.Details</td>
+                                    <td data-label="@Loc.T("When")" class="small text-nowrap text-muted">@Loc.TDate(e.When.ToString("dd/MM/yyyy")) @e.When.ToString("HH:mm")</td>
+                                    <td data-label="@Loc.T("Action")"><span class="badge bg-light text-dark border">@e.Action</span></td>
+                                    <td data-label="@Loc.T("Entity")" class="small text-muted" data-hide-mobile>@e.EntityType</td>
+                                    <td data-label="@Loc.T("Details")" class="small" style="max-width:400px;word-break:break-word">@e.Details</td>
                                 </tr>
                             }
                         </tbody>

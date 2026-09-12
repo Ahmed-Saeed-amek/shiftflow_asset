@@ -27,14 +27,34 @@ public class VendorsController : Controller
     private const int PageSize = 25;
 
     [Authorize(Policy = PermissionCatalog.VendorView)]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(string? search, string? status, int page = 1)
     {
         if (page < 1) page = 1;
-        var query = _db.Vendors.AsNoTracking().OrderBy(v => v.Name);
+        var vendorQuery = _db.Vendors.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            vendorQuery = vendorQuery.Where(v =>
+                EF.Functions.Like(v.Name, $"%{term}%") ||
+                (v.ContactName != null && EF.Functions.Like(v.ContactName, $"%{term}%")) ||
+                (v.Email != null && EF.Functions.Like(v.Email, $"%{term}%")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var s = status.Trim();
+            vendorQuery = vendorQuery.Where(v => v.Status == s);
+        }
+
+        var query = vendorQuery.OrderBy(v => v.Name);
         var totalCount = await query.CountAsync();
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         if (page > totalPages) page = totalPages;
         ViewBag.Pagination = new ShiftFlow.Web.ViewModels.PaginationModel { Page = page, TotalPages = totalPages };
+        ViewBag.SearchFilter = search;
+        ViewBag.StatusFilter = status;
+        ViewBag.TotalCount = totalCount;
         var vendors = await query.Skip((page - 1) * PageSize).Take(PageSize).ToListAsync();
         return View(vendors);
     }

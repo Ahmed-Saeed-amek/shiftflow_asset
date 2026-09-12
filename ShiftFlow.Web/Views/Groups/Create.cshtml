@@ -3,7 +3,10 @@
 @{
     ViewData["Title"] = Loc.T("New Group");
 }
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("New Group"),Subtitle=Loc.T("Create a reusable group of employees")})" />
+<partial name="_PageHeader" model="@(new PageHeaderModel{
+    Title = Loc.T("New Group"),
+    Subtitle = Loc.T("Create a reusable group of employees"),
+    Breadcrumbs = new List<(string Label, string? Url)>{ (Loc.T("Groups"), Url.Action("Index")), (Loc.T("New Group"), null) } })" />
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
@@ -19,20 +22,20 @@
             }
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">@Loc.T("Name") <span class="text-danger">*</span></label>
+                    <label asp-for="Name" class="form-label required">@Loc.T("Name")</label>
                     <input asp-for="Name" class="form-control" />
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">@Loc.T("Arabic Name")</label>
+                    <label asp-for="NameAr" class="form-label">@Loc.T("Arabic Name")</label>
                     <input asp-for="NameAr" class="form-control" dir="rtl" />
                 </div>
                 <div class="col-12">
-                    <label class="form-label">@Loc.T("Description")</label>
+                    <label asp-for="Description" class="form-label">@Loc.T("Description")</label>
                     <textarea asp-for="Description" class="form-control" rows="2"></textarea>
                 </div>
                 <partial name="_MemberPicker" model="@(new MemberPickerModel { RootId = "memberPicker", FieldName = "MemberUserIds", Selected = new List<GroupMemberChip>() })" />
             </div>
-            <div class="mt-4">
+            <div class="form-actions mt-4">
                 <button type="submit" class="btn btn-primary" id="submitBtn"><i class="bi bi-check-lg me-1"></i>@Loc.T("Create Group")</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">@Loc.T("Cancel")</a>
             </div>

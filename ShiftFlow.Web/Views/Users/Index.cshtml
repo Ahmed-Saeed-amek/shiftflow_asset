@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using ShiftFlow.Domain.Entities
 @using ShiftFlow.Web.Authorization
+@using ShiftFlow.Web.Services
 @inject IAuthorizationService AuthZ
 @using Microsoft.Extensions.Hosting
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
@@ -12,132 +13,187 @@
     var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
     var roleOptions = ViewBag.RoleOptions as List<string> ?? new List<string>();
     var roleNameArByName = ViewBag.RoleNameArByName as Dictionary<string, string?> ?? new Dictionary<string, string?>();
-    string RoleLabel(string roleName) => Loc.LocalizedName(roleName, roleNameArByName.GetValueOrDefault(roleName));
+    string RoleLabel(string roleName) => RoleDisplay.Name(roleName, roleNameArByName.GetValueOrDefault(roleName), Loc.Lang);
     var canManageUsers = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserManage)).Succeeded;
     var canViewProfile = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.UserView)).Succeeded;
-    // Re-running the seeder against a live production database is not a routine admin action —
-    // keep the button to Development, where it's a convenience.
+    // Re-running the seeder against a live production database is not a routine admin action:
+    // keep the button to Development, where it is a convenience.
     var canSeedData = Env.IsDevelopment() && (await AuthZ.AuthorizeAsync(User, PermissionCatalog.IsAdmin)).Succeeded;
     var canManagePermissions = (await AuthZ.AuthorizeAsync(User, PermissionCatalog.RbacManage)).Succeeded;
-    var exportUrl = Url.Action("ExportExcel", new { role = (string)ViewBag.RoleFilter, search = (string)ViewBag.SearchFilter });
-    string actionsHtml = "<a href='" + exportUrl + "' class='btn btn-outline-success btn-sm me-2'><i class=\"bi bi-file-earmark-excel me-1\"></i>" + Loc.T("Excel") + "</a>"
-        + (canManageUsers
-            ? "<a href='" + Url.Action("Create") + "' class='btn btn-primary btn-sm me-2'><i class=\"bi bi-plus me-1\"></i>" + Loc.T("New User") + "</a>"
-            : "");
-}
-<partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Users"),Subtitle=Loc.T("All system accounts"),ActionsHtml=actionsHtml})" />
+    // Asset-visibility scopes are edited under User.Manage, the same gate UserAssetScopesController uses.
+    var canManageScopes = canManageUsers;
 
-@if (canSeedData)
-{
-    <div class="d-flex justify-content-end mb-3">
-        <form method="post" asp-action="SeedData"
-              onsubmit="return confirm('@Loc.T("This adds missing roles, permissions, and reference data. Safe to run again — nothing gets duplicated or overwritten. Continue?")')">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-database-add me-1"></i>@Loc.T("Seed Data")
-            </button>
-        </form>
-    </div>
+    var searchFilter = (string?)ViewBag.SearchFilter;
+    var roleFilter = (string?)ViewBag.RoleFilter;
+    var statusFilter = (string?)ViewBag.StatusFilter;
+    var totalCount = (int)(ViewBag.TotalCount ?? Model.Count);
+    var hasFilter = !string.IsNullOrWhiteSpace(searchFilter) || !string.IsNullOrWhiteSpace(roleFilter) || !string.IsNullOrWhiteSpace(statusFilter);
+    var exportUrl = Url.Action("ExportExcel", new { role = roleFilter, search = searchFilter, status = statusFilter });
 }
+<partial name="_PageHeader" model="@(new PageHeaderModel{ Title = Loc.T("Users"), Subtitle = Loc.T("All system accounts") })" />
 
-<form method="get" class="row g-2 mb-3">
-    <div class="col-12 col-sm-auto">
-        <input type="text" name="search" value="@ViewBag.SearchFilter" class="form-control form-control-sm w-100"
-               placeholder="@Loc.T("Search by name or email...")" style="min-width:220px" />
-    </div>
-    <div class="col-auto">
-        <select name="role" class="form-select form-select-sm">
-            <option value="">@Loc.T("All Roles")</option>
-            @foreach (var r in roleOptions)
-            {
-                <option value="@r" selected="@(r == (string)ViewBag.RoleFilter)">@RoleLabel(r)</option>
-            }
-        </select>
-    </div>
-    <div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-secondary">@Loc.T("Filter")</button></div>
-    @if (!string.IsNullOrWhiteSpace((string)ViewBag.SearchFilter) || !string.IsNullOrWhiteSpace((string)ViewBag.RoleFilter))
+@* The header action cluster is written here rather than passed as ActionsHtml so the "More"
+   menu can carry Razor (anti-forgery token, Development-only Seed Data). *@
+<div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+    @if (canManageUsers)
     {
-        <div class="col-auto"><a href="@Url.Action("Index")" class="btn btn-sm btn-outline-secondary">@Loc.T("Clear")</a></div>
+        <a href="@Url.Action("Create")" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>@Loc.T("New User")
+        </a>
     }
-</form>
-
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>@Loc.T("Name")</th><th class="d-none d-md-table-cell">@Loc.T("Email")</th><th>@Loc.T("Role")</th><th class="d-none d-lg-table-cell">@Loc.T("Department")</th><th class="d-none d-sm-table-cell">@Loc.T("Status")</th><th></th></tr></thead>
-            <tbody>
-                @if (Model.Count == 0)
-                {
-                    <tr><td colspan="6" class="text-center text-muted py-4">@Loc.T("No records found")</td></tr>
-                }
-                @foreach (var u in Model)
-                {
-                    var isSelf = u.Id == currentUserId;
-                    var profileUrl = canViewProfile ? Url.Action("Profile", new { id = u.Id }) : null;
-                    <tr class="@(canViewProfile ? "cursor-pointer" : "")" onclick="@(profileUrl != null ? $"location.href='{profileUrl}'" : null)">
-                        <td>@u.FullName</td>
-                        <td class="small text-muted d-none d-md-table-cell">@u.Email</td>
-                        <td>@string.Join(", ", rolesByUser[u.Id].Select(RoleLabel))</td>
-                        <td class="d-none d-lg-table-cell">@u.Department</td>
-                        <td class="d-none d-sm-table-cell"><partial name="_StatusBadge" model="@(u.IsActive ? "Active" : "Inactive")" /></td>
-                        <td class="text-end pe-3" onclick="event.stopPropagation()">
-                            <div class="d-flex justify-content-end gap-1">
-                                @if (canViewProfile)
-                                {
-                                    <a href="@Url.Action("Profile", new { id = u.Id })"
-                                       class="btn btn-sm btn-outline-secondary" title="@Loc.T("View profile")">
-                                        <i class="bi bi-person-lines-fill"></i>
-                                    </a>
-                                }
-                                @if (canManageUsers && !rolesByUser[u.Id].Contains("Vendor"))
-                                {
-                                    <a href="@Url.Action("Edit", new { id = u.Id })"
-                                       class="btn btn-sm btn-outline-secondary" title="@Loc.T("Edit")">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                }
-                                @if (canManagePermissions)
-                                {
-                                    <a href="@Url.Action("UserPermissions","Rbac", new { userId = u.Id })"
-                                       class="btn btn-sm btn-outline-primary" title="@Loc.T("Manage permissions")">
-                                        <i class="bi bi-shield-lock"></i>
-                                    </a>
-                                }
-                                @if (canManageUsers)
-                                {
-                                    @if (isSelf)
-                                    {
-                                        <button class="btn btn-sm btn-outline-danger" disabled title="@Loc.T("Cannot delete your own account")">
-                                            <i class="bi bi-trash3"></i>
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <form method="post" asp-action="ToggleActive" asp-route-id="@u.Id"
-                                              onsubmit="return confirm('@(u.IsActive ? Loc.T("Deactivate {0}?", u.FullName) : Loc.T("Activate {0}?", u.FullName))')">
-                                            @Html.AntiForgeryToken()
-                                            <button class="btn btn-sm @(u.IsActive ? "btn-outline-warning" : "btn-outline-success")"
-                                                    title="@(u.IsActive ? Loc.T("Deactivate user") : Loc.T("Activate user"))">
-                                                <i class="bi @(u.IsActive ? "bi-person-dash" : "bi-person-check")"></i>
-                                            </button>
-                                        </form>
-                                        <form method="post" asp-action="Delete" asp-route-id="@u.Id"
-                                              onsubmit="return confirm('@Loc.T("Delete {0}? This cannot be undone.", u.FullName)')">
-                                            @Html.AntiForgeryToken()
-                                            <button class="btn btn-sm btn-outline-danger" title="@Loc.T("Delete user")">
-                                                <i class="bi bi-trash3"></i>
-                                            </button>
-                                        </form>
-                                    }
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    <a href="@exportUrl" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>@Loc.T("Export Excel")
+    </a>
+    @if (canSeedData)
+    {
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
+                @Loc.T("More")<i class="bi bi-chevron-down ms-1"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <form method="post" asp-action="SeedData">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="dropdown-item"
+                                data-confirm="@Loc.T("This adds missing roles, permissions, and reference data. Safe to run again — nothing gets duplicated or overwritten. Continue?")">
+                            <i class="bi bi-database-add me-2"></i>@Loc.T("Seed Data")
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    }
 </div>
 
-<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
+<form method="get" class="filter-bar">
+    <input type="search" name="search" value="@searchFilter" class="form-control form-control-sm"
+           placeholder="@Loc.T("Search by name or email...")" style="max-width:240px" aria-label="@Loc.T("Search by name or email...")" />
+    <select name="role" class="form-select form-select-sm" style="max-width:200px" aria-label="@Loc.T("Role")">
+        <option value="">@Loc.T("All Roles")</option>
+        @foreach (var r in roleOptions)
+        {
+            <option value="@r" selected="@(r == roleFilter)">@RoleLabel(r)</option>
+        }
+    </select>
+    <select name="status" class="form-select form-select-sm" style="max-width:170px" aria-label="@Loc.T("Status")">
+        <option value="">@Loc.T("All Statuses")</option>
+        <option value="Active" selected="@(statusFilter == "Active")">@Loc.T("Active")</option>
+        <option value="Inactive" selected="@(statusFilter == "Inactive")">@Loc.T("Inactive")</option>
+    </select>
+    <button type="submit" class="btn btn-outline-secondary btn-sm">@Loc.T("Filter")</button>
+    @if (hasFilter)
+    {
+        <a href="@Url.Action("Index")" class="btn btn-link btn-sm">@Loc.T("Clear")</a>
+    }
+    <span class="filter-bar__count text-muted small">@totalCount @Loc.T("records")</span>
+</form>
 
+@if (Model.Count == 0)
+{
+    <partial name="_EmptyState" model="@(new EmptyStateModel{
+        Icon = "bi-people",
+        Title = hasFilter ? Loc.T("No users match these filters") : Loc.T("No users yet"),
+        Text = hasFilter ? Loc.T("Try a different search term, role, or status.") : Loc.T("Add the first account to get started."),
+        ActionUrl = hasFilter ? Url.Action("Index") : (canManageUsers ? Url.Action("Create") : null),
+        ActionLabel = hasFilter ? Loc.T("Clear") : (canManageUsers ? Loc.T("New User") : null) })" />
+}
+else
+{
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-card-stack">
+                <thead>
+                    <tr>
+                        <th>@Loc.T("Name")</th>
+                        <th>@Loc.T("Email")</th>
+                        <th>@Loc.T("Role")</th>
+                        <th>@Loc.T("Department")</th>
+                        <th>@Loc.T("Status")</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model)
+                    {
+                        var isSelf = u.Id == currentUserId;
+                        var isVendorAccount = rolesByUser[u.Id].Contains("Vendor");
+                        var profileUrl = canViewProfile ? Url.Action("Profile", new { id = u.Id }) : null;
+                        <tr class="@(profileUrl != null ? "row-link" : null)" data-href="@profileUrl">
+                            <td data-label="@Loc.T("Name")">
+                                @if (profileUrl != null)
+                                {
+                                    <a href="@profileUrl" class="fw-semibold">@u.FullName</a>
+                                }
+                                else
+                                {
+                                    <span class="fw-semibold">@u.FullName</span>
+                                }
+                            </td>
+                            <td data-label="@Loc.T("Email")" class="small text-muted">@u.Email</td>
+                            <td data-label="@Loc.T("Role")">
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var r in rolesByUser[u.Id])
+                                    {
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle">@RoleLabel(r)</span>
+                                    }
+                                </div>
+                            </td>
+                            <td data-label="@Loc.T("Department")" data-hide-mobile>@u.Department</td>
+                            <td data-label="@Loc.T("Status")"><partial name="_StatusBadge" model="@(u.IsActive ? "Active" : "Inactive")" /></td>
+                            <td class="text-end pe-3">
+                                <div class="dropdown row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                                            aria-expanded="false" aria-label="@Loc.T("Actions")">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        @if (canViewProfile)
+                                        {
+                                            <li><a class="dropdown-item" href="@Url.Action("Profile", new { id = u.Id })"><i class="bi bi-person-lines-fill me-2"></i>@Loc.T("Profile")</a></li>
+                                        }
+                                        @if (canManageUsers && !isVendorAccount)
+                                        {
+                                            <li><a class="dropdown-item" href="@Url.Action("Edit", new { id = u.Id })"><i class="bi bi-pencil me-2"></i>@Loc.T("Edit")</a></li>
+                                        }
+                                        @if (canManagePermissions)
+                                        {
+                                            <li><a class="dropdown-item" href="@Url.Action("UserPermissions", "Rbac", new { userId = u.Id })"><i class="bi bi-shield-lock me-2"></i>@Loc.T("Permissions")</a></li>
+                                        }
+                                        @if (canManageScopes)
+                                        {
+                                            <li><a class="dropdown-item" href="@Url.Action("Index", "UserAssetScopes")"><i class="bi bi-box-seam me-2"></i>@Loc.T("Asset scope")</a></li>
+                                        }
+                                        @if (canManageUsers && !isSelf)
+                                        {
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form method="post" asp-action="ToggleActive" asp-route-id="@u.Id">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item"
+                                                            data-confirm="@(u.IsActive ? Loc.T("Deactivate {0}?", u.FullName) : Loc.T("Activate {0}?", u.FullName))">
+                                                        <i class="bi @(u.IsActive ? "bi-person-dash" : "bi-person-check") me-2"></i>@(u.IsActive ? Loc.T("Deactivate") : Loc.T("Activate"))
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" asp-action="Delete" asp-route-id="@u.Id">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-danger"
+                                                            data-confirm="@Loc.T("Delete {0}? This cannot be undone.", u.FullName)">
+                                                        <i class="bi bi-trash me-2"></i>@Loc.T("Delete")
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<partial name="_Pagination" model="@((PaginationModel)ViewBag.Pagination)" />
