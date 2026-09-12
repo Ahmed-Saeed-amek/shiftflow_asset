@@ -1,0 +1,412 @@
+/* AI Assistant page — extracted from Views/AiAssistant/Index.cshtml.
+   All colors come from site.css design tokens; every text/background pair meets WCAG AA 4.5:1.
+   Directional spacing uses logical properties so the RTL layout mirrors automatically. */
+
+/* Two-column layout: fixed-width avatar/controls sidebar + flexible chat panel.
+   Stacks to a single column below the tablet breakpoint. */
+.ai-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+}
+
+.ai-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 320px;
+    flex-shrink: 0;
+}
+
+.ai-side-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 16px rgba(17, 24, 39, .06);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .9rem;
+}
+
+.ai-side-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.ai-side-card-header h6 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: .9rem;
+    color: hsl(var(--foreground));
+}
+
+.ai-chat-wrap {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    height: calc(100vh - 180px);
+    min-height: 500px;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 16px rgba(17, 24, 39, .06);
+    overflow: hidden;
+}
+
+.ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.ai-bubble {
+    max-width: 72%;
+    padding: .6rem 1rem;
+    border-radius: var(--radius-lg);
+    line-height: 1.5;
+    font-size: .9rem;
+    word-break: break-word;
+}
+
+.ai-bubble.assistant {
+    align-self: flex-start;
+    background: hsl(var(--muted));
+    border-end-start-radius: 4px;
+    color: hsl(var(--foreground));
+}
+
+/* White on --primary (#0369A1) measures 5.93:1 — the same pairing site.css uses for .btn-primary. */
+.ai-bubble.user {
+    align-self: flex-end;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-end-end-radius: 4px;
+}
+
+/* Error/notice bubble (fetch failure, session expired, rate limit). --destructive at 50%
+   lightness on a pale tint of itself stays above 4.5:1. */
+.ai-bubble.error {
+    align-self: flex-start;
+    background: hsl(var(--destructive) / .08);
+    border: 1px solid hsl(var(--destructive) / .35);
+    color: hsl(var(--destructive));
+    border-end-start-radius: 4px;
+}
+
+.ai-bubble p { margin: 0 0 .5rem; }
+.ai-bubble p:last-child { margin-bottom: 0; }
+.ai-bubble ul, .ai-bubble ol { margin: 0 0 .5rem; padding-inline-start: 1.25rem; }
+.ai-bubble li { margin-bottom: .15rem; }
+.ai-bubble strong { font-weight: 600; }
+
+/* Responsive 16:9 embed for getAssetRepairGuidance video suggestions. max-width keeps
+   it from overflowing the bubble's max-width on the (rare) very wide viewport. */
+.ai-video-embed {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 16 / 9;
+    margin: .4rem 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #000;
+}
+
+.ai-video-embed iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.ai-typing {
+    align-self: flex-start;
+    display: none;
+    gap: 4px;
+    padding: .6rem 1rem;
+}
+
+.ai-typing span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    display: inline-block;
+    animation: aiBounce .9s infinite;
+}
+
+.ai-typing span:nth-child(2) { animation-delay: .15s; }
+.ai-typing span:nth-child(3) { animation-delay: .3s; }
+
+@keyframes aiBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+}
+
+.ai-quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .75rem 1.25rem;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--secondary));
+}
+
+/* --primary on white is 5.93:1; the amber border it replaces carried no text contrast duty. */
+.ai-chip {
+    padding: .3rem .75rem;
+    border-radius: 20px;
+    border: 1px solid hsl(var(--primary) / .45);
+    color: hsl(var(--primary));
+    font-size: .8rem;
+    cursor: pointer;
+    background: hsl(var(--card));
+    transition: background .15s, border-color .15s;
+}
+
+.ai-chip:hover { background: hsl(var(--primary) / .08); border-color: hsl(var(--primary)); }
+.ai-chip:focus-visible, .btn-mic:focus-visible, .btn-send:focus-visible, .btn-clear:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+.ai-mic-standalone {
+    margin: .75rem auto 0;
+    display: flex;
+}
+
+.ai-input-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .75rem 1.25rem;
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+}
+
+.ai-input-row textarea {
+    flex: 1;
+    resize: none;
+    max-height: 6rem;
+    line-height: 1.4;
+    border: 1px solid hsl(var(--input));
+    border-radius: 20px;
+    padding: .5rem 1rem;
+    font-size: .9rem;
+    color: hsl(var(--foreground));
+    background: hsl(var(--card));
+    outline: none;
+}
+
+.ai-input-row textarea:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .15); }
+
+.btn-mic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: hsl(var(--muted));
+    color: hsl(var(--primary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: background .15s;
+    flex-shrink: 0;
+}
+
+.btn-mic-stop {
+    background: hsl(var(--destructive) / .12);
+    color: hsl(var(--destructive));
+}
+
+.btn-mic-stop:hover { background: hsl(var(--destructive) / .2); }
+
+.btn-mic.listening {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    animation: aiPulse 1.2s infinite;
+}
+
+@keyframes aiPulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / .5); }
+    50% { box-shadow: 0 0 0 8px hsl(var(--primary) / 0); }
+}
+
+.btn-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: opacity .15s;
+    flex-shrink: 0;
+}
+
+.btn-send:disabled { opacity: .4; cursor: default; }
+
+/* The send icon points inline-end; in RTL the glyph itself doesn't mirror, so flip it. */
+html[dir="rtl"] .btn-send i { transform: scaleX(-1); }
+
+.ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+.ai-header h6 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: .95rem;
+}
+
+/* White on --primary = 5.93:1. The old amber-on-cyan pairing measured ~1.3:1. */
+.btn-clear {
+    background: transparent;
+    border: 1px solid hsl(var(--primary-foreground) / .55);
+    color: hsl(var(--primary-foreground));
+    padding: .2rem .6rem;
+    border-radius: var(--radius);
+    font-size: .75rem;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.btn-clear:hover { background: hsl(var(--primary-foreground) / .15); }
+
+.ai-avatar-scene {
+    position: relative;
+    width: 100%;
+    max-width: 260px;
+    aspect-ratio: 9 / 16;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: hsl(var(--muted));
+    border: 2px solid hsl(var(--border));
+    transition: border-color .4s, box-shadow .4s;
+    flex-shrink: 0;
+}
+
+.ai-avatar-scene video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ai-avatar-scene.state-listening { border-color: hsl(var(--primary)); box-shadow: 0 0 20px hsl(var(--primary) / .35); }
+.ai-avatar-scene.state-thinking  { border-color: hsl(var(--warning)); box-shadow: 0 0 20px hsl(var(--warning) / .35); }
+.ai-avatar-scene.state-speaking  { border-color: hsl(var(--success)); box-shadow: 0 0 20px hsl(var(--success) / .35); }
+
+.ai-avatar-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: hsl(var(--muted) / .95);
+    font-size: .7rem;
+    color: hsl(var(--foreground));
+    text-align: center;
+    padding: .5rem;
+}
+
+.ai-avatar-overlay.error { background: hsl(var(--destructive) / .1); color: hsl(var(--destructive)); }
+.ai-avatar-overlay.hidden { display: none; }
+
+.ai-avatar-spinner {
+    width: 22px;
+    height: 22px;
+    border: 2px solid hsl(var(--primary));
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: aiAvatarSpin .8s linear infinite;
+}
+
+@keyframes aiAvatarSpin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-typing span, .btn-mic.listening, .ai-avatar-spinner { animation: none; }
+}
+
+/* Below the tablet breakpoint the old layout stacked a full 9:16 avatar panel on top of
+   the chat panel — on a phone that pushed the conversation almost entirely off-screen, so
+   in practice you could see the avatar OR scroll down to the chat, never both at once.
+   Instead, shrink the avatar into a small rectangular picture-in-picture card that floats
+   over the top-inline-end corner of the chat, which now gets the full available height. */
+@media (max-width: 900px) {
+    .ai-layout { position: relative; flex-direction: column; }
+
+    .ai-side {
+        position: absolute;
+        /* .ai-layout's top edge lines up with .ai-chat-wrap's own top edge (its
+           "Conversation" header), not the space below it — a small top offset here
+           floated this picture-in-picture card straight over that header's text
+           instead of below it. 60px roughly clears .ai-header's height. */
+        top: 60px;
+        inset-inline-end: .5rem;
+        width: 110px;
+        z-index: 5;
+        gap: 0;
+    }
+
+    .ai-side-card {
+        padding: 0;
+        border-radius: var(--radius-lg);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, .2);
+    }
+
+    .ai-side-card-header { display: none; }
+
+    .ai-avatar-scene {
+        width: 100%;
+        max-width: 110px;
+        aspect-ratio: 3 / 4;
+        border-radius: var(--radius-lg);
+        border-width: 2px;
+        margin: 0;
+    }
+
+    .ai-avatar-overlay {
+        font-size: .55rem;
+        padding: .3rem;
+        gap: .3rem;
+    }
+
+    .ai-avatar-overlay span { display: none; }
+    .ai-avatar-overlay .btn { font-size: .6rem; padding: .1rem .35rem; }
+    .ai-avatar-spinner { width: 16px; height: 16px; }
+
+    .ai-chat-wrap { width: 100%; height: calc(100dvh - 140px); min-height: 600px; }
+
+    /* The PiP avatar card above is position:absolute relative to .ai-layout, not the
+       scrolling .ai-messages list — so it stays pinned over the same top-inline-end zone no
+       matter how far the conversation scrolls, permanently covering any bubble that renders
+       underneath it. Reserve that same width + gap as inline-end padding so no bubble ever
+       extends under it. */
+    .ai-messages { padding-inline-end: calc(110px + 1.5rem + .5rem); }
+}

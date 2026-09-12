@@ -18,6 +18,10 @@ public class AiAssistantController : Controller
     private static (string Token, DateTime Expiry) _cachedToken;
 
     private const string ArabicVoice = "ar-SA-ZariyahNeural";
+    private const int MaxTextLength = 500;
+    private const int MaxHistoryTurns = 12;
+    private const int MaxHistoryTurnLength = 2000;
+    private const int MaxHistoryBytes = 16 * 1024;
 
     private readonly AiAssistantOrchestrator _orchestrator;
     private readonly AzureSpeechOptions _speechOpts;
@@ -110,6 +114,7 @@ public class AiAssistantController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Query([FromBody] AiQueryRequest? req, CancellationToken ct)
     {
         // This controller extends Controller (not [ApiController]/ControllerBase), so ASP.NET
@@ -118,11 +123,34 @@ public class AiAssistantController : Controller
         if (req is null || string.IsNullOrWhiteSpace(req.Text))
             return BadRequest(new { error = _loc.T("Text is required") });
 
-        if (req.Text.Length > 500)
+        if (req.Text.Length > MaxTextLength)
             return BadRequest(new { error = _loc.T("Text exceeds maximum length of 500 characters") });
 
+        // The history is entirely client-supplied, so it is capped the same way req.Text is:
+        // per-turn length, total size, and an allow-list of roles (anything else would let a
+        // caller inject a "system"-looking turn or push an unbounded payload at the model).
+        List<ConversationTurn>? history = null;
+        if (req.History is { Count: > 0 })
+        {
+            var turns = req.History.TakeLast(MaxHistoryTurns).ToList();
+            var totalBytes = 0;
+            history = new List<ConversationTurn>(turns.Count);
+            foreach (var turn in turns)
+            {
+                var text = turn.Text ?? string.Empty;
+                if (text.Length > MaxHistoryTurnLength)
+                    return BadRequest(new { error = _loc.T("Conversation history is too large. Please clear the chat and try again.") });
+
+                totalBytes += System.Text.Encoding.UTF8.GetByteCount(text);
+                if (totalBytes > MaxHistoryBytes)
+                    return BadRequest(new { error = _loc.T("Conversation history is too large. Please clear the chat and try again.") });
+
+                var role = turn.Role == "assistant" ? "assistant" : "user";
+                history.Add(new ConversationTurn(role, text));
+            }
+        }
+
         var userId = _um.GetUserId(User)!;
-        var history = req.History?.TakeLast(12).ToList();
 
         try
         {

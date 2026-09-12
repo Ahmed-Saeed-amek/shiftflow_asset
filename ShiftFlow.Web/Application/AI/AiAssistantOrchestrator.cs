@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.Json;
 using Azure.AI.OpenAI;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
@@ -29,6 +31,7 @@ public class AiAssistantOrchestrator
     private readonly OpenAIOptions _openAiOpts;
     private readonly AzureOpenAIOptions _azureOpts;
     private readonly AiAssistantOptions _aiOpts;
+    private readonly ILogger<AiAssistantOrchestrator> _logger;
 
     public AiAssistantOrchestrator(
         IAiInspectionToolFunctions tools,
@@ -37,7 +40,8 @@ public class AiAssistantOrchestrator
         IAuditService audit,
         IOptions<OpenAIOptions> openAiOpts,
         IOptions<AzureOpenAIOptions> azureOpts,
-        IOptions<AiAssistantOptions> aiOpts)
+        IOptions<AiAssistantOptions> aiOpts,
+        ILogger<AiAssistantOrchestrator> logger)
     {
         _tools = tools;
         _repairGuidance = repairGuidance;
@@ -46,6 +50,7 @@ public class AiAssistantOrchestrator
         _openAiOpts = openAiOpts.Value;
         _azureOpts = azureOpts.Value;
         _aiOpts = aiOpts.Value;
+        _logger = logger;
     }
 
     public async Task<string> RunAsync(
@@ -102,11 +107,22 @@ public class AiAssistantOrchestrator
                 continue;
             }
 
-            return completion.Content[0].Text;
+            // Content is empty whenever the completion stopped for a reason other than a normal
+            // finish — a content filter, or the token limit hit before any text was emitted.
+            // Indexing [0] blindly threw an IndexOutOfRangeException into the 500 handler.
+            var text = completion.Content.Count > 0 ? completion.Content[0].Text : null;
+            if (!string.IsNullOrWhiteSpace(text)) return text;
+
+            _logger.LogWarning("AI completion returned no content (finish reason {Reason})", completion.FinishReason);
+            return NoReplyMessage(lang);
         }
 
         return lang == "ar" ? "لم أتمكن من إكمال الطلب. يرجى المحاولة مرة أخرى." : "I was unable to complete the request. Please try again.";
     }
+
+    private static string NoReplyMessage(string lang) => lang == "ar"
+        ? "لم أتمكن من إنشاء رد. يرجى إعادة صياغة سؤالك والمحاولة مرة أخرى."
+        : "I couldn't produce a reply. Please rephrase your question and try again.";
 
     private string BuildSystemPrompt(bool isManager, string lang)
     {
@@ -236,9 +252,23 @@ public class AiAssistantOrchestrator
 
             return result;
         }
+        catch (OperationCanceledException)
+        {
+            throw; // a cancelled request is the caller's business, not a tool error
+        }
         catch (InvalidOperationException ex)
         {
+            // Tool functions raise these deliberately with a user-facing message.
             return new { error = "action_failed", message = ex.Message };
+        }
+        catch (Exception ex)
+        {
+            // Anything else (DbUpdateException, KeyNotFoundException, HttpRequestException, …)
+            // used to abort the whole turn with a 500. Report it to the model as a failed tool
+            // call instead, so it can apologize or try a different approach. The exception text
+            // may contain internals, so only a generic message crosses back.
+            _logger.LogError(ex, "AI tool {Tool} failed", call.FunctionName);
+            return new { error = "action_failed", message = "That action failed unexpectedly. Tell the user it couldn't be completed." };
         }
     }
 
@@ -282,9 +312,16 @@ public class AiAssistantOrchestrator
     private static int? IntOpt(JsonElement args, string name) =>
         args.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
 
+    /// <summary>The model is told to send YYYY-MM-DD. Parsing that with the ambient culture made
+    /// the result depend on the server's locale (and would read 03/04 as April 3rd under en-GB),
+    /// so accept only these explicit formats, invariant.</summary>
+    private static readonly string[] DateFormats =
+        { "yyyy-MM-dd", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ssK", "yyyy-MM-dd HH:mm:ss" };
+
     private static DateTime? DateOpt(JsonElement args, string name) =>
         args.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
-            && DateTime.TryParse(v.GetString(), out var d) ? d : null;
+            && DateTime.TryParseExact(v.GetString(), DateFormats, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var d) ? d : null;
 
     private static List<int>? IntArrOpt(JsonElement args, string name) =>
         args.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array
