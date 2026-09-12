@@ -38,6 +38,7 @@ public static class Translations
         AddJs();
         AddOther();
         AddUiPass();
+        AddAiAssistant();
     }
 
     // ─── Navigation, page titles and section headers ───────────────────────────────
@@ -1722,6 +1723,43 @@ public static class Translations
         Ar["Work orders raised from a defect or a vendor job will show up here."] = "ستظهر هنا أوامر العمل الناتجة عن عطل أو عمل لدى مورد.";
         Ar["Zone Category"] = "فئة المنطقة";
         Ar["Reference Data"] = "البيانات المرجعية";
+    }
+
+    // ── AI assistant (drawer, chips, confirm flow) ──
+    private static void AddAiAssistant()
+    {
+        Ar["STEP Assistant"] = "مساعد STEP";
+        Ar["Open full page"] = "فتح الصفحة الكاملة";
+        Ar["Stop using this page as context"] = "إيقاف استخدام هذه الصفحة كسياق";
+        Ar["Suggested prompts"] = "اقتراحات";
+        Ar["Ask me anything…"] = "اسألني أي شيء…";
+        Ar["Viewing"] = "تعرض";
+        Ar["Retry"] = "إعادة المحاولة";
+        Ar["Copy reply"] = "نسخ الرد";
+        Ar["Copied"] = "تم النسخ";
+        Ar["Download"] = "تنزيل";
+        Ar["…and more"] = "…والمزيد";
+        Ar["Summarize"] = "تلخيص";
+        Ar["Summarize this order"] = "لخّص هذا الأمر";
+        Ar["Asset history"] = "سجل الأصل";
+        Ar["What's the asset's history?"] = "ما هو سجل الأصل؟";
+        Ar["Send to vendor"] = "إرسال إلى المورد";
+        Ar["Send to vendor…"] = "إرسال إلى المورد…";
+        Ar["Health summary"] = "ملخص الحالة";
+        Ar["Open work orders"] = "أوامر العمل المفتوحة";
+        Ar["Report a defect"] = "الإبلاغ عن عطل";
+        Ar["My attention"] = "يحتاج انتباهي";
+        Ar["What needs my attention today?"] = "ما الذي يحتاج انتباهي اليوم؟";
+        Ar["My open orders"] = "أوامري المفتوحة";
+        Ar["Low stock parts"] = "قطع غيار منخفضة المخزون";
+        Ar["Expiring contracts"] = "عقود على وشك الانتهاء";
+        Ar["Contracts expiring soon"] = "العقود التي ستنتهي قريبًا";
+        Ar["Export to Excel"] = "تصدير إلى Excel";
+        Ar["Export work orders to Excel"] = "تصدير أوامر العمل إلى Excel";
+        Ar["Confirmation token is required"] = "رمز التأكيد مطلوب";
+        Ar["Done — the action has been carried out."] = "تم تنفيذ الإجراء.";
+        Ar["That confirmation has expired, was already used, or isn't yours."] = "انتهت صلاحية هذا التأكيد أو تم استخدامه بالفعل أو أنه لا يخصك.";
+        Ar["You don't have permission to do that."] = "ليس لديك صلاحية للقيام بذلك.";
     }
 
     /// <summary>English falls back to the key itself, matching the React LanguageContext behavior.</summary>

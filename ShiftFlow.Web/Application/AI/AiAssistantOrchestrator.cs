@@ -268,6 +268,8 @@ public class AiAssistantOrchestrator
             : "a page";
         return $"\n\nThe user is currently viewing: {what} at {context.Page ?? "the app"}. " +
                "When they say 'this asset' / 'this order' / 'it', they mean that record — use its id directly " +
+               "with the tool for THAT entity type only (the id is a " + (context.EntityType ?? "record") + " id, never an asset id unless the entity type is Asset). " +
+               "To answer about a related record (e.g. the asset behind this work order), first call the detail tool for the viewed record and take the related id from its result " +
                "instead of searching for it.";
     }
 
@@ -353,7 +355,7 @@ public class AiAssistantOrchestrator
             PermissionCatalog.AssetView),
 
         new(ChatTool.CreateFunctionTool("getAssetHistory",
-            "Everything that has happened to one asset, newest first: inspections, work orders, maintenance orders, parts used and contracts.",
+            "Everything that has happened to one asset, newest first: inspections, work orders, maintenance orders, parts used and contracts. assetId is the asset's own numeric id (from searchAssets, getAssetDetail or the assetId field of an order detail) — never an order id.",
             BinaryData.FromString("""{"type":"object","properties":{"assetId":{"type":"integer"}},"required":["assetId"]}""")),
             PermissionCatalog.AssetView),
 

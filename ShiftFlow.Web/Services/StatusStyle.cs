@@ -109,6 +109,7 @@ public static class StatusStyle
         "Working", "Maintenance", "Defective",
         "New", "Assigned", "In Progress", "Open", "Dispatched", "Resolved", "Closed",
         "Sent to Vendor", "Blocked", "Fixed - Pending Confirmation",
+        "Draft", "Pending Approval", "Done", "Cancelled", "Overdue", "Low Stock", "Active", "Inactive", "Expired", "Retired", "Pending", "OK",
     ];
 
     /// <summary>Badge classes for a status name; <see cref="Default"/> when unmapped or null.
