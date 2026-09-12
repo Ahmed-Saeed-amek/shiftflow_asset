@@ -8,14 +8,16 @@
 }
 <partial name="_PageHeader" model="@(new PageHeaderModel{Title=Loc.T("Welcome back") + ", " + (string)ViewBag.UserName,Subtitle=Loc.T("Here's what's on your plate today")})" />
 
+@* Both KPIs are links into the list they count — the overdue one carries the filter, so the
+   number and the page you land on always agree. *@
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-6">
-        <a href="@Url.Action("MyOrders","Users")" class="text-decoration-none">
+        <a href="@Url.Action("MyOrders","Users")" class="text-decoration-none d-block h-100">
             <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("My Open Orders"),Value=ViewBag.OpenOrderCount.ToString(),Icon="bi-clipboard-check",Color="amber"})" />
         </a>
     </div>
     <div class="col-6 col-md-6">
-        <a href="@Url.Action("MyOrders","Users")" class="text-decoration-none">
+        <a href="@Url.Action("MyOrders","Users", new { overdue = "true" })" class="text-decoration-none d-block h-100">
             <partial name="_KpiCard" model="@(new KpiCardModel{Title=Loc.T("Overdue"),Value=ViewBag.OverdueOrderCount.ToString(),Icon="bi-alarm",Color="red"})" />
         </a>
     </div>
@@ -48,24 +50,29 @@
 
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-grid me-2"></i>@Loc.T("Quick Links")</div>
-            <div class="list-group list-group-flush">
-                <a asp-controller="Users" asp-action="MyOrders" class="list-group-item list-group-item-action"><i class="bi bi-list-check me-2 text-muted"></i>@Loc.T("My Orders")</a>
-                <a asp-controller="Users" asp-action="MyHistory" class="list-group-item list-group-item-action"><i class="bi bi-clock-history me-2 text-muted"></i>@Loc.T("My History")</a>
+            <div class="card-header bg-transparent border-0 fw-semibold"><i class="bi bi-grid me-2 text-primary"></i>@Loc.T("Quick Links")</div>
+            @* A 2x2 tile grid on desktop, a plain tappable list on phones (.quick-links in
+               site.css) — the same four destinations either way. *@
+            <div class="card-body quick-links">
+                <a asp-controller="Users" asp-action="MyOrders" class="quick-link">
+                    <i class="bi bi-list-check" aria-hidden="true"></i><span>@Loc.T("My Orders")</span>
+                </a>
+                <a asp-controller="Users" asp-action="MyHistory" class="quick-link">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i><span>@Loc.T("My History")</span>
+                </a>
                 @if (perms.CanReportAssetAction)
                 {
                     @* WorkOrders/Report needs an assetId, and the fastest way a field user has one
                        is the asset's own printed QR label — so this scans first, then opens the
                        report form for whatever was scanned. *@
-                    <button type="button" class="list-group-item list-group-item-action" id="quickReportAction">
-                        <i class="bi bi-megaphone me-2 text-muted"></i>@Loc.T("Report Action")
-                        <span class="d-block small text-muted">@Loc.T("Scan an asset's QR label to report an action on it")</span>
+                    <button type="button" class="quick-link" id="quickReportAction">
+                        <i class="bi bi-megaphone" aria-hidden="true"></i><span>@Loc.T("Report Action")</span>
                     </button>
                 }
                 @* Opens the shared QR modal from _Layout (site.js lazily loads the decoder) and
                    navigates straight to whatever asset was scanned. *@
-                <button type="button" class="list-group-item list-group-item-action" id="quickScanQr">
-                    <i class="bi bi-qr-code-scan me-2 text-muted"></i>@Loc.T("Scan QR Code")
+                <button type="button" class="quick-link" id="quickScanQr">
+                    <i class="bi bi-qr-code-scan" aria-hidden="true"></i><span>@Loc.T("Scan QR Code")</span>
                 </button>
             </div>
         </div>

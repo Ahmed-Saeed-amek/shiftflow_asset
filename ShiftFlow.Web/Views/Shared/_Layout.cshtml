@@ -144,9 +144,15 @@
             // when the user is actually on one of these pages.
             var hasAssetSettingsLinks = perms.CanViewAssets || perms.CanManageAssetCategories || perms.CanManageOrderTypes;
             var hasSettingsItem = hasAssetSettingsLinks || perms.CanViewGroups;
-            @if (perms.CanViewUsers || perms.CanManageRbac || perms.CanViewAuditLogs || perms.CanManageAssetScope || hasSettingsItem)
+            // For an Engineer this group holds nothing but lookup tables (Asset Categories,
+            // Zones) — calling that "Administration" implies powers they don't have and makes
+            // the section look like somewhere they shouldn't be. The heading only says
+            // "Administration" when the user actually holds one of the administrative
+            // permissions; otherwise it's "Reference Data".
+            var hasAdminLinks = perms.CanViewUsers || perms.CanManageRbac || perms.CanViewAuditLogs || perms.CanManageAssetScope;
+            @if (hasAdminLinks || hasSettingsItem)
             {
-                <li class="nav-section-label mt-3">@Loc.T("Administration")</li>
+                <li class="nav-section-label mt-3">@Loc.T(hasAdminLinks ? "Administration" : "Reference Data")</li>
                 @if (perms.CanViewUsers)
                 {
                     <li><a class="@NavCls("Users", "Index")" asp-controller="Users" asp-action="Index"><i class="bi bi-person-badge me-2"></i>@Loc.T("Users")</a></li>
@@ -178,7 +184,7 @@
                                 @if (perms.CanViewAssets)
                                 {
                                     <li><a class="@NavCls("AssetCategories")" asp-controller="AssetCategories" asp-action="Index"><i class="bi bi-diagram-2 me-2"></i>@Loc.T("Asset Categories")</a></li>
-                                    <li><a class="@NavCls("Zones")" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Asset Locations")</a></li>
+                                    <li><a class="@NavCls("Zones")" asp-controller="Zones" asp-action="Index"><i class="bi bi-map me-2"></i>@Loc.T("Zones")</a></li>
                                 }
                                 @if (perms.CanManageAssetCategories)
                                 {
@@ -245,7 +251,11 @@
 
     <div class="flex-grow-1 d-flex flex-column">
         <nav class="navbar bg-white border-bottom px-3 px-md-4 py-2 shadow-sm flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary me-3" id="sidebarToggle" aria-label="@Loc.T("Toggle menu")"><i class="bi bi-list fs-5"></i></button>
+            @* Kept at every width: below 992px it opens the sidebar drawer, at 992px+ it collapses the
+           always-visible sidebar to free content width (a real preference, persisted — see
+           initSidebar in site.js), so it is not hidden on desktop. *@
+        <button class="btn btn-sm btn-outline-secondary me-3" id="sidebarToggle" type="button"
+                aria-label="@Loc.T("Toggle menu")" title="@Loc.T("Toggle menu")"><i class="bi bi-list fs-5" aria-hidden="true"></i></button>
             <span class="fw-semibold text-primary">@ViewData["Title"]</span>
             <div class="ms-auto d-flex align-items-center gap-2 gap-md-3">
                 @* Server value is UTC; site.js re-renders it in the viewer's own timezone/locale. *@
