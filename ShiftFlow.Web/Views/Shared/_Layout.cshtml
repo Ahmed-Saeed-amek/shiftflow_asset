@@ -439,6 +439,16 @@
             <div class="modal-body text-center">
                 <video id="assetQrScanVideo" class="w-100 rounded bg-dark" playsinline muted style="max-height:60vh"></video>
                 <div id="assetQrScanStatus" class="small text-muted mt-2" role="status" aria-live="polite">@Loc.T("Point the camera at an asset's QR label…")</div>
+                @* No escape hatch existed here before — a denied/missing/broken camera left the user
+                   stuck on this modal with an explanation but no way to actually finish the task
+                   (confirmed live: this is the ONLY entry point for "Report Action" on My Home, so a
+                   camera failure blocked reporting entirely). A manual tag/name search is always
+                   available, independent of camera state. *@
+                <div class="position-relative mt-3 text-start">
+                    <input type="text" id="assetQrManualSearch" class="form-control form-control-sm" autocomplete="off"
+                           placeholder="@Loc.T("Or search by asset tag or name…")" />
+                    <div id="assetQrManualResults" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1056;max-height:200px;overflow:auto"></div>
+                </div>
             </div>
         </div>
     </div>

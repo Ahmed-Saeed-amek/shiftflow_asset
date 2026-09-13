@@ -692,6 +692,47 @@ window.scanAssetQr = function (onResolved) {
     if (!settled) { settled = true; stop(); onResolved(null); }
   });
 
+  // Manual fallback: independent of camera state, so a denied/missing/broken camera (or simply
+  // not having the physical asset in front of you) still lets the task finish. The modal element
+  // is reused across calls, so the search input/results wiring is attached ONCE (dataset guard,
+  // same idiom as initAssetPickers/initEmployeePickers) and rebinds only which `finish` callback
+  // it calls into on each new scanAssetQr invocation.
+  var manualSearch = document.getElementById('assetQrManualSearch');
+  var manualResults = document.getElementById('assetQrManualResults');
+  if (manualSearch && manualResults) {
+    manualSearch.value = '';
+    manualResults.classList.add('d-none');
+    manualResults.innerHTML = '';
+    window.__qrManualFinish = finish;
+    if (!manualSearch.dataset.qrInit) {
+      manualSearch.dataset.qrInit = '1';
+      var qrDebounce = null;
+      function runManualSearch() {
+        var q = manualSearch.value.trim();
+        if (!q) { manualResults.classList.add('d-none'); manualResults.innerHTML = ''; return; }
+        fetch('/Assets/Search?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (list) {
+            if (!list.length) { manualResults.innerHTML = '<div class="list-group-item small text-muted">' + t('noMatches', 'No matches') + '</div>'; manualResults.classList.remove('d-none'); return; }
+            manualResults.innerHTML = list.map(function (a) {
+              return '<button type="button" class="list-group-item list-group-item-action py-1 text-truncate" data-id="' + esc(a.id) + '" data-tag="' + esc(a.assetTag) + '" data-name="' + esc(a.name || '') + '">' +
+                     '<div class="fw-semibold small text-truncate">' + esc(a.assetTag) + '</div><div class="text-muted text-truncate" style="font-size:.72rem">' + esc(a.name || '') + '</div></button>';
+            }).join('');
+            manualResults.classList.remove('d-none');
+            manualResults.querySelectorAll('[data-id]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                manualResults.classList.add('d-none');
+                if (window.__qrManualFinish) window.__qrManualFinish({ id: Number(b.dataset.id), assetTag: b.dataset.tag, name: b.dataset.name });
+              });
+            });
+          })
+          .catch(function () { manualResults.classList.add('d-none'); });
+      }
+      manualSearch.addEventListener('input', function () { clearTimeout(qrDebounce); qrDebounce = setTimeout(runManualSearch, 220); });
+      document.addEventListener('click', function (e) { if (e.target !== manualSearch && !manualResults.contains(e.target)) manualResults.classList.add('d-none'); });
+    }
+  }
+
   // Open the modal before requesting the camera (not after) so a denial or "no camera" failure
   // shows an explanatory message in the modal itself instead of the button silently doing nothing.
   statusEl.textContent = messages.pointCamera;

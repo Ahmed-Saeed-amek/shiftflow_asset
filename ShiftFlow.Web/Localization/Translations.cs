@@ -870,6 +870,7 @@ public static class Translations
         Ar["Requires Vendor"] = "يتطلب مورداً";
         Ar["Resent to vendor."] = "أُعيد الإرسال إلى المورد.";
         Ar["Search by asset tag or name…"] = "ابحث بواسطة رمز الأصل أو الاسم…";
+        Ar["Or search by asset tag or name…"] = "أو ابحث بواسطة رمز الأصل أو الاسم…";
         Ar["Search by order # or asset tag…"] = "ابحث برقم الأمر أو رمز الأصل…";
         Ar["See the list of maintenance vendors"] = "عرض قائمة موردي الصيانة";
         Ar["See vendor contracts and which assets they cover"] = "عرض عقود الموردين والأصول التي تشملها";
