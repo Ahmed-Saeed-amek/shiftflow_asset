@@ -57,6 +57,13 @@ public class OrderCreationService : IOrderCreationService
         var orderType = await GetActiveOrderTypeAsync(request.OrderTypeId)
             ?? throw new InvalidOperationException("Invalid order type.");
 
+        // Nothing rejected a backdated Due Date on a brand-new order — a manager fighting the native
+        // date input's segment-jumping (day/month/year focus landing on the wrong segment) could
+        // create an order that shows as "Overdue" the instant it's saved, with no warning at all
+        // (found in a cold UX review, confirmed: no such check exists anywhere in the create path).
+        if (request.DueDate.HasValue && request.DueDate.Value.Date < DateTime.UtcNow.Date)
+            throw new InvalidOperationException("Due Date can't be in the past.");
+
         // Asset cardinality and assignment mode come from the OrderType, not from whichever inputs
         // the client happened to enable.
         var assetIds = orderType.AllowsMultipleAssets
