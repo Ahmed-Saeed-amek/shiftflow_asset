@@ -257,8 +257,19 @@ public class WorkOrderService : IWorkOrderService
         return totalCost;
     }
 
+    // Nothing rejected a future-dated Fix Completion Date on any of the three fix paths — a vendor
+    // (or employee) could report a fix "completed" months from now, and the work order would show
+    // that future date permanently with no warning (found in a cold vendor-portal UX review,
+    // confirmed: no such check exists in VendorFixAsync/EmployeeFixAsync/AdvanceWithoutVendorAsync).
+    private static void EnsureCompletionDateNotFuture(DateTime? completionDate)
+    {
+        if (completionDate.HasValue && completionDate.Value.Date > DateTime.UtcNow.Date)
+            throw new InvalidOperationException("Completion Date can't be in the future.");
+    }
+
     public async Task VendorFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string vendorUserId)
     {
+        EnsureCompletionDateNotFuture(completionDate);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
         if (wo.Stage != WorkOrderStages.SentToVendor) throw new InvalidOperationException("This work order isn't awaiting a vendor response.");
@@ -359,6 +370,7 @@ public class WorkOrderService : IWorkOrderService
 
     public async Task<WorkOrder> EmployeeFixAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string employeeUserId)
     {
+        EnsureCompletionDateNotFuture(completionDate);
         await EnsureWorkOrderActionableAsync(workOrderId, employeeUserId);
         var wo = await _db.WorkOrders.Include(w => w.Parts).FirstOrDefaultAsync(w => w.Id == workOrderId)
             ?? throw new InvalidOperationException("Work order not found.");
@@ -394,6 +406,7 @@ public class WorkOrderService : IWorkOrderService
     /// reported the fix.</summary>
     public async Task<WorkOrder> AdvanceWithoutVendorAsync(int workOrderId, DateTime? completionDate, List<(int SparePartId, int Quantity)> parts, string userId)
     {
+        EnsureCompletionDateNotFuture(completionDate);
         // Manager-ness is resolved here, not handed in by the caller. A manager acting outside
         // their own scope is still blocked; the assigned employee keeps access to their own
         // already-assigned work regardless of a scope narrowed/added afterward.
